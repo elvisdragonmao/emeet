@@ -1,5 +1,6 @@
 from meeting_backend.config import Settings
 from meeting_backend.transcription.faster_whisper_provider import FasterWhisperStreamingTranscriber
+from meeting_backend.transcription.mlx_whisper_provider import MlxWhisperStreamingTranscriber
 from meeting_backend.transcription.mock import MockStreamingTranscriber
 
 
@@ -14,6 +15,12 @@ def create_transcriber(settings: Settings):
             model_name=settings.whisper_model,
             device=settings.whisper_device,
             compute_type=settings.whisper_compute_type,
+            language=settings.whisper_language or None,
+            final_interval_ms=settings.final_interval_ms,
+        )
+    if settings.provider == "mlx-whisper":
+        return MlxWhisperStreamingTranscriber(
+            model_name=settings.whisper_model,
             language=settings.whisper_language or None,
             final_interval_ms=settings.final_interval_ms,
         )

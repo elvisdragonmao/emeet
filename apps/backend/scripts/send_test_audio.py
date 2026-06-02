@@ -17,8 +17,13 @@ def websocket_uri() -> str:
     return "ws://{}:{}/v1/transcribe/ws".format(host, port)
 
 
+def receive_timeout() -> float:
+    return float(os.getenv("MEETING_BACKEND_CLIENT_TIMEOUT", "10"))
+
+
 async def main() -> None:
     uri = websocket_uri()
+    timeout = receive_timeout()
     sample_rate = 16_000
     frame_ms = 100
     frame_bytes = int(sample_rate * frame_ms / 1000) * 2
@@ -52,7 +57,7 @@ async def main() -> None:
         await websocket.send(json.dumps({"type": "session.end"}))
         try:
             while True:
-                print(await asyncio.wait_for(websocket.recv(), timeout=0.5))
+                print(await asyncio.wait_for(websocket.recv(), timeout=timeout))
         except (asyncio.TimeoutError, websockets.ConnectionClosed):
             pass
 

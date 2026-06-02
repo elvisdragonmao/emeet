@@ -17,6 +17,10 @@ def websocket_uri() -> str:
     return "ws://{}:{}/v1/transcribe/ws".format(host, port)
 
 
+def receive_timeout() -> float:
+    return float(os.getenv("MEETING_BACKEND_CLIENT_TIMEOUT", "10"))
+
+
 async def stream_wav(path: str) -> None:
     with wave.open(path, "rb") as wav:
         channels = wav.getnchannels()
@@ -28,6 +32,7 @@ async def stream_wav(path: str) -> None:
         raise SystemExit("expected 16 kHz mono PCM16 wav")
 
     uri = websocket_uri()
+    timeout = receive_timeout()
     frame_ms = 100
     frame_bytes = int(sample_rate * frame_ms / 1000) * sample_width
 
@@ -53,7 +58,7 @@ async def stream_wav(path: str) -> None:
         await websocket.send(json.dumps({"type": "session.end"}))
         try:
             while True:
-                print(await asyncio.wait_for(websocket.recv(), timeout=2.0))
+                print(await asyncio.wait_for(websocket.recv(), timeout=timeout))
         except (asyncio.TimeoutError, websockets.ConnectionClosed):
             pass
 

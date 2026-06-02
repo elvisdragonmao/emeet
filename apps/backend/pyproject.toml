@@ -14,8 +14,15 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-stt = [
+faster-whisper = [
     "faster-whisper>=1.0,<2"
+]
+mlx-whisper = [
+    "mlx-whisper>=0.4,<1; platform_system == 'Darwin' and platform_machine == 'arm64'"
+]
+stt = [
+    "faster-whisper>=1.0,<2",
+    "mlx-whisper>=0.4,<1; platform_system == 'Darwin' and platform_machine == 'arm64'"
 ]
 
 [tool.setuptools.packages.find]

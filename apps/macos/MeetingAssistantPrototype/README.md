@@ -60,6 +60,15 @@ ws://127.0.0.1:8765/v1/transcribe/ws
 
 在 App 裡按 `Connect STT` 會自動開始麥克風擷取，並把音訊串流到 backend。若 backend 使用 `mock` provider，會先看到假的 partial/final transcript；若使用 `faster-whisper` provider，會跑本機開源模型。
 
+Apple Silicon 本機 demo 建議用 MLX backend：
+
+```bash
+cd ../../backend
+. .venv/bin/activate
+python -m pip install -e ".[mlx-whisper]"
+MEETING_BACKEND_PROVIDER=mlx-whisper MEETING_BACKEND_MODEL=large-v3-turbo ./scripts/dev.sh
+```
+
 App 也會讀取環境變數來切換 backend endpoint：
 
 ```bash
