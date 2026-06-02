@@ -20,6 +20,7 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(settings.assistant_provider, "mock")
         self.assertEqual(settings.assistant_model, "mock-conversation")
         self.assertEqual(settings.assistant_thinking, "medium")
+        self.assertEqual(settings.database_path, "data/meeting-assistant.sqlite3")
 
     def test_supports_short_model_alias_and_port(self) -> None:
         with patch.dict(
@@ -31,6 +32,7 @@ class ConfigTest(unittest.TestCase):
                 "MEETING_BACKEND_ASSISTANT_PROVIDER": "ollama",
                 "MEETING_BACKEND_ASSISTANT_MODEL": "llama3.2",
                 "MEETING_BACKEND_ASSISTANT_THINKING": "high",
+                "MEETING_BACKEND_DATABASE_PATH": "/tmp/meeting-test.sqlite3",
             },
             clear=True,
         ):
@@ -41,6 +43,7 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(settings.assistant_provider, "ollama")
         self.assertEqual(settings.assistant_model, "llama3.2")
         self.assertEqual(settings.assistant_thinking, "high")
+        self.assertEqual(settings.database_path, "/tmp/meeting-test.sqlite3")
 
     def test_supports_explicit_websocket_url(self) -> None:
         with patch.dict(

@@ -15,6 +15,8 @@ from meeting_backend.assistant.models import (
     AssistantResult,
     AssistantTranscriptLine,
 )
+from meeting_backend.assistant.prompts import build_messages
+from meeting_backend.assistant.schema import canonical_assistant_payload
 from meeting_backend.config import Settings
 
 
@@ -45,6 +47,7 @@ def generate_assistant_response(settings: Settings, request: AssistantRequest) -
     started_at = time.monotonic()
     raw_text = dispatch_provider(settings, request, provider, model, thinking)
     parsed = parse_assistant_json(raw_text)
+    payload = canonical_assistant_payload(parsed, raw_text)
     latency_ms = int((time.monotonic() - started_at) * 1000)
 
     return AssistantResult(
@@ -52,9 +55,9 @@ def generate_assistant_response(settings: Settings, request: AssistantRequest) -
         model=model,
         thinking=thinking,
         latency_ms=latency_ms,
-        drafts=normalize_drafts(parsed.get("drafts"), raw_text),
-        notes=normalize_notes(parsed.get("notes")),
-        actions=normalize_actions(parsed.get("actions")),
+        drafts=payload["drafts"],
+        notes=payload["notes"],
+        actions=payload["actions"],
         raw_text=raw_text,
     )
 
@@ -83,60 +86,6 @@ def dispatch_provider(
         return github_copilot_cli_completion(settings, model, messages, thinking)
 
     raise ValueError("unsupported assistant provider: {}".format(provider))
-
-
-def build_messages(request: AssistantRequest) -> List[Dict[str, str]]:
-    transcript = transcript_context(request.transcript)
-    action_instruction = {
-        "what_should_i_say": (
-            "Generate 2-3 concise, natural response suggestions the user can say next. "
-            "Prefer short spoken Chinese unless the transcript is clearly English."
-        ),
-        "follow_up_questions": (
-            "Generate 3 practical follow-up questions that clarify goals, constraints, ownership, or timeline."
-        ),
-        "meeting_notes": (
-            "Summarize meeting notes and next actions from the transcript. "
-            "Prefer concise notes and actions; drafts can be empty. "
-            "Do not guess owners or commitments that were not stated."
-        ),
-    }.get(request.action, "Help the user respond to the current meeting context.")
-
-    system = (
-        "You are a real-time meeting assistant. Use only the transcript context. "
-        "Do not invent facts. Return JSON only with keys drafts, notes, and actions. "
-        "drafts items need title, detail, badge, icon_name. "
-        "notes items need title and detail. "
-        "actions items need title, owner, and state."
-    )
-    user = (
-        "Action: {action}\n"
-        "Thinking setting requested by user: {thinking}\n"
-        "Instruction: {instruction}\n\n"
-        "Transcript:\n{transcript}\n\n"
-        "Return compact JSON only."
-    ).format(
-        action=request.action,
-        thinking=request.thinking,
-        instruction=action_instruction,
-        transcript=transcript,
-    )
-    return [
-        {"role": "system", "content": system},
-        {"role": "user", "content": user},
-    ]
-
-
-def transcript_context(lines: List[AssistantTranscriptLine]) -> str:
-    if not lines:
-        return "(No transcript yet.)"
-
-    formatted = []
-    for line in lines[-16:]:
-        source = line.source_label or line.source or "Unknown"
-        status = "final" if line.is_final else "partial"
-        formatted.append("[{} {}-{} {}] {}".format(source, line.start_ms, line.end_ms, status, line.text))
-    return "\n".join(formatted)
 
 
 def mock_completion(request: AssistantRequest, model: str, thinking: str) -> str:
@@ -542,69 +491,17 @@ def parse_assistant_json(text: str) -> Dict[str, Any]:
         return {}
 
     try:
-        return json.loads(stripped)
+        parsed = json.loads(stripped)
+        return parsed if isinstance(parsed, dict) else {}
     except json.JSONDecodeError:
         match = re.search(r"\{.*\}", stripped, re.DOTALL)
         if not match:
             return {}
         try:
-            return json.loads(match.group(0))
+            parsed = json.loads(match.group(0))
+            return parsed if isinstance(parsed, dict) else {}
         except json.JSONDecodeError:
             return {}
-
-
-def normalize_drafts(value: Any, raw_text: str) -> List[Dict[str, str]]:
-    if isinstance(value, list) and value:
-        drafts = [
-            {
-                "title": str(item.get("title") or "AI Suggestion"),
-                "detail": str(item.get("detail") or item.get("text") or ""),
-                "badge": str(item.get("badge") or "AI"),
-                "icon_name": str(item.get("icon_name") or item.get("iconName") or "sparkles"),
-            }
-            for item in value
-            if isinstance(item, dict)
-        ]
-        if drafts:
-            return drafts
-
-    return [
-        {
-            "title": "AI Suggestion",
-            "detail": raw_text.strip() or "No assistant response was generated.",
-            "badge": "AI",
-            "icon_name": "sparkles",
-        }
-    ]
-
-
-def normalize_notes(value: Any) -> List[Dict[str, str]]:
-    if not isinstance(value, list):
-        return []
-
-    return [
-        {
-            "title": str(item.get("title") or "Note"),
-            "detail": str(item.get("detail") or item.get("text") or ""),
-        }
-        for item in value
-        if isinstance(item, dict)
-    ]
-
-
-def normalize_actions(value: Any) -> List[Dict[str, str]]:
-    if not isinstance(value, list):
-        return []
-
-    return [
-        {
-            "title": str(item.get("title") or "Next action"),
-            "owner": str(item.get("owner") or "Unassigned"),
-            "state": str(item.get("state") or "Draft"),
-        }
-        for item in value
-        if isinstance(item, dict)
-    ]
 
 
 def latest_transcript_text(lines: List[AssistantTranscriptLine]) -> str:

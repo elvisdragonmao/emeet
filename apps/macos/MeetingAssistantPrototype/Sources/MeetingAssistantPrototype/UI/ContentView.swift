@@ -42,9 +42,17 @@ struct ContentView: View {
             .controlSize(.large)
 
             Button {
-                viewModel.connectTranscription()
+                viewModel.clearCurrentRecords()
             } label: {
-                Label("Connect STT", systemImage: "text.bubble.fill")
+                Label("Delete Records", systemImage: "trash")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+
+            Button {
+                viewModel.exportMeetingRecords()
+            } label: {
+                Label("Export", systemImage: "square.and.arrow.down")
             }
             .buttonStyle(.bordered)
             .controlSize(.large)
@@ -71,9 +79,7 @@ struct ContentView: View {
                 countLabel: viewModel.transcriptCountsLabel,
                 backendLatencyLabel: viewModel.backendLatencyLabel,
                 transcriptionLatencyLabel: viewModel.transcriptionLatencyLabel,
-                lines: viewModel.transcriptLines,
-                connectAction: viewModel.connectTranscription,
-                disconnectAction: viewModel.disconnectTranscription
+                lines: viewModel.transcriptLines
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 

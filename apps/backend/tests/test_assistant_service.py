@@ -81,6 +81,9 @@ class AssistantServiceTest(unittest.TestCase):
 
         self.assertEqual(parsed["drafts"][0]["title"], "A")
 
+    def test_parse_assistant_json_ignores_non_object_json(self) -> None:
+        self.assertEqual(parse_assistant_json('[{"title": "A"}]'), {})
+
     def test_codex_exec_command_skips_unsupported_approval_flag(self) -> None:
         help_text = """
         Options:

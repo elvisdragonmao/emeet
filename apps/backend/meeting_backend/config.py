@@ -9,6 +9,7 @@ DEFAULT_ASSISTANT_THINKING = "medium"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
 DEFAULT_WS_PATH = "/v1/transcribe/ws"
+DEFAULT_DATABASE_PATH = "data/meeting-assistant.sqlite3"
 
 
 @dataclass(frozen=True)
@@ -38,6 +39,7 @@ class Settings:
     assistant_timeout_ms: int = 20_000
     assistant_max_tokens: int = 700
     assistant_temperature: float = 0.2
+    database_path: str = DEFAULT_DATABASE_PATH
 
     @property
     def websocket_url(self) -> str:
@@ -102,6 +104,7 @@ def get_settings() -> Settings:
         assistant_timeout_ms=int(os.getenv("MEETING_BACKEND_ASSISTANT_TIMEOUT_MS", "20000")),
         assistant_max_tokens=int(os.getenv("MEETING_BACKEND_ASSISTANT_MAX_TOKENS", "700")),
         assistant_temperature=float(os.getenv("MEETING_BACKEND_ASSISTANT_TEMPERATURE", "0.2")),
+        database_path=env_first("MEETING_BACKEND_DATABASE_PATH", default=DEFAULT_DATABASE_PATH),
     )
 
 

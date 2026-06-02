@@ -6,8 +6,6 @@ struct TranscriptWorkspace: View {
     let backendLatencyLabel: String
     let transcriptionLatencyLabel: String
     let lines: [TranscriptLine]
-    let connectAction: () -> Void
-    let disconnectAction: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -26,17 +24,6 @@ struct TranscriptWorkspace: View {
                 LatencyReadout(title: "STT", value: transcriptionLatencyLabel)
                 SourceLegend(label: "Self", color: .blue)
                 SourceLegend(label: "Other", color: .green)
-
-                Button(action: connectAction) {
-                    Label("Connect", systemImage: "link")
-                }
-                .buttonStyle(.borderedProminent)
-
-                Button(action: disconnectAction) {
-                    Image(systemName: "link.badge.minus")
-                }
-                .buttonStyle(.bordered)
-                .help("Disconnect")
             }
 
             Divider()

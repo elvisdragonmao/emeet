@@ -6,6 +6,7 @@ from starlette.websockets import WebSocketDisconnect
 
 from meeting_backend.config import Settings
 from meeting_backend.protocol import error_event, parse_session_start, pong_event
+from meeting_backend.storage import MeetingStorage
 from meeting_backend.transcription import create_transcriber
 from meeting_backend.transcription.base import StreamingTranscriber
 
@@ -15,6 +16,8 @@ class TranscriptionSession:
         self.websocket = websocket
         self.settings = settings
         self.transcriber: Optional[StreamingTranscriber] = None
+        self.session_id: Optional[str] = None
+        self.storage = MeetingStorage(settings.database_path)
 
     async def run(self) -> None:
         await self.websocket.accept()
@@ -22,7 +25,13 @@ class TranscriptionSession:
         try:
             first_message = await self.websocket.receive_text()
             session = parse_session_start(json.loads(first_message))
+            self.session_id = session.session_id
             self.transcriber = create_transcriber(self.settings)
+            self.storage.record_session_start(
+                session,
+                provider=self.settings.provider,
+                model=self.settings.whisper_model,
+            )
             await self._send_many(self.transcriber.start(session))
 
             while True:
@@ -48,6 +57,8 @@ class TranscriptionSession:
         finally:
             if self.transcriber is not None:
                 await self._send_many(self.transcriber.finish())
+            if self.session_id is not None:
+                self.storage.record_session_end(self.session_id)
 
     async def _handle_text(self, text: str) -> None:
         payload = json.loads(text)
@@ -70,6 +81,7 @@ class TranscriptionSession:
 
     async def _send_many(self, events: Any) -> None:
         for event in events:
+            self.storage.record_transcript_event(event)
             await self._safe_send(event)
 
     async def _safe_send(self, event: Any) -> None:

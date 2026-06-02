@@ -59,9 +59,9 @@ App 預設連到：
 ws://127.0.0.1:8765/v1/transcribe/ws
 ```
 
-在 App 裡按 `Connect STT` 會自動開始麥克風擷取，並把音訊串流到 backend。若 backend 使用 `mock` provider，會先看到假的 partial/final transcript；若使用 `faster-whisper` provider，會跑本機開源模型。
+在 App 裡按 `Start Meeting` 會自動開始麥克風與系統音訊擷取、連上 STT backend，並把音訊串流到 backend。若 backend 使用 `mock` provider，會先看到假的 partial/final transcript；若使用 `faster-whisper` provider，會跑本機開源模型。
 
-右側的 action buttons 會呼叫 assistant backend，根據最近逐字稿產生 `What should I say?` 與 `Follow-up questions`。Meeting Notes 區塊會在 `Connect STT` 後顯示 30 秒圓形倒數，倒數結束時自動用 `meeting_notes` action 整理筆記與下一步行動。
+右側的 action buttons 會呼叫 assistant backend，根據最近逐字稿產生 `What should I say?` 與 `Follow-up questions`。Meeting Notes 區塊會在 `Start Meeting` 後顯示 30 秒圓形倒數，倒數結束時自動用 `meeting_notes` action 整理筆記與下一步行動。Header 也提供 `Delete Records` 清除目前記錄，以及 `Export` 匯出 Markdown 會議記錄與逐字稿。
 
 Apple Silicon 本機 demo 建議用 MLX backend：
 

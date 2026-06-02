@@ -214,7 +214,7 @@ GET /v1/assistant/providers
 
 ## Is There a Preprompt?
 
-有。現在的 preprompt 在 backend 的 `build_messages()` 裡，分成 system message 和 user message。
+有。現在的 preprompt 在 backend 的 `assistant/prompts.py` 裡，依 action 拆成獨立 template，再由 `build_messages()` 組成 system message 和 user message。
 
 system preprompt 的重點是：
 
@@ -241,14 +241,14 @@ user message 會放：
 - `follow_up_questions`：產生 3 個實用追問，聚焦目標、限制、責任歸屬或時程。
 - `meeting_notes`：根據逐字稿整理會議筆記與下一步。
 
-目前這是簡化版 prompt contract。下一階段應該把輸出 schema 版本化，例如 `suggested_reply_v1`、`follow_up_questions_v1`、`meeting_notes_v1`，再加 JSON Schema validation、重試和 evidence segment ids，降低模型格式漂移與幻覺風險。
+模型輸出會先經過 `assistant/schema.py` 的 JSON Schema-style validator。若模型回傳格式不完整，backend 會把可用欄位正規化成 `drafts`、`notes`、`actions`，再對正規化後的 payload 驗證一次，確保 UI 拿到固定結構。下一階段可再把 schema 版本化，例如 `suggested_reply_v1`、`follow_up_questions_v1`、`meeting_notes_v1`，並加入重試與 evidence segment ids。
 
 ## Meeting Notes and Next Actions
 
 目前 App 有兩層筆記邏輯：
 
 - 本地 draft：每收到一個 final transcript line，就用該段文字更新「最新重點」與「Review transcript segment」。
-- 自動整理：`Connect STT` 後，右側 Meeting Notes 會顯示 30 秒圓形倒數；倒數到 0 時，用最近 16 段 final transcript 呼叫 `/v1/assistant/respond` 的 `meeting_notes` action。
+- 自動整理：`Start Meeting` 後，App 會啟動音訊擷取、連上 STT backend，右側 Meeting Notes 會顯示 30 秒圓形倒數；倒數到 0 時，用最近 16 段 final transcript 呼叫 `/v1/assistant/respond` 的 `meeting_notes` action。
 - AI response：如果 auto summary 或按鈕請求回傳 `notes` / `actions`，UI 會用 provider 回來的內容取代本地 draft。
 
 目前的低頻增量管線：
@@ -383,16 +383,15 @@ python scripts/send_test_audio.py
 - 真實 STT provider 目前以 speech window 輸出 `transcript.final`，還不是完整 token-level streaming partial。
 - RMS VAD 很輕量，但不如 Silero/WebRTC VAD 穩，噪音環境需要再調參或替換。
 - `speaker_hint` 目前只根據來源推斷 `self` / `other`，不是完整 speaker diarization。
-- Assistant prompt 目前是簡化 JSON contract，還沒有正式 JSON Schema validator。
 - 會議聊天框還未成為獨立路由；目前優先完成兩個按鈕和筆記/action drafts。
-- 長會議的 rolling summary、SQLite append-only event log、evidence segment ids 還在規劃階段。
+- SQLite 目前保存 sessions、transcript segments、assistant suggestions、notes、actions，但還沒有完整 meeting-level join、查詢 API、匯出 API 或 evidence segment ids。
+- 長會議的 rolling summary 還在規劃階段。
 
 ## Next Technical Steps
 
-1. 把 transcript event 存成 append-only meeting event log。
-2. 加入 SQLite schema，保存 sessions、transcript segments、assistant suggestions、notes、actions。
-3. 把 assistant 輸出改成版本化 schema，加入 validator 與 retry。
-4. 增加 rolling summary，避免每次把整場逐字稿丟給模型。
-5. 將 `What should I say?`、`Follow-up questions`、`meeting_notes`、`chat` 拆成獨立 prompt/template。
-6. 測試 Zoom、Google Meet、Teams 的系統音訊擷取穩定性。
-7. 加入 latency metrics：capture-to-final、backend RTT、button-to-suggestion、notes refresh latency。
+1. 把 SQLite 資料加上 meeting-level 查詢 API 與匯出 API。
+2. 把 assistant schema 版本化，加入 invalid-output retry 與 evidence segment ids。
+3. 增加 rolling summary，避免每次把整場逐字稿丟給模型。
+4. 將 `chat` 補成前端可用的會議問答路由。
+5. 測試 Zoom、Google Meet、Teams 的系統音訊擷取穩定性。
+6. 加入 latency metrics：capture-to-final、backend RTT、button-to-suggestion、notes refresh latency。

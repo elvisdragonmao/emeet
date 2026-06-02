@@ -24,6 +24,7 @@ async def health():
         "assistant_provider": settings.assistant_provider,
         "assistant_model": settings.assistant_model,
         "assistant_thinking": settings.assistant_thinking,
+        "database_path": settings.database_path,
     }
 
 

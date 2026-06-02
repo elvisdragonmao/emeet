@@ -2,6 +2,7 @@ import AppKit
 import Combine
 import CoreGraphics
 import Foundation
+import UniformTypeIdentifiers
 
 @MainActor
 final class CaptureViewModel: ObservableObject {
@@ -40,10 +41,10 @@ final class CaptureViewModel: ObservableObject {
         MeetingActionDraft(title: "整理下一步", owner: "Unassigned", state: "Pending")
     ]
     @Published private(set) var autoSummaryRemainingSeconds = 30
-    @Published private(set) var autoSummaryStatusLabel = "Connect STT to start"
+    @Published private(set) var autoSummaryStatusLabel = "Start Meeting to begin"
     @Published private(set) var autoSummaryIsGenerating = false
     @Published private(set) var eventLog: [String] = [
-        "Ready. Start microphone and system audio capture to test inputs."
+        "Ready. Start Meeting begins capture, STT, and auto summaries."
     ]
 
     private let microphoneService = MicrophoneCaptureService()
@@ -201,8 +202,7 @@ final class CaptureViewModel: ObservableObject {
     }
 
     func startAll() {
-        startMicrophone()
-        startSystemAudio()
+        connectTranscription()
     }
 
     func stopAll() {
@@ -288,6 +288,44 @@ final class CaptureViewModel: ObservableObject {
         resetLatencyReadings()
         stopAutoSummaryCountdown()
         appendLog("Transcription backend disconnected.")
+    }
+
+    func clearCurrentRecords() {
+        autoSummaryRequestGeneration += 1
+        autoSummaryIsGenerating = false
+        transcriptLines.removeAll()
+        resetLatencyReadings()
+        resetMeetingDrafts()
+        resetAssistantDrafts()
+        hasAutomaticSummary = false
+
+        if transcriptionStatus == .starting || transcriptionStatus == .running {
+            resetAutoSummaryCountdown(status: "Records cleared")
+        } else {
+            autoSummaryRemainingSeconds = autoSummaryIntervalSeconds
+            autoSummaryStatusLabel = "Start Meeting to begin"
+        }
+
+        appendLog("Current meeting records cleared.")
+    }
+
+    func exportMeetingRecords() {
+        let panel = NSSavePanel()
+        panel.title = "Export Meeting Record"
+        panel.nameFieldStringValue = "meeting-record-\(fileTimestamp()).md"
+        panel.allowedContentTypes = [UTType(filenameExtension: "md") ?? .plainText]
+        panel.canCreateDirectories = true
+
+        guard panel.runModal() == .OK, let url = panel.url else {
+            return
+        }
+
+        do {
+            try exportMarkdown().write(to: url, atomically: true, encoding: .utf8)
+            appendLog("Meeting record exported: \(url.lastPathComponent)")
+        } catch {
+            appendLog("Export failed: \(error.localizedDescription)")
+        }
     }
 
     func prepareWhatShouldISay() {
@@ -549,7 +587,7 @@ final class CaptureViewModel: ObservableObject {
         autoSummaryRequestGeneration += 1
         autoSummaryIsGenerating = false
         autoSummaryRemainingSeconds = autoSummaryIntervalSeconds
-        autoSummaryStatusLabel = "Connect STT to start"
+        autoSummaryStatusLabel = "Start Meeting to begin"
     }
 
     private func tickAutoSummaryCountdown() {
@@ -700,6 +738,19 @@ final class CaptureViewModel: ObservableObject {
         ]
     }
 
+    private func resetAssistantDrafts() {
+        assistantModeLabel = "Ready"
+        assistantStatus = .idle
+        assistantDrafts = [
+            AssistantDraft(
+                title: "回覆策略",
+                detail: "等待逐字稿事件後，這裡會放可直接說出口的短句草稿。",
+                badge: "Draft",
+                iconName: "quote.bubble"
+            )
+        ]
+    }
+
     private func latestTranscriptText() -> String {
         guard let text = transcriptLines.last(where: { $0.isFinal })?.text ?? transcriptLines.last?.text else {
             return "對方剛剛提出的重點"
@@ -713,9 +764,83 @@ final class CaptureViewModel: ObservableObject {
         return trimmed.count > 24 ? "\(trimmed.prefix(24))..." : trimmed
     }
 
+    private func exportMarkdown() -> String {
+        var lines: [String] = []
+        lines.append("# Meeting Record")
+        lines.append("")
+        lines.append("- Exported: \(displayTimestamp())")
+        lines.append("- STT endpoint: \(transcriptionEndpointLabel)")
+        lines.append("- Assistant provider: \(assistantProviderID)")
+        lines.append("- Assistant model: \(assistantModel)")
+        lines.append("")
+        lines.append("## Meeting Notes")
+        lines.append("")
+        if noteDrafts.isEmpty {
+            lines.append("_No meeting notes yet._")
+        } else {
+            for note in noteDrafts {
+                lines.append("### \(note.title)")
+                lines.append(note.detail)
+                lines.append("")
+            }
+        }
+
+        lines.append("## Next Actions")
+        lines.append("")
+        if actionDrafts.isEmpty {
+            lines.append("_No next actions yet._")
+        } else {
+            for action in actionDrafts {
+                lines.append("- [ ] \(action.title)  ")
+                lines.append("  Owner: \(action.owner)  ")
+                lines.append("  State: \(action.state)")
+            }
+        }
+
+        lines.append("")
+        lines.append("## AI Suggestions")
+        lines.append("")
+        if assistantDrafts.isEmpty {
+            lines.append("_No assistant suggestions yet._")
+        } else {
+            for draft in assistantDrafts {
+                lines.append("### \(draft.title)")
+                lines.append("- Badge: \(draft.badge)")
+                lines.append("- Suggestion: \(draft.detail)")
+                lines.append("")
+            }
+        }
+
+        lines.append("## Transcript")
+        lines.append("")
+        if transcriptLines.isEmpty {
+            lines.append("_No transcript yet._")
+        } else {
+            for line in transcriptLines {
+                let status = line.isFinal ? "Final" : "Partial"
+                lines.append("- `\(line.timeRangeLabel)` **\(line.sourceLabel)** (\(status), \(line.provider)): \(line.text)")
+            }
+        }
+
+        lines.append("")
+        return lines.joined(separator: "\n")
+    }
+
     private func shortTimeLabel() -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm:ss"
+        return formatter.string(from: Date())
+    }
+
+    private func displayTimestamp() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return formatter.string(from: Date())
+    }
+
+    private func fileTimestamp() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
         return formatter.string(from: Date())
     }
 

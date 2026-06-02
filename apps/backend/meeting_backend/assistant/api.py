@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from meeting_backend.assistant.models import AssistantRequest, AssistantTranscriptLine
 from meeting_backend.assistant.service import generate_assistant_response, list_provider_descriptors
 from meeting_backend.config import get_settings
+from meeting_backend.storage import MeetingStorage
 
 router = APIRouter(prefix="/v1/assistant", tags=["assistant"])
 
@@ -65,4 +66,5 @@ async def respond(body: AssistantRespondBody):
     except Exception as error:
         raise HTTPException(status_code=502, detail=str(error)) from error
 
+    await asyncio.to_thread(MeetingStorage(settings.database_path).record_assistant_result, request, result)
     return result.to_dict()
