@@ -41,7 +41,7 @@ sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 第一次測試需要授權：
 
 - Microphone：對麥克風說話後，Microphone 波形應該會動。
-- Screen Recording：授權後可能要重開 App；播放 YouTube、音樂或會議聲音後，System Audio 波形應該會動。
+- Screen Recording：App 視窗開啟時會自動請求；授權後可能要重開 App。播放 YouTube、音樂或會議聲音後，System Audio 波形應該會動。
 
 ## Local transcription
 

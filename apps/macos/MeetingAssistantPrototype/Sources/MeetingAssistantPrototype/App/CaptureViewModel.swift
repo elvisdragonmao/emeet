@@ -59,6 +59,7 @@ final class CaptureViewModel: ObservableObject {
     private var autoSummaryTask: Task<Void, Never>?
     private var hasAutomaticSummary = false
     private var autoSummaryRequestGeneration = 0
+    private var didRequestScreenRecordingPermission = false
 
     init(transcriptionBackend: TranscriptionBackendConfig = .fromEnvironment()) {
         self.transcriptionBackend = transcriptionBackend
@@ -203,6 +204,27 @@ final class CaptureViewModel: ObservableObject {
 
     func startAll() {
         connectTranscription()
+    }
+
+    func requestScreenRecordingPermissionOnLaunch() {
+        guard !didRequestScreenRecordingPermission else {
+            return
+        }
+
+        didRequestScreenRecordingPermission = true
+        guard !CGPreflightScreenCaptureAccess() else {
+            appendLog("Screen Recording permission is available.")
+            return
+        }
+
+        appendLog("Requesting Screen Recording permission...")
+        let granted = CGRequestScreenCaptureAccess()
+        if granted {
+            appendLog("Screen Recording permission granted.")
+        } else {
+            systemAudioStatus = .failed("螢幕錄製權限尚未授權。授權後通常需要重新啟動 App。")
+            appendLog("Screen Recording permission is not granted yet.")
+        }
     }
 
     func stopAll() {

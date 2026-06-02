@@ -11,6 +11,9 @@ struct ContentView: View {
         }
         .frame(minWidth: 1180, minHeight: 760)
         .background(Color(nsColor: .windowBackgroundColor))
+        .task {
+            viewModel.requestScreenRecordingPermissionOnLaunch()
+        }
     }
 
     private var header: some View {
