@@ -49,8 +49,13 @@ PROMPT_TEMPLATES: Dict[str, PromptTemplate] = {
         action="meeting_notes",
         system=BASE_SYSTEM_PROMPT,
         instruction=(
-            "Summarize meeting notes and next actions from the transcript. Prefer concise notes. "
-            "Actions should only include stated or strongly implied next steps. Do not guess owners."
+            "Generate a structured meeting record, not a one-sentence summary. "
+            "Use the notes array as fixed meeting-record sections with these titles when applicable: "
+            "討論主題與內容, 目前結論, 待討論事項, 未解決問題. "
+            "Each note detail should be 2-5 concise bullet points separated by newlines when enough context exists. "
+            "Use the actions array for CTA / next actions only. Each action should include the task, owner if stated "
+            "or Unassigned if not stated, and a state such as Draft, Confirmed, Waiting, or Blocked. "
+            "Do not guess owners, due dates, conclusions, or commitments that were not stated."
         ),
     ),
     "chat": PromptTemplate(

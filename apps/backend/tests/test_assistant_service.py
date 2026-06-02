@@ -62,8 +62,10 @@ class AssistantServiceTest(unittest.TestCase):
 
         result = generate_assistant_response(Settings(), request)
 
-        self.assertGreaterEqual(len(result.notes), 1)
+        self.assertGreaterEqual(len(result.notes), 4)
         self.assertGreaterEqual(len(result.actions), 1)
+        self.assertIn("討論主題與內容", [note["title"] for note in result.notes])
+        self.assertIn("未解決問題", [note["title"] for note in result.notes])
         self.assertIn("demo checklist", result.raw_text or "")
 
     def test_provider_descriptors_include_mock_and_cli_entries(self) -> None:

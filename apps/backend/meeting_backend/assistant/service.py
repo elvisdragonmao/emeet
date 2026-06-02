@@ -121,12 +121,20 @@ def mock_completion(request: AssistantRequest, model: str, thinking: str) -> str
             "drafts": [],
             "notes": [
                 {
-                    "title": "自動會議摘要",
-                    "detail": "已根據最近 {} 段逐字稿整理，目前最新重點是：{}".format(final_count, latest),
+                    "title": "討論主題與內容",
+                    "detail": "- 已根據最近 {} 段逐字稿整理。\n- 最新討論內容：{}".format(final_count, latest),
                 },
                 {
-                    "title": "未決問題",
-                    "detail": "請確認責任歸屬、時程、限制或風險是否已經明確說出。",
+                    "title": "目前結論",
+                    "detail": "- 逐字稿尚未提供明確決策時，維持草稿狀態。\n- 只保留 transcript 中已說出的結論。",
+                },
+                {
+                    "title": "待討論事項",
+                    "detail": "- 補齊尚未確認的時程、範圍與決策標準。\n- 確認是否需要更多資料或 demo 檢查清單。",
+                },
+                {
+                    "title": "未解決問題",
+                    "detail": "- 責任歸屬是否明確？\n- 是否有風險、限制或依賴尚未確認？",
                 },
             ],
             "actions": [

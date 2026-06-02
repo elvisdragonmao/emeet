@@ -291,6 +291,8 @@ Assistant prompts are split by action in `meeting_backend/assistant/prompts.py`:
 - `meeting_notes`
 - `chat`
 
+`meeting_notes` uses a fixed meeting-record template: discussion topics/content, current conclusions, items still to discuss, unresolved questions, and CTA / next actions.
+
 Provider output is parsed as JSON and validated by `meeting_backend/assistant/schema.py`. The validated response contract is:
 
 ```json

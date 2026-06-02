@@ -9,7 +9,7 @@ struct ContentView: View {
             Divider()
             workspace
         }
-        .frame(minWidth: 1180, minHeight: 760)
+        .frame(minWidth: 760, minHeight: 560)
         .background(Color(nsColor: .windowBackgroundColor))
         .task {
             viewModel.requestScreenRecordingPermissionOnLaunch()
@@ -17,17 +17,39 @@ struct ContentView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 18) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Meeting Assistant")
-                    .font(.system(size: 23, weight: .semibold))
-                Text(viewModel.transcriptionEndpointLabel)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 18) {
+                headerTitle
+                Spacer()
+                statusBadges
+                headerActions
             }
 
-            Spacer()
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 14) {
+                    headerTitle
+                    Spacer()
+                    headerActions
+                }
+                statusBadges
+            }
+        }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 18)
+    }
 
+    private var headerTitle: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Meeting Assistant")
+                .font(.system(size: 23, weight: .semibold))
+            Text(viewModel.transcriptionEndpointLabel)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var statusBadges: some View {
+        HStack(spacing: 18) {
             StatusBadge(title: "Mic", status: viewModel.microphoneStatus)
             StatusBadge(title: "System", status: viewModel.systemAudioStatus)
             StatusBadge(
@@ -35,7 +57,11 @@ struct ContentView: View {
                 status: viewModel.transcriptionStatus,
                 detail: viewModel.transcriptionStatusDetailLabel
             )
+        }
+    }
 
+    private var headerActions: some View {
+        HStack(spacing: 10) {
             Button {
                 viewModel.toggleMeeting()
             } label: {
@@ -45,7 +71,6 @@ struct ContentView: View {
                 )
             }
             .buttonStyle(.borderedProminent)
-            .controlSize(.large)
 
             Button {
                 viewModel.clearCurrentRecords()
@@ -53,7 +78,6 @@ struct ContentView: View {
                 Label("Delete Records", systemImage: "trash")
             }
             .buttonStyle(.bordered)
-            .controlSize(.large)
 
             Button {
                 viewModel.exportMeetingRecords()
@@ -61,58 +85,90 @@ struct ContentView: View {
                 Label("Export", systemImage: "square.and.arrow.down")
             }
             .buttonStyle(.bordered)
-            .controlSize(.large)
-
         }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 18)
+        .controlSize(.large)
     }
 
     private var workspace: some View {
+        GeometryReader { proxy in
+            if proxy.size.width < 1040 {
+                ScrollView {
+                    compactWorkspace
+                        .padding(18)
+                }
+            } else {
+                regularWorkspace
+                    .padding(18)
+            }
+        }
+    }
+
+    private var regularWorkspace: some View {
         HStack(alignment: .top, spacing: 18) {
             sidebar
                 .frame(width: 285)
 
-            TranscriptWorkspace(
-                status: viewModel.transcriptionStatus,
-                countLabel: viewModel.transcriptCountsLabel,
-                backendLatencyLabel: viewModel.backendLatencyLabel,
-                transcriptionLatencyLabel: viewModel.transcriptionLatencyLabel,
-                lines: viewModel.transcriptLines
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            transcriptPanel
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            AssistantWorkspace(
-                modeLabel: viewModel.assistantModeLabel,
-                statusLabel: viewModel.assistantStatusLabel,
-                providerOptions: viewModel.assistantProviderOptions,
-                selectedProviderID: Binding(
-                    get: { viewModel.assistantProviderID },
-                    set: { viewModel.selectAssistantProvider($0) }
-                ),
-                model: Binding(
-                    get: { viewModel.assistantModel },
-                    set: { viewModel.updateAssistantModel($0) }
-                ),
-                modelOptions: viewModel.assistantModelOptions,
-                thinking: Binding(
-                    get: { viewModel.assistantThinking },
-                    set: { viewModel.updateAssistantThinking($0) }
-                ),
-                drafts: viewModel.assistantDrafts,
-                notes: viewModel.noteDrafts,
-                actions: viewModel.actionDrafts,
-                autoSummaryRemainingSeconds: viewModel.autoSummaryRemainingSeconds,
-                autoSummaryProgress: viewModel.autoSummaryProgress,
-                autoSummaryStatusLabel: viewModel.autoSummaryStatusLabel,
-                autoSummaryIsGenerating: viewModel.autoSummaryIsGenerating,
-                refreshProvidersAction: viewModel.refreshAssistantProviders,
-                whatShouldISayAction: viewModel.prepareWhatShouldISay,
-                followUpAction: viewModel.prepareFollowUpQuestions
-            )
-            .frame(width: 360)
+            assistantPanel
+                .frame(width: 360)
         }
-        .padding(18)
+    }
+
+    private var compactWorkspace: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            sidebar
+                .frame(maxWidth: .infinity)
+
+            transcriptPanel
+                .frame(maxWidth: .infinity, minHeight: 360)
+
+            assistantPanel
+                .frame(maxWidth: .infinity)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var transcriptPanel: some View {
+        TranscriptWorkspace(
+            status: viewModel.transcriptionStatus,
+            countLabel: viewModel.transcriptCountsLabel,
+            backendLatencyLabel: viewModel.backendLatencyLabel,
+            transcriptionLatencyLabel: viewModel.transcriptionLatencyLabel,
+            lines: viewModel.transcriptLines
+        )
+    }
+
+    private var assistantPanel: some View {
+        AssistantWorkspace(
+            modeLabel: viewModel.assistantModeLabel,
+            statusLabel: viewModel.assistantStatusLabel,
+            providerOptions: viewModel.assistantProviderOptions,
+            selectedProviderID: Binding(
+                get: { viewModel.assistantProviderID },
+                set: { viewModel.selectAssistantProvider($0) }
+            ),
+            model: Binding(
+                get: { viewModel.assistantModel },
+                set: { viewModel.updateAssistantModel($0) }
+            ),
+            modelOptions: viewModel.assistantModelOptions,
+            thinking: Binding(
+                get: { viewModel.assistantThinking },
+                set: { viewModel.updateAssistantThinking($0) }
+            ),
+            drafts: viewModel.assistantDrafts,
+            notes: viewModel.noteDrafts,
+            actions: viewModel.actionDrafts,
+            autoSummaryRemainingSeconds: viewModel.autoSummaryRemainingSeconds,
+            autoSummaryProgress: viewModel.autoSummaryProgress,
+            autoSummaryStatusLabel: viewModel.autoSummaryStatusLabel,
+            autoSummaryIsGenerating: viewModel.autoSummaryIsGenerating,
+            refreshProvidersAction: viewModel.refreshAssistantProviders,
+            whatShouldISayAction: viewModel.prepareWhatShouldISay,
+            followUpAction: viewModel.prepareFollowUpQuestions
+        )
     }
 
     private var sidebar: some View {

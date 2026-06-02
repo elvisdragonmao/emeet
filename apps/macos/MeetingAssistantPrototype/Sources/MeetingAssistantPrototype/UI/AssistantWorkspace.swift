@@ -20,65 +20,68 @@ struct AssistantWorkspace: View {
     let followUpAction: () -> Void
 
     var body: some View {
-        VStack(spacing: 14) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Assistant")
-                            .font(.title3.weight(.semibold))
-                        Text(modeLabel)
-                            .font(.caption)
+        ScrollView {
+            VStack(spacing: 14) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Assistant")
+                                .font(.title3.weight(.semibold))
+                            Text(modeLabel)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Spacer()
+
+                        Text(statusLabel)
+                            .font(.caption.weight(.medium))
                             .foregroundStyle(.secondary)
                     }
 
-                    Spacer()
-
-                    Text(statusLabel)
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.secondary)
-                }
-
-                AssistantSettingsBar(
-                    providerOptions: providerOptions,
-                    selectedProviderID: selectedProviderID,
-                    model: model,
-                    modelOptions: modelOptions,
-                    thinking: thinking,
-                    refreshAction: refreshProvidersAction
-                )
-
-                HStack(spacing: 10) {
-                    AssistantActionButton(
-                        title: "What should I say?",
-                        iconName: "quote.bubble.fill",
-                        color: .blue,
-                        action: whatShouldISayAction
+                    AssistantSettingsBar(
+                        providerOptions: providerOptions,
+                        selectedProviderID: selectedProviderID,
+                        model: model,
+                        modelOptions: modelOptions,
+                        thinking: thinking,
+                        refreshAction: refreshProvidersAction
                     )
 
-                    AssistantActionButton(
-                        title: "Follow-up questions",
-                        iconName: "questionmark.bubble.fill",
-                        color: .green,
-                        action: followUpAction
-                    )
-                }
+                    HStack(spacing: 10) {
+                        AssistantActionButton(
+                            title: "What should I say?",
+                            iconName: "quote.bubble.fill",
+                            color: .blue,
+                            action: whatShouldISayAction
+                        )
 
-                VStack(spacing: 10) {
-                    ForEach(drafts) { draft in
-                        AssistantDraftView(draft: draft)
+                        AssistantActionButton(
+                            title: "Follow-up questions",
+                            iconName: "questionmark.bubble.fill",
+                            color: .green,
+                            action: followUpAction
+                        )
+                    }
+
+                    VStack(spacing: 10) {
+                        ForEach(drafts) { draft in
+                            AssistantDraftView(draft: draft)
+                        }
                     }
                 }
-            }
-            .panelStyle()
+                .panelStyle()
 
-            NotesWorkspace(
-                notes: notes,
-                actions: actions,
-                autoSummaryRemainingSeconds: autoSummaryRemainingSeconds,
-                autoSummaryProgress: autoSummaryProgress,
-                autoSummaryStatusLabel: autoSummaryStatusLabel,
-                autoSummaryIsGenerating: autoSummaryIsGenerating
-            )
+                NotesWorkspace(
+                    notes: notes,
+                    actions: actions,
+                    autoSummaryRemainingSeconds: autoSummaryRemainingSeconds,
+                    autoSummaryProgress: autoSummaryProgress,
+                    autoSummaryStatusLabel: autoSummaryStatusLabel,
+                    autoSummaryIsGenerating: autoSummaryIsGenerating
+                )
+            }
+            .frame(maxWidth: .infinity)
         }
     }
 }

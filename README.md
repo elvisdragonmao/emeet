@@ -239,7 +239,7 @@ user message 會放：
 
 - `what_should_i_say`：產生 2 到 3 句自然、簡短、可直接說出口的回覆。若逐字稿不是明顯英文，優先用口語中文。
 - `follow_up_questions`：產生 3 個實用追問，聚焦目標、限制、責任歸屬或時程。
-- `meeting_notes`：根據逐字稿整理會議筆記與下一步。
+- `meeting_notes`：依固定會議記錄 template 整理「討論主題與內容、目前結論、待討論事項、未解決問題」和 CTA / next actions。
 
 模型輸出會先經過 `assistant/schema.py` 的 JSON Schema-style validator。若模型回傳格式不完整，backend 會把可用欄位正規化成 `drafts`、`notes`、`actions`，再對正規化後的 payload 驗證一次，確保 UI 拿到固定結構。下一階段可再把 schema 版本化，例如 `suggested_reply_v1`、`follow_up_questions_v1`、`meeting_notes_v1`，並加入重試與 evidence segment ids。
 
