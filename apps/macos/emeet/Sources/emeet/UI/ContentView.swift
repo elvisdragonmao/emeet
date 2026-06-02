@@ -165,6 +165,9 @@ struct ContentView: View {
             autoSummaryProgress: viewModel.autoSummaryProgress,
             autoSummaryStatusLabel: viewModel.autoSummaryStatusLabel,
             autoSummaryIsGenerating: viewModel.autoSummaryIsGenerating,
+            quickActionsDisabled: viewModel.isAssistantActionRunning,
+            whatShouldISayIsLoading: viewModel.isWhatShouldISayLoading,
+            followUpIsLoading: viewModel.isFollowUpQuestionsLoading,
             refreshProvidersAction: viewModel.refreshAssistantProviders,
             whatShouldISayAction: viewModel.prepareWhatShouldISay,
             followUpAction: viewModel.prepareFollowUpQuestions

@@ -26,6 +26,7 @@ final class CaptureViewModel: ObservableObject {
     @Published private(set) var assistantModel = "gpt-5.5"
     @Published private(set) var assistantThinking = AssistantThinking.medium.rawValue
     @Published private(set) var assistantDrafts: [AssistantDraft] = []
+    @Published private(set) var activeAssistantAction: AssistantQuickAction?
     @Published private(set) var noteDrafts: [MeetingNoteDraft] = []
     @Published private(set) var actionDrafts: [MeetingActionDraft] = []
     @Published private(set) var autoSummaryRemainingSeconds = 30
@@ -47,6 +48,7 @@ final class CaptureViewModel: ObservableObject {
     private var autoSummaryTask: Task<Void, Never>?
     private var hasAutomaticSummary = false
     private var autoSummaryRequestGeneration = 0
+    private var assistantRequestGeneration = 0
     private var didRequestScreenRecordingPermission = false
 
     init(transcriptionBackend: TranscriptionBackendConfig = .fromEnvironment()) {
@@ -188,6 +190,18 @@ final class CaptureViewModel: ObservableObject {
         case .failed(let message):
             return message
         }
+    }
+
+    var isAssistantActionRunning: Bool {
+        activeAssistantAction != nil
+    }
+
+    var isWhatShouldISayLoading: Bool {
+        activeAssistantAction == .whatShouldISay
+    }
+
+    var isFollowUpQuestionsLoading: Bool {
+        activeAssistantAction == .followUpQuestions
     }
 
     var autoSummaryProgress: Double {
@@ -372,11 +386,11 @@ final class CaptureViewModel: ObservableObject {
     }
 
     func prepareWhatShouldISay() {
-        runAssistant(action: "what_should_i_say", label: "What should I say?")
+        runAssistant(.whatShouldISay)
     }
 
     func prepareFollowUpQuestions() {
-        runAssistant(action: "follow_up_questions", label: "Follow-up questions")
+        runAssistant(.followUpQuestions)
     }
 
     func refreshAssistantProviders() {
@@ -514,21 +528,21 @@ final class CaptureViewModel: ObservableObject {
         }
     }
 
-    private func runAssistant(action: String, label: String) {
+    private func runAssistant(_ quickAction: AssistantQuickAction) {
+        guard activeAssistantAction == nil else {
+            appendLog("Assistant request ignored because another quick action is still running.")
+            return
+        }
+
+        activeAssistantAction = quickAction
+        assistantRequestGeneration += 1
+        let requestGeneration = assistantRequestGeneration
         assistantStatus = .starting
-        assistantModeLabel = "\(label) · \(assistantProviderID)"
-        assistantDrafts = [
-            AssistantDraft(
-                title: "Generating",
-                detail: "AI 正在根據最近逐字稿產生建議。",
-                badge: assistantThinking,
-                iconName: "sparkles"
-            )
-        ]
-        appendLog("Requesting assistant response: \(label).")
+        assistantModeLabel = "\(quickAction.label) · \(assistantProviderID)"
+        appendLog("Requesting assistant response: \(quickAction.label).")
 
         let request = AssistantRespondRequest(
-            action: action,
+            action: quickAction.requestAction,
             provider: assistantProviderID,
             model: assistantModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 ? "gpt-5.5"
@@ -540,19 +554,19 @@ final class CaptureViewModel: ObservableObject {
         Task {
             do {
                 let response = try await assistantClient.respond(request)
-                applyAssistantResponse(response, label: label)
+                if requestGeneration == assistantRequestGeneration {
+                    applyAssistantResponse(response, label: quickAction.label)
+                }
             } catch {
-                assistantStatus = .failed(error.localizedDescription)
-                assistantModeLabel = "AI error"
-                assistantDrafts = [
-                    AssistantDraft(
-                        title: "Assistant error",
-                        detail: error.localizedDescription,
-                        badge: "Error",
-                        iconName: "exclamationmark.triangle"
-                    )
-                ]
-                appendLog("Assistant response failed: \(error.localizedDescription)")
+                if requestGeneration == assistantRequestGeneration {
+                    assistantStatus = .failed(error.localizedDescription)
+                    assistantModeLabel = "AI error"
+                    appendLog("Assistant response failed: \(error.localizedDescription)")
+                }
+            }
+
+            if requestGeneration == assistantRequestGeneration {
+                activeAssistantAction = nil
             }
         }
     }
@@ -777,6 +791,8 @@ final class CaptureViewModel: ObservableObject {
     }
 
     private func resetAssistantDrafts() {
+        assistantRequestGeneration += 1
+        activeAssistantAction = nil
         assistantModeLabel = "Ready"
         assistantStatus = .idle
         assistantDrafts = []

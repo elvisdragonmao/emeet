@@ -15,6 +15,9 @@ struct AssistantWorkspace: View {
     let autoSummaryProgress: Double
     let autoSummaryStatusLabel: String
     let autoSummaryIsGenerating: Bool
+    let quickActionsDisabled: Bool
+    let whatShouldISayIsLoading: Bool
+    let followUpIsLoading: Bool
     let refreshProvidersAction: () -> Void
     let whatShouldISayAction: () -> Void
     let followUpAction: () -> Void
@@ -53,6 +56,8 @@ struct AssistantWorkspace: View {
                             title: "What should I say?",
                             iconName: "quote.bubble.fill",
                             color: .blue,
+                            isLoading: whatShouldISayIsLoading,
+                            isDisabled: quickActionsDisabled,
                             action: whatShouldISayAction
                         )
 
@@ -60,6 +65,8 @@ struct AssistantWorkspace: View {
                             title: "Follow-up questions",
                             iconName: "questionmark.bubble.fill",
                             color: .green,
+                            isLoading: followUpIsLoading,
+                            isDisabled: quickActionsDisabled,
                             action: followUpAction
                         )
                     }
@@ -153,29 +160,59 @@ private struct AssistantActionButton: View {
     let title: String
     let iconName: String
     let color: Color
+    let isLoading: Bool
+    let isDisabled: Bool
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 9) {
-                Image(systemName: iconName)
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(color)
-                Text(title)
-                    .font(.caption.weight(.semibold))
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
+            ZStack(alignment: .topTrailing) {
+                VStack(alignment: .leading, spacing: 9) {
+                    Image(systemName: iconName)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(isDisabled && !isLoading ? .secondary : color)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(title)
+                            .font(.caption.weight(.semibold))
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+
+                        if isLoading {
+                            Text("Thinking")
+                                .font(.caption2.weight(.medium))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                     .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, minHeight: 84, alignment: .leading)
+
+                if isLoading {
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .controlSize(.small)
+                        .padding(10)
+                }
             }
-            .padding(12)
-            .frame(maxWidth: .infinity, minHeight: 78, alignment: .leading)
-            .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+            .background(buttonBackground, in: RoundedRectangle(cornerRadius: 8))
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
-                    .stroke(color.opacity(0.35), lineWidth: 1)
+                    .stroke(color.opacity(isLoading ? 0.75 : 0.35), lineWidth: isLoading ? 1.5 : 1)
             )
+            .opacity(isDisabled && !isLoading ? 0.55 : 1)
+            .animation(.easeInOut(duration: 0.2), value: isLoading)
+            .animation(.easeInOut(duration: 0.2), value: isDisabled)
         }
         .buttonStyle(.plain)
+        .disabled(isDisabled)
+    }
+
+    private var buttonBackground: Color {
+        isLoading
+            ? color.opacity(0.08)
+            : Color(nsColor: .textBackgroundColor)
     }
 }
 

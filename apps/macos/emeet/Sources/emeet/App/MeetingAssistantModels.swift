@@ -79,3 +79,26 @@ enum AssistantThinking: String, CaseIterable, Identifiable {
         }
     }
 }
+
+enum AssistantQuickAction: String, Equatable {
+    case whatShouldISay
+    case followUpQuestions
+
+    var requestAction: String {
+        switch self {
+        case .whatShouldISay:
+            return "what_should_i_say"
+        case .followUpQuestions:
+            return "follow_up_questions"
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .whatShouldISay:
+            return "What should I say?"
+        case .followUpQuestions:
+            return "Follow-up questions"
+        }
+    }
+}
