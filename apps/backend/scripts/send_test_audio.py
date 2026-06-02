@@ -1,13 +1,24 @@
 import asyncio
 import json
+import os
 
 import websockets
 
 from meeting_backend.audio import sine_pcm16
 
 
+def websocket_uri() -> str:
+    explicit_url = os.getenv("MEETING_BACKEND_WS_URL")
+    if explicit_url:
+        return explicit_url
+
+    host = os.getenv("MEETING_BACKEND_HOST", "127.0.0.1")
+    port = os.getenv("MEETING_BACKEND_PORT", "8765")
+    return "ws://{}:{}/v1/transcribe/ws".format(host, port)
+
+
 async def main() -> None:
-    uri = "ws://127.0.0.1:8765/v1/transcribe/ws"
+    uri = websocket_uri()
     sample_rate = 16_000
     frame_ms = 100
     frame_bytes = int(sample_rate * frame_ms / 1000) * 2

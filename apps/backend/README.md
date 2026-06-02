@@ -4,8 +4,8 @@ Local-first transcription backend for the macOS meeting assistant prototype.
 
 This service exposes a WebSocket endpoint that accepts small PCM16 audio packets and returns transcript events. It has two providers:
 
+- `faster-whisper`: self-hosted open-source STT provider for local/VPS use. This is the default.
 - `mock`: verifies transport and event shape without downloading a model.
-- `faster-whisper`: self-hosted open-source STT provider for local/VPS use.
 
 ## Run Locally
 
@@ -13,8 +13,8 @@ This service exposes a WebSocket endpoint that accepts small PCM16 audio packets
 cd apps/backend
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install -e .
-uvicorn meeting_backend.main:app --reload --host 127.0.0.1 --port 8765
+python -m pip install -e ".[stt]"
+./scripts/dev.sh
 ```
 
 In another terminal:
@@ -39,10 +39,16 @@ Start the backend with the model provider:
 
 ```bash
 MEETING_BACKEND_PROVIDER=faster-whisper \
-MEETING_BACKEND_WHISPER_MODEL=tiny \
+MEETING_BACKEND_MODEL=large-v3 \
 MEETING_BACKEND_WHISPER_DEVICE=cpu \
 MEETING_BACKEND_WHISPER_COMPUTE_TYPE=int8 \
-uvicorn meeting_backend.main:app --host 127.0.0.1 --port 8765
+./scripts/dev.sh
+```
+
+Use `mock` for a fast transport-only smoke test:
+
+```bash
+MEETING_BACKEND_PROVIDER=mock ./scripts/dev.sh
 ```
 
 For a quick local speech test on macOS:
@@ -60,6 +66,25 @@ Connect to:
 ```text
 ws://127.0.0.1:8765/v1/transcribe/ws
 ```
+
+## Environment
+
+The backend reads these environment variables:
+
+```text
+MEETING_BACKEND_PROVIDER=faster-whisper
+MEETING_BACKEND_MODEL=large-v3
+MEETING_BACKEND_HOST=127.0.0.1
+MEETING_BACKEND_PORT=8765
+MEETING_BACKEND_WS_URL=
+MEETING_BACKEND_WHISPER_DEVICE=cpu
+MEETING_BACKEND_WHISPER_COMPUTE_TYPE=int8
+MEETING_BACKEND_WHISPER_LANGUAGE=
+MEETING_BACKEND_PARTIAL_INTERVAL_MS=800
+MEETING_BACKEND_FINAL_INTERVAL_MS=2400
+```
+
+`MEETING_BACKEND_MODEL` is the preferred short alias. `MEETING_BACKEND_WHISPER_MODEL` is still supported for compatibility. The default model is `large-v3`, the largest standard Whisper model supported by faster-whisper. On macOS CPU this can be slow; use `large-v3-turbo`, `medium`, or `small` when latency matters more than maximum accuracy.
 
 First send a JSON text message:
 

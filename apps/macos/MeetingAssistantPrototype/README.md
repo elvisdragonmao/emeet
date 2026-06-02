@@ -49,13 +49,27 @@ sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 ```bash
 cd ../../backend
 . .venv/bin/activate
-uvicorn meeting_backend.main:app --host 127.0.0.1 --port 8765
+./scripts/dev.sh
 ```
 
-App 目前固定連到：
+App 預設連到：
 
 ```text
 ws://127.0.0.1:8765/v1/transcribe/ws
 ```
 
 在 App 裡按 `Connect STT` 會自動開始麥克風擷取，並把音訊串流到 backend。若 backend 使用 `mock` provider，會先看到假的 partial/final transcript；若使用 `faster-whisper` provider，會跑本機開源模型。
+
+App 也會讀取環境變數來切換 backend endpoint：
+
+```bash
+MEETING_BACKEND_PORT=9000 .build/app/MeetingAssistantPrototype.app/Contents/MacOS/MeetingAssistantPrototype
+```
+
+可用的 client-side env：
+
+```text
+MEETING_BACKEND_WS_URL=ws://127.0.0.1:8765/v1/transcribe/ws
+MEETING_BACKEND_HOST=127.0.0.1
+MEETING_BACKEND_PORT=8765
+```

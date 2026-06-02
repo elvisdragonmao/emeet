@@ -12,6 +12,10 @@ async def health():
     return {
         "status": "ok",
         "provider": settings.provider,
+        "model": settings.whisper_model,
+        "host": settings.host,
+        "port": settings.port,
+        "websocket_url": settings.websocket_url,
     }
 
 

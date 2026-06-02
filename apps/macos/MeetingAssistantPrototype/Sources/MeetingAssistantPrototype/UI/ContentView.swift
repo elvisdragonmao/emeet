@@ -81,6 +81,7 @@ struct ContentView: View {
             VStack(spacing: 18) {
                 TranscriptionPanel(
                     status: viewModel.transcriptionStatus,
+                    endpointLabel: viewModel.transcriptionEndpointLabel,
                     lines: viewModel.transcriptLines,
                     connectAction: viewModel.connectTranscription,
                     disconnectAction: viewModel.disconnectTranscription
@@ -266,6 +267,7 @@ private struct LevelReadout: View {
 
 private struct TranscriptionPanel: View {
     let status: CaptureStatus
+    let endpointLabel: String
     let lines: [TranscriptLine]
     let connectAction: () -> Void
     let disconnectAction: () -> Void
@@ -282,7 +284,7 @@ private struct TranscriptionPanel: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Live Transcript")
                         .font(.headline)
-                    Text("Local websocket STT")
+                    Text(endpointLabel)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

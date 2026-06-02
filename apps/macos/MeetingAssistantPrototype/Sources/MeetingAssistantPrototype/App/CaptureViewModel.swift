@@ -128,19 +128,23 @@ final class CaptureViewModel: ObservableObject {
     @Published private(set) var systemAudioHistory: [Float] = Array(repeating: 0, count: 96)
     @Published private(set) var transcriptionStatus: CaptureStatus = .idle
     @Published private(set) var transcriptLines: [TranscriptLine] = []
+    @Published private(set) var transcriptionEndpointLabel: String
     @Published private(set) var eventLog: [String] = [
         "Ready. Start microphone and system audio capture to test inputs."
     ]
 
     private let microphoneService = MicrophoneCaptureService()
     private let systemAudioService = SystemAudioCaptureService()
-    private let transcriptionClient = TranscriptionWebSocketClient(
-        url: URL(string: "ws://127.0.0.1:8765/v1/transcribe/ws")!
-    )
+    private let transcriptionBackend: TranscriptionBackendConfig
+    private let transcriptionClient: TranscriptionWebSocketClient
     private let maxHistoryCount = 96
     private let maxTranscriptLineCount = 24
 
-    init() {
+    init(transcriptionBackend: TranscriptionBackendConfig = .fromEnvironment()) {
+        self.transcriptionBackend = transcriptionBackend
+        transcriptionEndpointLabel = transcriptionBackend.displayAddress
+        transcriptionClient = TranscriptionWebSocketClient(url: transcriptionBackend.websocketURL)
+
         microphoneService.onLevel = { [weak self] level in
             Task { @MainActor in
                 self?.update(level, for: .microphone)
@@ -253,7 +257,7 @@ final class CaptureViewModel: ObservableObject {
 
         transcriptionStatus = .starting
         transcriptLines.removeAll()
-        appendLog("Connecting transcription backend at 127.0.0.1:8765...")
+        appendLog("Connecting transcription backend at \(transcriptionBackend.displayAddress)...")
         transcriptionClient.connect()
 
         if microphoneStatus != .running && microphoneStatus != .starting {

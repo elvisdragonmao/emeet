@@ -1,9 +1,20 @@
 import asyncio
 import json
+import os
 import sys
 import wave
 
 import websockets
+
+
+def websocket_uri() -> str:
+    explicit_url = os.getenv("MEETING_BACKEND_WS_URL")
+    if explicit_url:
+        return explicit_url
+
+    host = os.getenv("MEETING_BACKEND_HOST", "127.0.0.1")
+    port = os.getenv("MEETING_BACKEND_PORT", "8765")
+    return "ws://{}:{}/v1/transcribe/ws".format(host, port)
 
 
 async def stream_wav(path: str) -> None:
@@ -16,7 +27,7 @@ async def stream_wav(path: str) -> None:
     if channels != 1 or sample_rate != 16000 or sample_width != 2:
         raise SystemExit("expected 16 kHz mono PCM16 wav")
 
-    uri = "ws://127.0.0.1:8765/v1/transcribe/ws"
+    uri = websocket_uri()
     frame_ms = 100
     frame_bytes = int(sample_rate * frame_ms / 1000) * sample_width
 
