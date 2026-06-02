@@ -1,0 +1,26 @@
+.DS_Store
+
+# Node / Slide tooling
+node_modules/
+dist/
+.vite/
+
+# Swift / Xcode
+.build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcworkspace/xcuserdata/
+
+# App runtime outputs
+recordings/
+captures/
+*.m4a
+*.wav
+*.mov
+
+# Local secrets
+.env
+.env.*
+!.env.example
