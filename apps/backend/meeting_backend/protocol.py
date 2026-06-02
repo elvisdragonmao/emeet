@@ -1,3 +1,4 @@
+import time
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
@@ -78,6 +79,20 @@ def status_event(message: str, *, provider: str) -> Dict[str, Any]:
         "type": "session.status",
         "message": message,
         "provider": provider,
+    }
+
+
+def pong_event(
+    *,
+    ping_id: Any,
+    client_sent_at_ms: Any = None,
+    server_sent_at_ms: Optional[int] = None,
+) -> Dict[str, Any]:
+    return {
+        "type": "server.pong",
+        "ping_id": str(ping_id or ""),
+        "client_sent_at_ms": client_sent_at_ms,
+        "server_sent_at_ms": int(time.time() * 1000) if server_sent_at_ms is None else server_sent_at_ms,
     }
 
 

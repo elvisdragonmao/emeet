@@ -27,7 +27,11 @@ struct ContentView: View {
 
             StatusBadge(title: "Mic", status: viewModel.microphoneStatus)
             StatusBadge(title: "System", status: viewModel.systemAudioStatus)
-            StatusBadge(title: "STT", status: viewModel.transcriptionStatus)
+            StatusBadge(
+                title: "STT",
+                status: viewModel.transcriptionStatus,
+                detail: viewModel.transcriptionStatusDetailLabel
+            )
 
             Button {
                 viewModel.startAll()
@@ -65,6 +69,8 @@ struct ContentView: View {
             TranscriptWorkspace(
                 status: viewModel.transcriptionStatus,
                 countLabel: viewModel.transcriptCountsLabel,
+                backendLatencyLabel: viewModel.backendLatencyLabel,
+                transcriptionLatencyLabel: viewModel.transcriptionLatencyLabel,
                 lines: viewModel.transcriptLines,
                 connectAction: viewModel.connectTranscription,
                 disconnectAction: viewModel.disconnectTranscription

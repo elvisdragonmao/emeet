@@ -3,6 +3,9 @@ import Foundation
 struct TranscriptEvent: Decodable, Equatable {
     let type: String
     let message: String?
+    let pingId: String?
+    let clientSentAtMs: Int?
+    let serverSentAtMs: Int?
     let segmentId: String?
     let source: String?
     let speakerHint: String?
@@ -17,6 +20,8 @@ struct TranscriptEvent: Decodable, Equatable {
 
 final class TranscriptionWebSocketClient {
     var onEvent: ((TranscriptEvent) -> Void)?
+    var onBackendLatency: ((Int) -> Void)?
+    var onTranscriptionLatency: ((Int) -> Void)?
     var onError: ((String) -> Void)?
 
     private let url: URL
@@ -24,6 +29,7 @@ final class TranscriptionWebSocketClient {
     private let session: URLSession
     private let queue = DispatchQueue(label: "MeetingAssistantPrototype.TranscriptionWebSocketClient")
     private let chunkByteCount = PCM16AudioConverter.outputSampleRate * PCM16AudioConverter.sampleWidth / 10
+    private let heartbeatInterval: TimeInterval = 5
     private let decoder: JSONDecoder = {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
@@ -31,7 +37,10 @@ final class TranscriptionWebSocketClient {
     }()
 
     private var task: URLSessionWebSocketTask?
+    private var heartbeatTimer: DispatchSourceTimer?
+    private var pendingPings: [String: DispatchTime] = [:]
     private var bufferedAudio = Data()
+    private var audioTimelineStartNanoseconds: UInt64?
     private var sessionID = "macos-local"
 
     init(url: URL, source: String = "microphone", session: URLSession = .shared) {
@@ -49,10 +58,13 @@ final class TranscriptionWebSocketClient {
             let task = self.session.webSocketTask(with: self.url)
             self.sessionID = "macos-\(self.source)-\(UUID().uuidString.lowercased())"
             self.bufferedAudio.removeAll(keepingCapacity: true)
+            self.pendingPings.removeAll(keepingCapacity: true)
+            self.audioTimelineStartNanoseconds = nil
             self.task = task
 
             task.resume()
             self.sendSessionStart(on: task)
+            self.startHeartbeat(on: task)
             self.receiveNext(on: task)
         }
     }
@@ -66,7 +78,9 @@ final class TranscriptionWebSocketClient {
             self.sendSessionEnd(on: task)
             task.cancel(with: .normalClosure, reason: nil)
             self.task = nil
+            self.stopHeartbeat()
             self.bufferedAudio.removeAll(keepingCapacity: true)
+            self.audioTimelineStartNanoseconds = nil
         }
     }
 
@@ -85,9 +99,49 @@ final class TranscriptionWebSocketClient {
             while self.bufferedAudio.count >= self.chunkByteCount {
                 let chunk = self.bufferedAudio.prefix(self.chunkByteCount)
                 self.bufferedAudio.removeFirst(self.chunkByteCount)
-                self.send(Data(chunk), on: task)
+                let chunkData = Data(chunk)
+                self.noteAudioChunkSent(chunkData)
+                self.send(chunkData, on: task)
             }
         }
+    }
+
+    private func startHeartbeat(on task: URLSessionWebSocketTask) {
+        stopHeartbeat()
+
+        let timer = DispatchSource.makeTimerSource(queue: queue)
+        timer.schedule(deadline: .now() + 1, repeating: heartbeatInterval)
+        timer.setEventHandler { [weak self] in
+            guard let self, self.task === task else {
+                return
+            }
+
+            self.sendPing(on: task)
+        }
+
+        heartbeatTimer = timer
+        timer.resume()
+    }
+
+    private func stopHeartbeat() {
+        heartbeatTimer?.cancel()
+        heartbeatTimer = nil
+        pendingPings.removeAll(keepingCapacity: true)
+    }
+
+    private func sendPing(on task: URLSessionWebSocketTask) {
+        pruneExpiredPings()
+
+        let pingID = UUID().uuidString.lowercased()
+        pendingPings[pingID] = .now()
+        sendJSON(
+            [
+                "type": "client.ping",
+                "ping_id": pingID,
+                "client_sent_at_ms": Self.currentEpochMilliseconds()
+            ],
+            on: task
+        )
     }
 
     private func sendSessionStart(on task: URLSessionWebSocketTask) {
@@ -142,7 +196,9 @@ final class TranscriptionWebSocketClient {
                 switch result {
                 case .failure(let error):
                     self.task = nil
+                    self.stopHeartbeat()
                     self.bufferedAudio.removeAll(keepingCapacity: true)
+                    self.audioTimelineStartNanoseconds = nil
                     self.onError?("Receive websocket message failed: \(error.localizedDescription)")
                 case .success(let message):
                     self.handle(message)
@@ -166,9 +222,58 @@ final class TranscriptionWebSocketClient {
     private func parseEvent(_ data: Data) {
         do {
             let event = try decoder.decode(TranscriptEvent.self, from: data)
+            if event.type == "server.pong" {
+                handlePong(event)
+                return
+            }
+
+            handleTranscriptionLatency(event)
             onEvent?(event)
         } catch {
             onError?("Decode transcript event failed: \(error.localizedDescription)")
+        }
+    }
+
+    private func handlePong(_ event: TranscriptEvent) {
+        guard let pingID = event.pingId,
+              let startedAt = pendingPings.removeValue(forKey: pingID) else {
+            return
+        }
+
+        let elapsedNanoseconds = DispatchTime.now().uptimeNanoseconds - startedAt.uptimeNanoseconds
+        onBackendLatency?(Int(elapsedNanoseconds / 1_000_000))
+    }
+
+    private func handleTranscriptionLatency(_ event: TranscriptEvent) {
+        guard event.type == "transcript.partial" || event.type == "transcript.final",
+              let endMs = event.endMs,
+              let audioTimelineStartNanoseconds else {
+            return
+        }
+
+        let audioEndNanoseconds = audioTimelineStartNanoseconds + UInt64(max(0, endMs)) * 1_000_000
+        let now = DispatchTime.now().uptimeNanoseconds
+        let latencyNanoseconds = now > audioEndNanoseconds ? now - audioEndNanoseconds : 0
+        onTranscriptionLatency?(Int(latencyNanoseconds / 1_000_000))
+    }
+
+    private func noteAudioChunkSent(_ chunk: Data) {
+        guard audioTimelineStartNanoseconds == nil else {
+            return
+        }
+
+        let bytesPerSecond = PCM16AudioConverter.outputSampleRate * PCM16AudioConverter.sampleWidth
+        let chunkDurationNanoseconds = UInt64(Double(chunk.count) / Double(bytesPerSecond) * 1_000_000_000)
+        let now = DispatchTime.now().uptimeNanoseconds
+        audioTimelineStartNanoseconds = now > chunkDurationNanoseconds ? now - chunkDurationNanoseconds : now
+    }
+
+    private func pruneExpiredPings() {
+        let now = DispatchTime.now().uptimeNanoseconds
+        let timeoutNanoseconds: UInt64 = 30_000_000_000
+        pendingPings = pendingPings.filter { _, startedAt in
+            now >= startedAt.uptimeNanoseconds
+                && now - startedAt.uptimeNanoseconds < timeoutNanoseconds
         }
     }
 
@@ -183,8 +288,14 @@ final class TranscriptionWebSocketClient {
             }
 
             self.task = nil
+            self.stopHeartbeat()
             self.bufferedAudio.removeAll(keepingCapacity: true)
+            self.audioTimelineStartNanoseconds = nil
             self.onError?("Send websocket message failed: \(error.localizedDescription)")
         }
+    }
+
+    private static func currentEpochMilliseconds() -> Int {
+        Int(Date().timeIntervalSince1970 * 1_000)
     }
 }

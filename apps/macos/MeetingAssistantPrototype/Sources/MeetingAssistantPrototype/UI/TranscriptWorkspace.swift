@@ -3,6 +3,8 @@ import SwiftUI
 struct TranscriptWorkspace: View {
     let status: CaptureStatus
     let countLabel: String
+    let backendLatencyLabel: String
+    let transcriptionLatencyLabel: String
     let lines: [TranscriptLine]
     let connectAction: () -> Void
     let disconnectAction: () -> Void
@@ -20,6 +22,8 @@ struct TranscriptWorkspace: View {
 
                 Spacer()
 
+                LatencyReadout(title: "Backend", value: backendLatencyLabel)
+                LatencyReadout(title: "STT", value: transcriptionLatencyLabel)
                 SourceLegend(label: "Self", color: .blue)
                 SourceLegend(label: "Other", color: .green)
 
@@ -144,5 +148,22 @@ private struct SourceLegend: View {
                 .font(.caption.weight(.medium))
                 .foregroundStyle(.secondary)
         }
+    }
+}
+
+private struct LatencyReadout: View {
+    let title: String
+    let value: String
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 2) {
+            Text(title)
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.system(.caption, design: .monospaced).weight(.semibold))
+                .foregroundStyle(value == "--" ? .secondary : .primary)
+        }
+        .frame(minWidth: 62, alignment: .trailing)
     }
 }

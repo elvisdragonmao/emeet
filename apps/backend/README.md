@@ -185,6 +185,27 @@ Then send raw binary PCM16 little-endian audio frames. The client should send ro
 }
 ```
 
+Clients can also measure backend websocket round-trip time with an app-level heartbeat:
+
+```json
+{
+  "type": "client.ping",
+  "ping_id": "ping-1",
+  "client_sent_at_ms": 1717315200000
+}
+```
+
+The server replies on the same websocket:
+
+```json
+{
+  "type": "server.pong",
+  "ping_id": "ping-1",
+  "client_sent_at_ms": 1717315200000,
+  "server_sent_at_ms": 1717315200042
+}
+```
+
 ## Tests
 
 ```bash

@@ -3,6 +3,13 @@ import SwiftUI
 struct StatusBadge: View {
     let title: String
     let status: CaptureStatus
+    let detail: String?
+
+    init(title: String, status: CaptureStatus, detail: String? = nil) {
+        self.title = title
+        self.status = status
+        self.detail = detail
+    }
 
     var body: some View {
         HStack(spacing: 6) {
@@ -11,7 +18,7 @@ struct StatusBadge: View {
                 .frame(width: 8, height: 8)
             Text(title)
                 .font(.caption.weight(.semibold))
-            Text(status.label)
+            Text(detail ?? status.label)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

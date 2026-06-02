@@ -14,6 +14,10 @@ final class CaptureViewModel: ObservableObject {
     @Published private(set) var transcriptionStatus: CaptureStatus = .idle
     @Published private(set) var transcriptLines: [TranscriptLine] = []
     @Published private(set) var transcriptionEndpointLabel: String
+    @Published private(set) var microphoneBackendLatencyMs: Int?
+    @Published private(set) var systemBackendLatencyMs: Int?
+    @Published private(set) var microphoneTranscriptionLatencyMs: Int?
+    @Published private(set) var systemTranscriptionLatencyMs: Int?
     @Published private(set) var assistantModeLabel = "Ready"
     @Published private(set) var assistantDrafts: [AssistantDraft] = [
         AssistantDraft(
@@ -88,8 +92,16 @@ final class CaptureViewModel: ObservableObject {
             }
         }
 
-        configureTranscriptionClient(microphoneTranscriptionClient, label: "Microphone")
-        configureTranscriptionClient(systemTranscriptionClient, label: "System audio")
+        configureTranscriptionClient(
+            microphoneTranscriptionClient,
+            source: .microphone,
+            label: "Microphone"
+        )
+        configureTranscriptionClient(
+            systemTranscriptionClient,
+            source: .systemAudio,
+            label: "System audio"
+        )
     }
 
     var isAnyRunning: Bool {
@@ -100,6 +112,26 @@ final class CaptureViewModel: ObservableObject {
         let finalCount = transcriptLines.filter(\.isFinal).count
         let partialCount = transcriptLines.count - finalCount
         return "\(finalCount) final / \(partialCount) live"
+    }
+
+    var backendLatencyLabel: String {
+        formatLatency(averageLatency([microphoneBackendLatencyMs, systemBackendLatencyMs]))
+    }
+
+    var transcriptionLatencyLabel: String {
+        formatLatency(averageLatency([microphoneTranscriptionLatencyMs, systemTranscriptionLatencyMs]))
+    }
+
+    var transcriptionStatusDetailLabel: String? {
+        guard transcriptionStatus == .running else {
+            return nil
+        }
+
+        if let latencyMs = averageLatency([microphoneBackendLatencyMs, systemBackendLatencyMs]) {
+            return "\(latencyMs) ms"
+        }
+
+        return "Connected"
     }
 
     func startAll() {
@@ -166,6 +198,7 @@ final class CaptureViewModel: ObservableObject {
 
         transcriptionStatus = .starting
         transcriptLines.removeAll()
+        resetLatencyReadings()
         appendLog("Connecting transcription backend at \(transcriptionBackend.displayAddress)...")
         microphoneTranscriptionClient.connect()
         systemTranscriptionClient.connect()
@@ -183,6 +216,7 @@ final class CaptureViewModel: ObservableObject {
         microphoneTranscriptionClient.disconnect()
         systemTranscriptionClient.disconnect()
         transcriptionStatus = .idle
+        resetLatencyReadings()
         appendLog("Transcription backend disconnected.")
     }
 
@@ -298,10 +332,26 @@ final class CaptureViewModel: ObservableObject {
         }
     }
 
-    private func configureTranscriptionClient(_ client: TranscriptionWebSocketClient, label: String) {
+    private func configureTranscriptionClient(
+        _ client: TranscriptionWebSocketClient,
+        source: CaptureSource,
+        label: String
+    ) {
         client.onEvent = { [weak self] event in
             Task { @MainActor in
                 self?.handleTranscriptionEvent(event)
+            }
+        }
+
+        client.onBackendLatency = { [weak self] latencyMs in
+            Task { @MainActor in
+                self?.updateBackendLatency(latencyMs, for: source)
+            }
+        }
+
+        client.onTranscriptionLatency = { [weak self] latencyMs in
+            Task { @MainActor in
+                self?.updateTranscriptionLatency(latencyMs, for: source)
             }
         }
 
@@ -311,6 +361,31 @@ final class CaptureViewModel: ObservableObject {
                 self?.appendLog("\(label) transcription error: \(message)")
             }
         }
+    }
+
+    private func updateBackendLatency(_ latencyMs: Int, for source: CaptureSource) {
+        switch source {
+        case .microphone:
+            microphoneBackendLatencyMs = latencyMs
+        case .systemAudio:
+            systemBackendLatencyMs = latencyMs
+        }
+    }
+
+    private func updateTranscriptionLatency(_ latencyMs: Int, for source: CaptureSource) {
+        switch source {
+        case .microphone:
+            microphoneTranscriptionLatencyMs = latencyMs
+        case .systemAudio:
+            systemTranscriptionLatencyMs = latencyMs
+        }
+    }
+
+    private func resetLatencyReadings() {
+        microphoneBackendLatencyMs = nil
+        systemBackendLatencyMs = nil
+        microphoneTranscriptionLatencyMs = nil
+        systemTranscriptionLatencyMs = nil
     }
 
     private func refreshDraftNotes(with line: TranscriptLine) {
@@ -342,6 +417,23 @@ final class CaptureViewModel: ObservableObject {
         let line = "[\(formatter.string(from: Date()))] \(message)"
         eventLog.insert(line, at: 0)
         eventLog = Array(eventLog.prefix(8))
+    }
+
+    private func averageLatency(_ values: [Int?]) -> Int? {
+        let concreteValues = values.compactMap(\.self)
+        guard !concreteValues.isEmpty else {
+            return nil
+        }
+
+        return concreteValues.reduce(0, +) / concreteValues.count
+    }
+
+    private func formatLatency(_ latencyMs: Int?) -> String {
+        guard let latencyMs else {
+            return "--"
+        }
+
+        return "\(latencyMs) ms"
     }
 
     private func openSystemSettings(path: String) {

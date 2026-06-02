@@ -5,7 +5,7 @@ from fastapi import WebSocket
 from starlette.websockets import WebSocketDisconnect
 
 from meeting_backend.config import Settings
-from meeting_backend.protocol import error_event, parse_session_start
+from meeting_backend.protocol import error_event, parse_session_start, pong_event
 from meeting_backend.transcription import create_transcriber
 from meeting_backend.transcription.base import StreamingTranscriber
 
@@ -51,6 +51,15 @@ class TranscriptionSession:
 
     async def _handle_text(self, text: str) -> None:
         payload = json.loads(text)
+        if payload.get("type") == "client.ping":
+            await self._safe_send(
+                pong_event(
+                    ping_id=payload.get("ping_id"),
+                    client_sent_at_ms=payload.get("client_sent_at_ms"),
+                )
+            )
+            return
+
         if payload.get("type") == "session.end":
             if self.transcriber is not None:
                 await self._send_many(self.transcriber.finish())
