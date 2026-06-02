@@ -2,6 +2,7 @@ import unittest
 
 from meeting_backend.assistant.models import AssistantRequest, AssistantTranscriptLine
 from meeting_backend.assistant.service import (
+    build_codex_exec_command,
     generate_assistant_response,
     list_provider_descriptors,
     parse_assistant_json,
@@ -52,6 +53,48 @@ class AssistantServiceTest(unittest.TestCase):
         parsed = parse_assistant_json('Here is JSON:\n{"drafts": [{"title": "A"}]}')
 
         self.assertEqual(parsed["drafts"][0]["title"], "A")
+
+    def test_codex_exec_command_skips_unsupported_approval_flag(self) -> None:
+        help_text = """
+        Options:
+          -c, --config <key=value>
+          -m, --model <MODEL>
+              --sandbox <SANDBOX_MODE>
+              --skip-git-repo-check
+              --ephemeral
+          -o, --output-last-message <FILE>
+              --color <COLOR>
+        """
+
+        command = build_codex_exec_command(
+            "codex",
+            "gpt-5.4-mini",
+            "medium",
+            "/tmp/out.txt",
+            help_text=help_text,
+        )
+
+        self.assertNotIn("--ask-for-approval", command)
+        self.assertIn("--sandbox", command)
+        self.assertIn("read-only", command)
+        self.assertEqual(command[-1], "-")
+
+    def test_codex_exec_command_uses_approval_flag_when_supported(self) -> None:
+        help_text = """
+        Options:
+              --ask-for-approval <APPROVAL_POLICY>
+        """
+
+        command = build_codex_exec_command(
+            "codex",
+            "",
+            "none",
+            "/tmp/out.txt",
+            help_text=help_text,
+        )
+
+        self.assertIn("--ask-for-approval", command)
+        self.assertIn("never", command)
 
 
 if __name__ == "__main__":

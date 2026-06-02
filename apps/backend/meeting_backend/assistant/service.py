@@ -267,30 +267,53 @@ def codex_cli_completion(
 
     prompt = cli_prompt(messages, model, thinking)
     with tempfile.NamedTemporaryFile(prefix="meeting-assistant-codex-", suffix=".txt") as output:
-        command = [
-            binary,
-            "exec",
-            "--skip-git-repo-check",
-            "--ephemeral",
-            "--sandbox",
-            "read-only",
-            "--ask-for-approval",
-            "never",
-            "--output-last-message",
-            output.name,
-            "--color",
-            "never",
-        ]
-        if model:
-            command.extend(["--model", model])
-        if thinking != "none":
-            command.extend(["-c", 'model_reasoning_effort="{}"'.format(thinking)])
-        command.append("-")
-
+        command = build_codex_exec_command(binary, model, thinking, output.name)
         completed = run_command(command, prompt, settings.assistant_timeout_ms)
         output.seek(0)
         text = output.read().decode("utf-8", errors="replace").strip()
         return text or completed.stdout.strip()
+
+
+def build_codex_exec_command(
+    binary: str,
+    model: str,
+    thinking: str,
+    output_path: str,
+    help_text: Optional[str] = None,
+) -> List[str]:
+    help_text = help_text if help_text is not None else codex_exec_help(binary)
+    command = [binary, "exec"]
+
+    if "--skip-git-repo-check" in help_text:
+        command.append("--skip-git-repo-check")
+    if "--ephemeral" in help_text:
+        command.append("--ephemeral")
+    if "--sandbox" in help_text:
+        command.extend(["--sandbox", "read-only"])
+    if "--ask-for-approval" in help_text:
+        command.extend(["--ask-for-approval", "never"])
+    if "--output-last-message" in help_text:
+        command.extend(["--output-last-message", output_path])
+    if "--color" in help_text:
+        command.extend(["--color", "never"])
+    if model and "--model" in help_text:
+        command.extend(["--model", model])
+    if thinking != "none" and "--config" in help_text:
+        command.extend(["-c", 'model_reasoning_effort="{}"'.format(thinking)])
+
+    command.append("-")
+    return command
+
+
+def codex_exec_help(binary: str) -> str:
+    completed = subprocess.run(
+        [binary, "exec", "--help"],
+        text=True,
+        capture_output=True,
+        timeout=5,
+        check=False,
+    )
+    return "{}\n{}".format(completed.stdout, completed.stderr)
 
 
 def github_copilot_cli_completion(

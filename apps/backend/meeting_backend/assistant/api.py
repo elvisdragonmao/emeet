@@ -1,7 +1,7 @@
 import asyncio
 from typing import List, Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from meeting_backend.assistant.models import AssistantRequest, AssistantTranscriptLine
@@ -60,5 +60,9 @@ async def respond(body: AssistantRespondBody):
         temperature=settings.assistant_temperature if body.temperature is None else body.temperature,
         max_tokens=settings.assistant_max_tokens if body.max_tokens is None else body.max_tokens,
     )
-    result = await asyncio.to_thread(generate_assistant_response, settings, request)
+    try:
+        result = await asyncio.to_thread(generate_assistant_response, settings, request)
+    except Exception as error:
+        raise HTTPException(status_code=502, detail=str(error)) from error
+
     return result.to_dict()
