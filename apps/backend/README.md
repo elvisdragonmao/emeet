@@ -2,7 +2,10 @@
 
 Local-first transcription backend for the macOS meeting assistant prototype.
 
-This service exposes a WebSocket endpoint that accepts small PCM16 audio packets and returns transcript events. The first provider is a mock streaming transcriber so the transport and event model can be verified without downloading a model. The provider boundary is intentionally small so `faster-whisper` can be added as the next step.
+This service exposes a WebSocket endpoint that accepts small PCM16 audio packets and returns transcript events. It has two providers:
+
+- `mock`: verifies transport and event shape without downloading a model.
+- `faster-whisper`: self-hosted open-source STT provider for local/VPS use.
 
 ## Run Locally
 
@@ -20,6 +23,34 @@ In another terminal:
 cd apps/backend
 source .venv/bin/activate
 python scripts/send_test_audio.py
+```
+
+## Run With Faster Whisper
+
+Install the optional STT dependencies:
+
+```bash
+cd apps/backend
+source .venv/bin/activate
+python -m pip install -e ".[stt]"
+```
+
+Start the backend with the model provider:
+
+```bash
+MEETING_BACKEND_PROVIDER=faster-whisper \
+MEETING_BACKEND_WHISPER_MODEL=tiny \
+MEETING_BACKEND_WHISPER_DEVICE=cpu \
+MEETING_BACKEND_WHISPER_COMPUTE_TYPE=int8 \
+uvicorn meeting_backend.main:app --host 127.0.0.1 --port 8765
+```
+
+For a quick local speech test on macOS:
+
+```bash
+say -o /tmp/meeting-assistant-test.aiff "Hello, this is a local transcription test."
+ffmpeg -y -i /tmp/meeting-assistant-test.aiff -ac 1 -ar 16000 -sample_fmt s16 /tmp/meeting-assistant-test.wav
+python scripts/send_wav_audio.py /tmp/meeting-assistant-test.wav
 ```
 
 ## WebSocket Protocol

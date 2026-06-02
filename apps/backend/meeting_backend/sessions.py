@@ -1,5 +1,5 @@
 import json
-from typing import Any
+from typing import Any, Optional
 
 from fastapi import WebSocket
 from starlette.websockets import WebSocketDisconnect
@@ -7,13 +7,14 @@ from starlette.websockets import WebSocketDisconnect
 from meeting_backend.config import Settings
 from meeting_backend.protocol import error_event, parse_session_start
 from meeting_backend.transcription import create_transcriber
+from meeting_backend.transcription.base import StreamingTranscriber
 
 
 class TranscriptionSession:
     def __init__(self, websocket: WebSocket, settings: Settings) -> None:
         self.websocket = websocket
         self.settings = settings
-        self.transcriber = create_transcriber(settings)
+        self.transcriber: Optional[StreamingTranscriber] = None
 
     async def run(self) -> None:
         await self.websocket.accept()
@@ -21,6 +22,7 @@ class TranscriptionSession:
         try:
             first_message = await self.websocket.receive_text()
             session = parse_session_start(json.loads(first_message))
+            self.transcriber = create_transcriber(self.settings)
             await self._send_many(self.transcriber.start(session))
 
             while True:
@@ -29,6 +31,9 @@ class TranscriptionSession:
                     break
 
                 if message.get("bytes") is not None:
+                    if self.transcriber is None:
+                        await self._safe_send(error_event("session has not started"))
+                        continue
                     events = self.transcriber.accept_audio(message["bytes"])
                     await self._send_many(events)
                     continue
@@ -41,12 +46,14 @@ class TranscriptionSession:
         except Exception as error:
             await self._safe_send(error_event(str(error)))
         finally:
-            await self._send_many(self.transcriber.finish())
+            if self.transcriber is not None:
+                await self._send_many(self.transcriber.finish())
 
     async def _handle_text(self, text: str) -> None:
         payload = json.loads(text)
         if payload.get("type") == "session.end":
-            await self._send_many(self.transcriber.finish())
+            if self.transcriber is not None:
+                await self._send_many(self.transcriber.finish())
             await self.websocket.close()
             return
 
