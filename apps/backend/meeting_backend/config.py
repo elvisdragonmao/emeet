@@ -2,7 +2,7 @@ import os
 from dataclasses import dataclass
 
 DEFAULT_PROVIDER = "faster-whisper"
-DEFAULT_WHISPER_MODEL = "large-v3"
+DEFAULT_WHISPER_MODEL = "large-v3-turbo"
 DEFAULT_ASSISTANT_PROVIDER = "ollama"
 DEFAULT_ASSISTANT_MODEL = "fast"
 DEFAULT_ASSISTANT_THINKING = "medium"

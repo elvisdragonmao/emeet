@@ -24,7 +24,7 @@ class FactoryTest(unittest.TestCase):
             factory.FasterWhisperStreamingTranscriber = original
 
         self.assertEqual(transcriber.provider_name, "recording")
-        self.assertEqual(RecordingTranscriber.calls[0]["model_name"], "large-v3")
+        self.assertEqual(RecordingTranscriber.calls[0]["model_name"], "large-v3-turbo")
 
     def test_creates_mlx_provider(self) -> None:
         original = factory.MlxWhisperStreamingTranscriber
@@ -36,7 +36,7 @@ class FactoryTest(unittest.TestCase):
             factory.MlxWhisperStreamingTranscriber = original
 
         self.assertEqual(transcriber.provider_name, "recording")
-        self.assertEqual(RecordingTranscriber.calls[0]["model_name"], "large-v3")
+        self.assertEqual(RecordingTranscriber.calls[0]["model_name"], "large-v3-turbo")
 
     def test_rejects_unknown_provider(self) -> None:
         with self.assertRaises(ValueError):

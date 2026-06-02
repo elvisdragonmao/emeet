@@ -11,7 +11,7 @@ class ConfigTest(unittest.TestCase):
             settings = get_settings()
 
         self.assertEqual(settings.provider, "faster-whisper")
-        self.assertEqual(settings.whisper_model, "large-v3")
+        self.assertEqual(settings.whisper_model, "large-v3-turbo")
         self.assertEqual(settings.host, "127.0.0.1")
         self.assertEqual(settings.port, 8765)
         self.assertEqual(settings.websocket_url, "ws://127.0.0.1:8765/v1/transcribe/ws")

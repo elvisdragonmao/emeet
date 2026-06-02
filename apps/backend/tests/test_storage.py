@@ -21,7 +21,7 @@ class StorageTest(unittest.TestCase):
                 sample_width=2,
             )
 
-            storage.record_session_start(session, provider="faster-whisper", model="large-v3")
+            storage.record_session_start(session, provider="faster-whisper", model="large-v3-turbo")
             storage.record_transcript_event(
                 transcript_event(
                     event_type="transcript.final",
