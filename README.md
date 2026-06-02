@@ -1,133 +1,95 @@
 # Meeting Assistant Capstone
 
-一個原生 macOS App 會議輔助工具，在會議進行中擷取麥克風與系統音訊，產生即時逐字稿，整理會議筆記與下一步行動，並在需要時用 AI 產生「我現在可以怎麼回」和「還可以追問什麼」。
+這是一個以 macOS App 實作的即時會議輔助工具。目標是在會議中同時提供即時逐字稿、回覆建議、追問問題、會議筆記、下一步行動，以及可切換模型/provider 的 AI 助理工作台。
 
-目前原型採用本地優先的混合式架構：
+目前原型採用本地優先的混合式架構：macOS App 負責音訊擷取、UI、逐字稿狀態與使用者操作；FastAPI backend 負責 STT session、assistant provider dispatch、JSON 結構驗證與 SQLite append-first 儲存。
 
-- macOS App：SwiftUI + AppKit + AVFoundation + ScreenCaptureKit。
-- STT backend：Python FastAPI，透過 WebSocket 收 16 kHz mono PCM16 音訊。
-- STT provider：`mock`、`faster-whisper`、`mlx-whisper`。
-- Assistant provider：`mock`、Ollama、OpenAI-compatible endpoint、Codex CLI、GitHub Copilot CLI。
-- AI 輸入：目前只把逐字稿文字丟給 assistant，不直接把原始音訊丟給 LLM。
+## Current Scope
+
+已實作的 MVP 功能：
+
+- 麥克風音訊：`AVAudioEngine` 擷取並轉成 16 kHz mono PCM16。
+- 系統音訊：`ScreenCaptureKit` `.audio` stream 擷取遠端/系統聲音，再轉成 16 kHz mono PCM16。
+- 即時傳輸：macOS client 以約 100 ms binary WebSocket frames 傳到 backend。
+- STT provider：`faster-whisper`、`mlx-whisper`。
+- 逐字稿 UI：以 `Self` / `Other` source label 區分麥克風與系統音訊，保留 partial/final 狀態。
+- AI 按鈕：`What should I say?`、`Follow-up questions`。
+- 會議筆記：每 30 秒以 final transcript 自動整理 meeting notes 與 next actions。
+- Assistant provider：Ollama、OpenAI-compatible endpoint、Codex CLI、GitHub Copilot CLI。
+- 匯出：macOS App 可匯出 Markdown meeting record。
+- 簡報：`docs/slides/slides.md` 是畢業專題報告 Slidev deck。
 
 ## Project Layout
 
 ```text
 .
 ├── apps/
-│   ├── backend/
-│   │   └── meeting_backend/             # FastAPI STT + assistant backend
+│   ├── backend/                         # FastAPI STT + assistant backend
 │   └── macos/
-│       └── MeetingAssistantPrototype/   # SwiftUI macOS App 原型
+│       └── MeetingAssistantPrototype/   # SwiftUI macOS App prototype
 ├── docs/
 │   ├── research/
-│   │   ├── raw-reports/                 # 原始 deep research 報告
-│   │   ├── translated/                  # 中文翻譯整理版
-│   │   └── notes/                       # 研究筆記版
-│   └── slides/                          # 簡報與展示素材
-├── AGENTS.md                            # 專題需求與協作背景
-├── package.json                         # Node/簡報工具設定
-└── pnpm-lock.yaml
+│   │   ├── raw-reports/                 # 原始研究輸出
+│   │   ├── translated/                  # 中文整理版，簡報主要依據
+│   │   └── notes/                       # 較短的開發筆記
+│   └── slides/
+│       └── slides.md                    # Slidev 畢業專題簡報
+├── AGENTS.md                            # 專案需求、技術選型與協作規範
+├── README.md                            # 專案入口文件
+└── package.json                         # Slidev tooling
 ```
+
+子目錄 README 已移除，避免同一份執行方式和技術說明分散維護。重要背景請集中看 `README.md`、`AGENTS.md`、`docs/research/translated/` 和 `docs/slides/slides.md`。
 
 ## End-to-End Flow
 
-```text
-Microphone / System Audio
-        |
-        v
-macOS capture services
-        |
-        v
-16 kHz mono PCM16 conversion
-        |
-        v
-100 ms binary WebSocket audio frames
-        |
-        v
-FastAPI transcription session
-        |
-        v
-speech-window segmentation + STT provider
-        |
-        v
-transcript.final events
-        |
-        v
-SwiftUI transcript state
-        |
-        +--> Meeting notes / next actions draft
-        |
-        +--> Assistant button request
-                 |
-                 v
-          preprompt + recent transcript
-                 |
-                 v
-          selected AI provider
-                 |
-                 v
-          JSON drafts / notes / actions
+```mermaid
+flowchart LR
+    Mic[Microphone<br/>AVAudioEngine] --> Mac[macOS capture layer]
+    Sys[System audio<br/>ScreenCaptureKit] --> Mac
+    Mac --> PCM[16 kHz mono PCM16]
+    PCM --> WS[100 ms WebSocket frames]
+    WS --> STT[FastAPI transcription session]
+    STT --> Seg[Speech-window segmentation]
+    Seg --> Provider[faster-whisper / mlx-whisper]
+    Provider --> Events[transcript.final events]
+    Events --> UI[SwiftUI transcript state]
+    UI --> Buttons[What should I say?<br/>Follow-up questions]
+    UI --> Notes[30s meeting notes]
+    Buttons --> Assistant[Assistant provider abstraction]
+    Notes --> Assistant
+    Assistant --> JSON[drafts / notes / actions JSON]
+    JSON --> UI
 ```
 
-核心設計是把「音訊小封包」、「語音段落」、「逐字稿事件」和「AI 建議」分開。音訊可以每 100 ms 送一次，但 AI 不應該每 100 ms 被呼叫；目前 AI 是由按鈕觸發，使用最近的逐字稿作為上下文。
+設計重點是把音訊封包、語音段落、逐字稿事件和 AI 建議分開。音訊可以 100 ms 一包送給 STT，但 LLM 不應每 100 ms 被呼叫；目前建議由按鈕觸發，筆記以 30 秒低頻更新。
 
-## macOS Audio Pipeline
+## Technical Decisions
 
-App 目前有兩條音訊來源，並且刻意分開處理：
+### Audio Capture
 
-- 麥克風：`AVAudioEngine` + input tap，來源標記為 `microphone`，UI 顯示為 `Self`。
-- 系統音訊：`ScreenCaptureKit` 的 `.audio` stream output，來源標記為 `system`，UI 顯示為 `Other`。
+研究結論建議先用官方且可交付的音訊路線：
 
-分開來源的理由是會議助理需要知道「自己說的」和「對方說的」大概來自哪裡。這不是完整 speaker diarization，但對 MVP 已經比把全部音訊混成一軌更可控。
+- 本機講者：`AVAudioEngine` / AVFoundation。
+- 遠端或系統音訊：`ScreenCaptureKit`，需要 Screen Recording 權限。
+- Big Sur / Monterey 回退可研究 BlackHole 類虛擬裝置。
+- 逐參與者原始音訊只有在控制會議 SDK / WebRTC 堆疊時才比較可行。
 
-音訊格式轉換流程：
+目前原型選擇 `AVAudioEngine + ScreenCaptureKit`，因為它不需要安裝額外 driver，且能將自己與對方聲音分成 `microphone` / `system` 兩條來源。這不是完整 speaker diarization，但對 MVP 的 `Self` / `Other` 判斷已足夠。
 
-1. 麥克風由 `PCM16AudioConverter` 使用 `AVAudioConverter` 轉成 16 kHz、mono、PCM16 little-endian。
-2. 系統音訊由 `SampleBufferPCM16AudioConverter` 先把多聲道混成 mono，再線性重取樣到 16 kHz，最後轉 PCM16。
-3. `TranscriptionWebSocketClient` 把 PCM16 buffer 聚合成 3,200 bytes 一包，也就是 16,000 samples/sec * 2 bytes / 10 = 約 100 ms。
-4. 麥克風和系統音訊各自開一條 WebSocket session，送到同一個 backend endpoint。
+### STT, Not TTS
 
-WebSocket 連線開始時，client 先送：
+需求中提到「把聲音丟 AI 做 TTS」時，本專案核心實際是 STT/ASR：speech-to-text。TTS 是 text-to-speech，較適合作為未來把 AI 建議念出來的延伸功能；目前不做自動念稿，避免 AI 代表使用者發言。
 
-```json
-{
-  "type": "session.start",
-  "session_id": "macos-microphone-...",
-  "source": "microphone",
-  "sample_rate": 16000,
-  "channels": 1,
-  "sample_width": 2
-}
-```
+### Realtime Strategy
 
-之後才送 binary PCM16 音訊 frame。App 也會定期送 `client.ping`，用 `server.pong` 估算 backend round-trip latency。
+研究建議把三種節奏拆開：
 
-## Speech Segmentation and STT
+- 傳輸分塊：50-200 ms，原型採約 100 ms PCM16 frame。
+- STT 分段：用 speech window、VAD/silence 和 max duration 決定何時送模型。
+- LLM 更新：只吃穩定逐字稿或使用者按鈕，筆記每 30 秒更新。
 
-後端入口是：
-
-```text
-ws://127.0.0.1:8765/v1/transcribe/ws
-```
-
-`TranscriptionSession` 會解析 `session.start`，建立對應的 STT provider，然後持續接收 binary PCM16 frames。
-
-目前有兩種 STT 行為：
-
-- `mock`：不跑模型，固定依 `partial_interval_ms` 和 `final_interval_ms` 回傳假逐字稿，用來測 UI 和 WebSocket。
-- `faster-whisper` / `mlx-whisper`：使用 speech-window segmenter 切段，切完一段後才送模型，回傳 `transcript.final`。
-
-真實 STT provider 的切段邏輯在 `SpeechWindowSegmenter`：
-
-- 先用 PCM16 RMS 做簡單 speech detection。
-- 還沒聽到 speech 前，前置 silence 會被忽略。
-- 聽到 speech 後開始累積 audio window。
-- 累積至少 `MEETING_BACKEND_SEGMENT_MIN_MS` 後，如果尾端 silence 超過 `MEETING_BACKEND_SEGMENT_SILENCE_MS`，就 finalize。
-- 如果一直沒有 silence，超過 `MEETING_BACKEND_SEGMENT_MAX_MS` 會強制切段。
-- session 結束時會 flush 尚未送出的 speech segment。
-
-預設參數：
+目前 backend 的預設分段參數：
 
 ```text
 MEETING_BACKEND_SEGMENT_MIN_MS=800
@@ -136,170 +98,49 @@ MEETING_BACKEND_SEGMENT_MAX_MS=12000
 MEETING_BACKEND_VAD_RMS_THRESHOLD=0.012
 ```
 
-STT provider 的處理方式：
+### Model and Provider Strategy
 
-- `faster-whisper`：把 PCM16 bytes 轉成 float32 numpy array，呼叫 WhisperModel `transcribe()`，目前 `beam_size=1`，並關閉 provider 內建 VAD，因為前面已經先做 segmenting。
-- `mlx-whisper`：把該 speech window 寫成暫存 WAV，再呼叫 `mlx_whisper.transcribe()`，適合 Apple Silicon demo。
+研究結論是做能力感知的 provider abstraction，而不是把產品綁死在單一 API。實作上分成兩層：
 
-逐字稿事件會長這樣：
+- STT provider：把 audio segment 轉 transcript。
+- Assistant provider：把 transcript context 轉 structured JSON。
 
-```json
-{
-  "type": "transcript.final",
-  "segment_id": "seg_macos-microphone-..._0001",
-  "source": "microphone",
-  "speaker_hint": "self",
-  "start_ms": 0,
-  "end_ms": 2400,
-  "text": "逐字稿內容",
-  "revision": 1,
-  "is_final": true,
-  "confidence": 0.0,
-  "provider": "mlx-whisper"
-}
-```
+目前 assistant provider 支援 `ollama`、`openai-compatible`、`codex-cli`、`github-copilot-cli`。預設 assistant 設定是 provider `ollama`、model `fast`、thinking `high`。Codex CLI 和 GitHub Copilot CLI 是展示「可串自己的 agent / API」的實驗線；正式低延遲會議話術仍應優先使用 chat provider 或本機 LLM。
 
-SwiftUI 端用 `segment_id` 更新或新增 transcript line。UI 目前最多保留最近 24 行，Assistant request 會取最近 16 行當上下文。
+### Prompt and Output Contract
 
-## AI Assistant Pipeline
+後端在 `apps/backend/meeting_backend/assistant/prompts.py` 依 action 拆提示詞：
 
-Assistant 目前由右側按鈕觸發：
+- `what_should_i_say`
+- `follow_up_questions`
+- `meeting_notes`
+- `chat`
 
-- `What should I say?`
-- `Follow-up questions`
-
-按下按鈕後，macOS App 會把最近逐字稿送到：
-
-```http
-POST /v1/assistant/respond
-```
-
-request 形狀：
+模型必須輸出固定 JSON：
 
 ```json
 {
-  "action": "what_should_i_say",
-  "provider": "ollama",
-  "model": "llama3.2",
-  "thinking": "medium",
-  "transcript": [
-    {
-      "source": "system",
-      "source_label": "Other",
-      "speaker_hint": "other",
-      "start_ms": 1200,
-      "end_ms": 4200,
-      "text": "對方剛剛問的問題",
-      "is_final": true
-    }
-  ]
+  "drafts": [{ "title": "...", "detail": "...", "badge": "...", "icon_name": "..." }],
+  "notes": [{ "title": "...", "detail": "..." }],
+  "actions": [{ "title": "...", "owner": "...", "state": "..." }]
 }
 ```
 
-後端會依 UI 選到的 provider dispatch：
-
-- `mock`：本地固定回覆，方便 demo。
-- `ollama`：呼叫 `http://127.0.0.1:11434/api/chat`。
-- `openai-compatible`：呼叫 `/chat/completions`，可接 LM Studio、vLLM、llama.cpp、OpenAI API 等相容端點。
-- `codex-cli`：執行 `codex exec`，使用 read-only sandbox、ephemeral session、approval disabled。
-- `github-copilot-cli`：透過 `gh copilot` 呼叫。
-
-Provider、model、thinking 都可以在 App 裡選。App 會先呼叫：
-
-```http
-GET /v1/assistant/providers
-```
-
-取得可用 provider、models、auth mode 和 endpoint risk。
-
-## Is There a Preprompt?
-
-有。現在的 preprompt 在 backend 的 `assistant/prompts.py` 裡，依 action 拆成獨立 template，再由 `build_messages()` 組成 system message 和 user message。
-
-system preprompt 的重點是：
-
-- 你是即時會議助理。
-- 只能使用 transcript context。
-- 不要編造事實。
-- 只回 JSON。
-- JSON 必須包含 `drafts`、`notes`、`actions`。
-- `drafts` item 需要 `title`、`detail`、`badge`、`icon_name`。
-- `notes` item 需要 `title`、`detail`。
-- `actions` item 需要 `title`、`owner`、`state`。
-
-user message 會放：
-
-- `Action`：例如 `what_should_i_say` 或 `follow_up_questions`。
-- `Thinking setting requested by user`：例如 `none`、`low`、`medium`、`high`、`xhigh`。
-- 任務說明。
-- 最近 16 行 transcript context。
-- `Return compact JSON only.`
-
-不同 action 會有不同任務說明：
-
-- `what_should_i_say`：產生 2 到 3 句自然、簡短、可直接說出口的回覆。若逐字稿不是明顯英文，優先用口語中文。
-- `follow_up_questions`：產生 3 個實用追問，聚焦目標、限制、責任歸屬或時程。
-- `meeting_notes`：依固定會議記錄 template 整理「討論主題與內容、目前結論、待討論事項、未解決問題」和 CTA / next actions。
-
-模型輸出會先經過 `assistant/schema.py` 的 JSON Schema-style validator。若模型回傳格式不完整，backend 會把可用欄位正規化成 `drafts`、`notes`、`actions`，再對正規化後的 payload 驗證一次，確保 UI 拿到固定結構。下一階段可再把 schema 版本化，例如 `suggested_reply_v1`、`follow_up_questions_v1`、`meeting_notes_v1`，並加入重試與 evidence segment ids。
-
-## Meeting Notes and Next Actions
-
-目前 App 有兩層筆記邏輯：
-
-- 本地 draft：每收到一個 final transcript line，就用該段文字更新「最新重點」與「Review transcript segment」。
-- 自動整理：`Start Meeting` 後，App 會啟動音訊擷取、連上 STT backend，右側 Meeting Notes 會顯示 30 秒圓形倒數；倒數到 0 時，用最近 16 段 final transcript 呼叫 `/v1/assistant/respond` 的 `meeting_notes` action。
-- AI response：如果 auto summary 或按鈕請求回傳 `notes` / `actions`，UI 會用 provider 回來的內容取代本地 draft。
-
-目前的低頻增量管線：
-
-- 即時字幕：跟 STT event 走，越快越好。
-- 回覆建議：由 `What should I say?` 和 `Follow-up questions` 按鈕觸發。
-- 會議筆記：每 30 秒自動整理一次，只使用 final transcript，避免 partial transcript 把筆記帶歪。
-- 會後整理：仍可再用較高品質模型重整 decisions、action items、risks、open questions。
-
-## Model and Provider Strategy
-
-這個專題的模型策略不是綁死單一 API，而是建立 provider abstraction：
-
-- STT provider 負責把 audio segment 轉 transcript。
-- Assistant provider 負責把 transcript context 轉成 structured JSON。
-- UI 不直接依賴特定模型的輸出格式，而是吃 backend normalize 過的 `drafts`、`notes`、`actions`。
-
-推薦 MVP 組合：
-
-- Apple Silicon demo：`mlx-whisper` + `large-v3-turbo`。
-- 快速 UI 測試：`mock` STT + `mock` assistant。
-- 本機 LLM：`ollama` assistant。
-- 外部或相容端點：`openai-compatible` assistant。
-
-Codex CLI 和 GitHub Copilot CLI 目前被當成 assistant provider 實驗路線。它們適合展示「可串自己的 agent / API」，但正式會議話術預設仍應優先用低延遲 chat provider，因為 CLI agent 啟動成本和行為邊界比較不適合高頻即時回覆。
-
-## Privacy and Data Boundaries
-
-目前原型的資料邊界：
-
-- 原始音訊只送到 backend STT WebSocket。
-- Assistant API 只接收逐字稿文字與 metadata，不接收音訊。
-- 若 provider 是本機 `mock`、`ollama` 或 localhost OpenAI-compatible endpoint，文字留在本機服務。
-- 若 provider 指向外部 API，逐字稿文字會送出本機。
-- API key 由 backend environment 提供，macOS App 不直接保存 key。
-
-未來若要做正式產品，會議前需要明確告知錄音、轉寫、模型處理、保存期限與刪除方式。高敏感場景應預設 local-first、短 TTL、可見 recording/assistant-on 指示，並允許會後刪除。
+`assistant/schema.py` 會把 provider 輸出正規化並驗證，確保 UI 不依賴自由文字解析。
 
 ## Run the Prototype
 
-啟動 backend：
+Backend faster-whisper STT:
 
 ```bash
 cd apps/backend
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e ".[stt]"
-MEETING_BACKEND_PROVIDER=mock ./scripts/dev.sh
+MEETING_BACKEND_PROVIDER=faster-whisper ./scripts/dev.sh
 ```
 
-Apple Silicon 本機 STT demo：
+Apple Silicon MLX Whisper demo:
 
 ```bash
 cd apps/backend
@@ -310,17 +151,18 @@ MEETING_BACKEND_MODEL=large-v3-turbo \
 ./scripts/dev.sh
 ```
 
-Ollama assistant demo：
+Ollama assistant demo:
 
 ```bash
 cd apps/backend
 source .venv/bin/activate
 MEETING_BACKEND_ASSISTANT_PROVIDER=ollama \
-MEETING_BACKEND_ASSISTANT_MODEL=llama3.2 \
+MEETING_BACKEND_ASSISTANT_MODEL=fast \
+MEETING_BACKEND_ASSISTANT_THINKING=high \
 ./scripts/dev.sh
 ```
 
-OpenAI-compatible assistant demo：
+OpenAI-compatible assistant demo:
 
 ```bash
 cd apps/backend
@@ -328,10 +170,11 @@ source .venv/bin/activate
 MEETING_BACKEND_ASSISTANT_PROVIDER=openai-compatible \
 MEETING_BACKEND_ASSISTANT_OPENAI_BASE_URL=http://127.0.0.1:1234/v1 \
 MEETING_BACKEND_ASSISTANT_MODEL=local-model \
+MEETING_BACKEND_ASSISTANT_THINKING=high \
 ./scripts/dev.sh
 ```
 
-Build macOS App：
+Build and open the macOS app:
 
 ```bash
 cd apps/macos/MeetingAssistantPrototype
@@ -339,10 +182,10 @@ cd apps/macos/MeetingAssistantPrototype
 open .build/app/MeetingAssistantPrototype.app
 ```
 
-第一次測試需要 macOS 權限：
+第一次測試需要授權：
 
 - Microphone：麥克風權限。
-- Screen Recording：ScreenCaptureKit 擷取系統音訊需要螢幕錄製權限，授權後通常要重開 App。
+- Screen Recording：ScreenCaptureKit 系統音訊需要螢幕錄製權限，授權後通常要重開 App。
 
 App 預設連到：
 
@@ -350,48 +193,79 @@ App 預設連到：
 ws://127.0.0.1:8765/v1/transcribe/ws
 ```
 
-也可以用環境變數改 endpoint：
+## Slides
+
+畢業專題 Slidev 簡報在：
 
 ```text
-MEETING_BACKEND_WS_URL=ws://127.0.0.1:8765/v1/transcribe/ws
-MEETING_BACKEND_HOST=127.0.0.1
-MEETING_BACKEND_PORT=8765
+docs/slides/slides.md
+```
+
+啟動簡報：
+
+```bash
+pnpm install
+pnpm slides:dev
+```
+
+預設 URL：
+
+```text
+http://127.0.0.1:3030
+```
+
+產生靜態版：
+
+```bash
+pnpm slides:build
 ```
 
 ## Validation
 
-後端測試：
+Backend tests:
 
 ```bash
 cd apps/backend
 source .venv/bin/activate
-python -m pip install -e ".[stt]"
 python -m pytest
 ```
 
-可以用 test client 對 backend 做 WebSocket smoke test：
+WebSocket smoke test:
 
 ```bash
 cd apps/backend
 source .venv/bin/activate
-MEETING_BACKEND_PROVIDER=mock ./scripts/dev.sh
+MEETING_BACKEND_PROVIDER=faster-whisper ./scripts/dev.sh
 python scripts/send_test_audio.py
+```
+
+macOS build:
+
+```bash
+cd apps/macos/MeetingAssistantPrototype
+./Scripts/build-app.sh
+```
+
+Slidev:
+
+```bash
+pnpm slides:build
 ```
 
 ## Current Limitations
 
-- 真實 STT provider 目前以 speech window 輸出 `transcript.final`，還不是完整 token-level streaming partial。
-- RMS VAD 很輕量，但不如 Silero/WebRTC VAD 穩，噪音環境需要再調參或替換。
-- `speaker_hint` 目前只根據來源推斷 `self` / `other`，不是完整 speaker diarization。
-- 會議聊天框還未成為獨立路由；目前優先完成兩個按鈕和筆記/action drafts。
-- SQLite 目前保存 sessions、transcript segments、assistant suggestions、notes、actions，但還沒有完整 meeting-level join、查詢 API、匯出 API 或 evidence segment ids。
-- 長會議的 rolling summary 還在規劃階段。
+- 真實 STT provider 目前以 speech window 產生 `transcript.final`，還不是 token-level streaming partial。
+- RMS VAD 足夠輕量，但噪音場景仍需要 Silero/WebRTC VAD 或更完整的語意邊界策略。
+- `speaker_hint` 目前只根據音訊來源推斷 `self` / `other`。
+- 會議聊天框尚未成為完整 UI route，目前先完成按鈕建議和筆記/action drafts。
+- SQLite 已保存 sessions、transcript segments、assistant runs、suggestions、notes、actions，但還沒有 meeting-level 查詢、匯出 API、FTS 或 evidence segment ids。
+- 長會議 rolling summary 和 prompt state object 仍是下一階段。
 
-## Next Technical Steps
+## Next Steps
 
-1. 把 SQLite 資料加上 meeting-level 查詢 API 與匯出 API。
-2. 把 assistant schema 版本化，加入 invalid-output retry 與 evidence segment ids。
-3. 增加 rolling summary，避免每次把整場逐字稿丟給模型。
-4. 將 `chat` 補成前端可用的會議問答路由。
-5. 測試 Zoom、Google Meet、Teams 的系統音訊擷取穩定性。
-6. 加入 latency metrics：capture-to-final、backend RTT、button-to-suggestion、notes refresh latency。
+1. 補 meeting-level API、查詢、匯出與 FTS。
+2. 將 assistant schema 版本化，加入 invalid-output retry 與 evidence segment ids。
+3. 將 RMS VAD 替換或升級成 Silero/WebRTC VAD 加語意邊界。
+4. 補會議聊天框，讓使用者可以針對目前逐字稿問 AI。
+5. 在 Zoom、Google Meet、Teams 上做系統音訊穩定性測試。
+6. 量測 capture-to-final、backend RTT、button-to-suggestion、notes refresh latency。
