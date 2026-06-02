@@ -3,9 +3,11 @@ import Foundation
 
 final class MicrophoneCaptureService {
     var onLevel: ((AudioLevel) -> Void)?
+    var onAudioChunk: ((Data) -> Void)?
     var onError: ((String) -> Void)?
 
     private let engine = AVAudioEngine()
+    private let pcm16Converter = PCM16AudioConverter()
     private var isRunning = false
 
     func start() async throws {
@@ -24,6 +26,10 @@ final class MicrophoneCaptureService {
         inputNode.removeTap(onBus: 0)
         inputNode.installTap(onBus: 0, bufferSize: 1_024, format: format) { [weak self] buffer, _ in
             self?.onLevel?(AudioLevelAnalyzer.levels(from: buffer))
+
+            if let chunk = self?.pcm16Converter.convert(buffer), !chunk.isEmpty {
+                self?.onAudioChunk?(chunk)
+            }
         }
 
         engine.prepare()

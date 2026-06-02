@@ -17,7 +17,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Meeting Assistant Capture Test")
                     .font(.system(size: 22, weight: .semibold))
-                Text("Verify microphone input and ScreenCaptureKit system audio before building transcription.")
+                Text("Verify microphone, ScreenCaptureKit system audio, and local live transcription.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -30,6 +30,14 @@ struct ContentView: View {
                 Label("Start All", systemImage: "record.circle")
             }
             .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+
+            Button {
+                viewModel.connectTranscription()
+            } label: {
+                Label("Connect STT", systemImage: "text.bubble.fill")
+            }
+            .buttonStyle(.bordered)
             .controlSize(.large)
 
             Button {
@@ -70,8 +78,17 @@ struct ContentView: View {
             }
             .frame(maxWidth: .infinity)
 
-            EventLogPanel(events: viewModel.eventLog)
-                .frame(width: 310)
+            VStack(spacing: 18) {
+                TranscriptionPanel(
+                    status: viewModel.transcriptionStatus,
+                    lines: viewModel.transcriptLines,
+                    connectAction: viewModel.connectTranscription,
+                    disconnectAction: viewModel.disconnectTranscription
+                )
+
+                EventLogPanel(events: viewModel.eventLog)
+            }
+            .frame(width: 360)
         }
         .padding(24)
     }
@@ -247,6 +264,125 @@ private struct LevelReadout: View {
     }
 }
 
+private struct TranscriptionPanel: View {
+    let status: CaptureStatus
+    let lines: [TranscriptLine]
+    let connectAction: () -> Void
+    let disconnectAction: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 10) {
+                Image(systemName: "text.bubble.fill")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(.white)
+                    .frame(width: 34, height: 34)
+                    .background(statusColor, in: RoundedRectangle(cornerRadius: 8))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Live Transcript")
+                        .font(.headline)
+                    Text("Local websocket STT")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                StatusPill(status: status, color: statusColor)
+            }
+
+            HStack(spacing: 10) {
+                Button(action: connectAction) {
+                    Label("Connect", systemImage: "link")
+                }
+                .buttonStyle(.borderedProminent)
+
+                Button(action: disconnectAction) {
+                    Label("Disconnect", systemImage: "link.badge.minus")
+                }
+                .buttonStyle(.bordered)
+
+                Spacer()
+            }
+
+            Divider()
+
+            if lines.isEmpty {
+                Text("啟動 backend 後按 Connect STT，對著麥克風說話，逐字稿會顯示在這裡。")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, minHeight: 180, alignment: .topLeading)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(lines) { line in
+                            TranscriptLineView(line: line)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(minHeight: 180, maxHeight: 300)
+            }
+        }
+        .padding(16)
+        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        )
+    }
+
+    private var statusColor: Color {
+        switch status {
+        case .idle:
+            return .gray
+        case .starting:
+            return .orange
+        case .running:
+            return .blue
+        case .failed:
+            return .red
+        }
+    }
+}
+
+private struct TranscriptLineView: View {
+    let line: TranscriptLine
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Text(line.sourceLabel)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(line.isFinal ? .blue : .orange)
+
+                Text(line.timeRangeLabel)
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                Text(line.isFinal ? "Final" : "Partial")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(line.isFinal ? Color.secondary : Color.orange)
+            }
+
+            Text(line.text)
+                .font(.callout)
+                .foregroundStyle(line.isFinal ? .primary : .secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(10)
+        .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        )
+    }
+}
+
 private struct EventLogPanel: View {
     let events: [String]
 
@@ -279,7 +415,9 @@ private struct EventLogPanel: View {
     }
 }
 
-#Preview {
-    ContentView()
-        .environmentObject(CaptureViewModel())
+struct ContentView_Previews: PreviewProvider {
+    static var previews: some View {
+        ContentView()
+            .environmentObject(CaptureViewModel())
+    }
 }
