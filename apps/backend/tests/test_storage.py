@@ -21,7 +21,7 @@ class StorageTest(unittest.TestCase):
                 sample_width=2,
             )
 
-            storage.record_session_start(session, provider="mock", model="mock-model")
+            storage.record_session_start(session, provider="faster-whisper", model="large-v3")
             storage.record_transcript_event(
                 transcript_event(
                     event_type="transcript.final",
@@ -32,15 +32,15 @@ class StorageTest(unittest.TestCase):
                     text="Hello from the meeting.",
                     revision=1,
                     is_final=True,
-                    provider="mock",
+                    provider="faster-whisper",
                 )
             )
             storage.record_assistant_result(
                 AssistantRequest(
                     action="meeting_notes",
-                    provider="mock",
-                    model="mock-conversation",
-                    thinking="medium",
+                    provider="ollama",
+                    model="fast",
+                    thinking="high",
                     temperature=0.2,
                     max_tokens=700,
                     transcript=[
@@ -56,9 +56,9 @@ class StorageTest(unittest.TestCase):
                     ],
                 ),
                 AssistantResult(
-                    provider="mock",
-                    model="mock-conversation",
-                    thinking="medium",
+                    provider="ollama",
+                    model="fast",
+                    thinking="high",
                     latency_ms=12,
                     drafts=[
                         {

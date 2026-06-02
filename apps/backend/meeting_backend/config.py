@@ -3,9 +3,9 @@ from dataclasses import dataclass
 
 DEFAULT_PROVIDER = "faster-whisper"
 DEFAULT_WHISPER_MODEL = "large-v3"
-DEFAULT_ASSISTANT_PROVIDER = "mock"
-DEFAULT_ASSISTANT_MODEL = "mock-conversation"
-DEFAULT_ASSISTANT_THINKING = "medium"
+DEFAULT_ASSISTANT_PROVIDER = "ollama"
+DEFAULT_ASSISTANT_MODEL = "fast"
+DEFAULT_ASSISTANT_THINKING = "high"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
 DEFAULT_WS_PATH = "/v1/transcribe/ws"

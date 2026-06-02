@@ -1,7 +1,6 @@
 from meeting_backend.config import Settings
 from meeting_backend.transcription.faster_whisper_provider import FasterWhisperStreamingTranscriber
 from meeting_backend.transcription.mlx_whisper_provider import MlxWhisperStreamingTranscriber
-from meeting_backend.transcription.mock import MockStreamingTranscriber
 from meeting_backend.transcription.segmenter import SpeechSegmenterConfig
 
 
@@ -13,11 +12,6 @@ def create_transcriber(settings: Settings):
         speech_rms_threshold=settings.vad_rms_threshold,
     )
 
-    if settings.provider == "mock":
-        return MockStreamingTranscriber(
-            partial_interval_ms=settings.partial_interval_ms,
-            final_interval_ms=settings.final_interval_ms,
-        )
     if settings.provider == "faster-whisper":
         return FasterWhisperStreamingTranscriber(
             model_name=settings.whisper_model,

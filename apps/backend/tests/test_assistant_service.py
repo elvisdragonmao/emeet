@@ -1,6 +1,7 @@
 import unittest
 
 from meeting_backend.assistant.models import AssistantRequest, AssistantTranscriptLine
+from meeting_backend.assistant import service
 from meeting_backend.assistant.service import (
     build_codex_exec_command,
     generate_assistant_response,
@@ -11,12 +12,12 @@ from meeting_backend.config import Settings
 
 
 class AssistantServiceTest(unittest.TestCase):
-    def test_mock_provider_generates_drafts(self) -> None:
+    def test_ollama_provider_generates_drafts(self) -> None:
         request = AssistantRequest(
             action="what_should_i_say",
-            provider="mock",
-            model="mock-conversation",
-            thinking="medium",
+            provider="ollama",
+            model="fast",
+            thinking="high",
             temperature=0.2,
             max_tokens=700,
             transcript=[
@@ -32,19 +33,28 @@ class AssistantServiceTest(unittest.TestCase):
             ],
         )
 
-        result = generate_assistant_response(Settings(), request)
+        original = service.ollama_completion
+        service.ollama_completion = lambda *_args: (
+            '{"drafts":[{"title":"Answer Friday","detail":"We can target Friday after checking scope.",'
+            '"badge":"AI","icon_name":"quote.bubble"}],"notes":[],"actions":[]}'
+        )
+        try:
+            result = generate_assistant_response(Settings(), request)
+        finally:
+            service.ollama_completion = original
 
-        self.assertEqual(result.provider, "mock")
-        self.assertEqual(result.model, "mock-conversation")
+        self.assertEqual(result.provider, "ollama")
+        self.assertEqual(result.model, "fast")
+        self.assertEqual(result.thinking, "high")
         self.assertGreaterEqual(len(result.drafts), 1)
         self.assertIn("Friday", result.raw_text or "")
 
-    def test_mock_provider_generates_meeting_notes_and_actions(self) -> None:
+    def test_ollama_provider_generates_meeting_notes_and_actions(self) -> None:
         request = AssistantRequest(
             action="meeting_notes",
-            provider="mock",
-            model="mock-conversation",
-            thinking="medium",
+            provider="ollama",
+            model="fast",
+            thinking="high",
             temperature=0.2,
             max_tokens=700,
             transcript=[
@@ -60,7 +70,18 @@ class AssistantServiceTest(unittest.TestCase):
             ],
         )
 
-        result = generate_assistant_response(Settings(), request)
+        original = service.ollama_completion
+        service.ollama_completion = lambda *_args: (
+            '{"drafts":[],"notes":[{"title":"討論主題與內容","detail":"Eva owns the demo checklist."},'
+            '{"title":"目前結論","detail":"Checklist needs confirmation."},'
+            '{"title":"待討論事項","detail":"Confirm timing."},'
+            '{"title":"未解決問題","detail":"Who signs off?"}],'
+            '"actions":[{"title":"Confirm demo checklist","owner":"Eva","state":"Draft"}]}'
+        )
+        try:
+            result = generate_assistant_response(Settings(), request)
+        finally:
+            service.ollama_completion = original
 
         self.assertGreaterEqual(len(result.notes), 4)
         self.assertGreaterEqual(len(result.actions), 1)
@@ -68,15 +89,16 @@ class AssistantServiceTest(unittest.TestCase):
         self.assertIn("未解決問題", [note["title"] for note in result.notes])
         self.assertIn("demo checklist", result.raw_text or "")
 
-    def test_provider_descriptors_include_mock_and_cli_entries(self) -> None:
+    def test_provider_descriptors_include_local_and_cli_entries(self) -> None:
         descriptors = list_provider_descriptors(Settings())
         provider_ids = [provider["id"] for provider in descriptors["providers"]]
 
-        self.assertIn("mock", provider_ids)
         self.assertIn("ollama", provider_ids)
         self.assertIn("openai-compatible", provider_ids)
         self.assertIn("codex-cli", provider_ids)
-        self.assertEqual(descriptors["defaults"]["thinking"], "medium")
+        self.assertEqual(descriptors["defaults"]["provider"], "ollama")
+        self.assertEqual(descriptors["defaults"]["model"], "fast")
+        self.assertEqual(descriptors["defaults"]["thinking"], "high")
 
     def test_parse_assistant_json_extracts_object_from_text(self) -> None:
         parsed = parse_assistant_json('Here is JSON:\n{"drafts": [{"title": "A"}]}')

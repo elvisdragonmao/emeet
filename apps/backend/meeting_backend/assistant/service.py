@@ -13,11 +13,10 @@ from meeting_backend.assistant.models import (
     AssistantProviderDescriptor,
     AssistantRequest,
     AssistantResult,
-    AssistantTranscriptLine,
 )
 from meeting_backend.assistant.prompts import build_messages
 from meeting_backend.assistant.schema import canonical_assistant_payload
-from meeting_backend.config import Settings
+from meeting_backend.config import DEFAULT_ASSISTANT_PROVIDER, DEFAULT_ASSISTANT_THINKING, Settings
 
 
 THINKING_LEVELS = {"none", "low", "medium", "high", "xhigh"}
@@ -31,7 +30,6 @@ def list_provider_descriptors(settings: Settings) -> Dict[str, Any]:
             "thinking": settings.assistant_thinking,
         },
         "providers": [
-            mock_descriptor(settings).to_dict(),
             ollama_descriptor(settings).to_dict(),
             openai_compatible_descriptor(settings).to_dict(),
             codex_cli_descriptor(settings).to_dict(),
@@ -69,9 +67,6 @@ def dispatch_provider(
     model: str,
     thinking: str,
 ) -> str:
-    if provider == "mock":
-        return mock_completion(request, model, thinking)
-
     messages = build_messages(request)
     if provider == "ollama":
         return ollama_completion(settings, model, messages, request, thinking)
@@ -86,95 +81,6 @@ def dispatch_provider(
         return github_copilot_cli_completion(settings, model, messages, thinking)
 
     raise ValueError("unsupported assistant provider: {}".format(provider))
-
-
-def mock_completion(request: AssistantRequest, model: str, thinking: str) -> str:
-    latest = latest_transcript_text(request.transcript)
-    if request.action == "follow_up_questions":
-        payload = {
-            "drafts": [
-                {
-                    "title": "釐清目標",
-                    "detail": "你希望我們優先確認目標、時程，還是決策標準？",
-                    "badge": "AI",
-                    "icon_name": "questionmark.bubble",
-                },
-                {
-                    "title": "確認下一步",
-                    "detail": "下一步由誰負責，預計什麼時間前可以回覆或完成？",
-                    "badge": thinking,
-                    "icon_name": "arrowshape.turn.up.right",
-                },
-                {
-                    "title": "補齊風險",
-                    "detail": "目前有沒有任何限制、依賴或風險，是我們需要先確認的？",
-                    "badge": model,
-                    "icon_name": "exclamationmark.triangle",
-                },
-            ],
-            "notes": [],
-            "actions": [],
-        }
-    elif request.action == "meeting_notes":
-        final_count = sum(1 for line in request.transcript if line.is_final)
-        payload = {
-            "drafts": [],
-            "notes": [
-                {
-                    "title": "討論主題與內容",
-                    "detail": "- 已根據最近 {} 段逐字稿整理。\n- 最新討論內容：{}".format(final_count, latest),
-                },
-                {
-                    "title": "目前結論",
-                    "detail": "- 逐字稿尚未提供明確決策時，維持草稿狀態。\n- 只保留 transcript 中已說出的結論。",
-                },
-                {
-                    "title": "待討論事項",
-                    "detail": "- 補齊尚未確認的時程、範圍與決策標準。\n- 確認是否需要更多資料或 demo 檢查清單。",
-                },
-                {
-                    "title": "未解決問題",
-                    "detail": "- 責任歸屬是否明確？\n- 是否有風險、限制或依賴尚未確認？",
-                },
-            ],
-            "actions": [
-                {
-                    "title": "確認下一步與負責人",
-                    "owner": "Unassigned",
-                    "state": "Draft",
-                },
-                {
-                    "title": "Review latest transcript evidence",
-                    "owner": "Self",
-                    "state": "Review",
-                },
-            ],
-        }
-    else:
-        payload = {
-            "drafts": [
-                {
-                    "title": "先對齊問題",
-                    "detail": "我先確認一下，你剛剛的重點是「{}」，對嗎？".format(latest),
-                    "badge": "AI",
-                    "icon_name": "quote.bubble",
-                },
-                {
-                    "title": "保守回覆",
-                    "detail": "我可以先給一個初步方向，細節我會再確認後補上，避免現在講錯。",
-                    "badge": thinking,
-                    "icon_name": "checkmark.seal",
-                },
-            ],
-            "notes": [
-                {"title": "最新脈絡", "detail": latest},
-            ],
-            "actions": [
-                {"title": "Review AI suggestion before speaking", "owner": "Self", "state": "Draft"},
-            ],
-        }
-
-    return json.dumps(payload, ensure_ascii=False)
 
 
 def ollama_completion(
@@ -342,21 +248,6 @@ def run_command(command: List[str], prompt: str, timeout_ms: int) -> subprocess.
     return completed
 
 
-def mock_descriptor(settings: Settings) -> AssistantProviderDescriptor:
-    return AssistantProviderDescriptor(
-        id="mock",
-        label="Mock Assistant",
-        kind="local_server",
-        installed=True,
-        available=True,
-        models=["mock-conversation"],
-        capabilities=["chat", "json_output"],
-        risk_level="low",
-        auth_mode="none",
-        notes=["Deterministic local fallback for UI and transport tests."],
-    )
-
-
 def ollama_descriptor(settings: Settings) -> AssistantProviderDescriptor:
     models, error = list_ollama_models(settings.assistant_ollama_base_url, probe_timeout_ms(settings))
     available = error == ""
@@ -512,14 +403,6 @@ def parse_assistant_json(text: str) -> Dict[str, Any]:
             return {}
 
 
-def latest_transcript_text(lines: List[AssistantTranscriptLine]) -> str:
-    for line in reversed(lines):
-        text = line.text.strip()
-        if text:
-            return text[:80]
-    return "目前還沒有逐字稿"
-
-
 def normalize_provider(provider: str) -> str:
     normalized = provider.strip().lower()
     aliases = {
@@ -531,12 +414,12 @@ def normalize_provider(provider: str) -> str:
         "github-copilot": "github-copilot-cli",
         "codex": "codex-cli",
     }
-    return aliases.get(normalized, normalized or "mock")
+    return aliases.get(normalized, normalized or DEFAULT_ASSISTANT_PROVIDER)
 
 
 def normalize_thinking(thinking: str) -> str:
     normalized = thinking.strip().lower()
-    return normalized if normalized in THINKING_LEVELS else "medium"
+    return normalized if normalized in THINKING_LEVELS else DEFAULT_ASSISTANT_THINKING
 
 
 def dedupe(values: List[str]) -> List[str]:

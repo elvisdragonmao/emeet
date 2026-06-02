@@ -15,9 +15,9 @@ class AssistantPromptsTest(unittest.TestCase):
     def test_build_messages_includes_transcript_and_output_contract(self) -> None:
         request = AssistantRequest(
             action="meeting_notes",
-            provider="mock",
-            model="mock-conversation",
-            thinking="medium",
+            provider="ollama",
+            model="fast",
+            thinking="high",
             temperature=0.2,
             max_tokens=700,
             transcript=[

@@ -22,9 +22,9 @@ final class CaptureViewModel: ObservableObject {
     @Published private(set) var assistantModeLabel = "Ready"
     @Published private(set) var assistantStatus: CaptureStatus = .idle
     @Published private(set) var assistantProviders: [AssistantProviderDescriptor] = []
-    @Published private(set) var assistantProviderID = "mock"
-    @Published private(set) var assistantModel = "mock-conversation"
-    @Published private(set) var assistantThinking = AssistantThinking.medium.rawValue
+    @Published private(set) var assistantProviderID = "ollama"
+    @Published private(set) var assistantModel = "fast"
+    @Published private(set) var assistantThinking = AssistantThinking.high.rawValue
     @Published private(set) var assistantDrafts: [AssistantDraft] = []
     @Published private(set) var noteDrafts: [MeetingNoteDraft] = []
     @Published private(set) var actionDrafts: [MeetingActionDraft] = []
@@ -153,18 +153,18 @@ final class CaptureViewModel: ObservableObject {
         assistantProviders.isEmpty
             ? [
                 AssistantProviderDescriptor(
-                    id: "mock",
-                    label: "Mock Assistant",
+                    id: "ollama",
+                    label: "Ollama",
                     kind: "local_server",
-                    installed: true,
-                    available: true,
-                    models: ["mock-conversation"],
-                    capabilities: ["chat"],
+                    installed: false,
+                    available: false,
+                    models: ["fast"],
+                    capabilities: ["chat", "json_output"],
                     riskLevel: "low",
                     authMode: "none",
-                    endpoint: "",
+                    endpoint: "http://127.0.0.1:11434",
                     binaryPath: "",
-                    notes: []
+                    notes: ["Provider discovery failed. Start the backend and Ollama, then refresh."]
                 )
             ]
             : assistantProviders
@@ -531,7 +531,7 @@ final class CaptureViewModel: ObservableObject {
             action: action,
             provider: assistantProviderID,
             model: assistantModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                ? "mock-conversation"
+                ? "fast"
                 : assistantModel,
             thinking: assistantThinking,
             transcript: assistantTranscriptPayload()
@@ -675,7 +675,7 @@ final class CaptureViewModel: ObservableObject {
             action: "meeting_notes",
             provider: assistantProviderID,
             model: assistantModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                ? "mock-conversation"
+                ? "fast"
                 : assistantModel,
             thinking: assistantThinking,
             transcript: transcript

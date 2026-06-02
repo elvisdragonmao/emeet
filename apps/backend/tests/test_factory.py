@@ -1,24 +1,46 @@
 import unittest
-from unittest.mock import patch
 
 from meeting_backend.config import Settings
-from meeting_backend.transcription import create_transcriber
+from meeting_backend.transcription import factory
+
+
+class RecordingTranscriber:
+    provider_name = "recording"
+    calls = []
+
+    def __init__(self, **kwargs) -> None:
+        self.kwargs = kwargs
+        self.__class__.calls.append(kwargs)
 
 
 class FactoryTest(unittest.TestCase):
-    def test_creates_mock_provider(self) -> None:
-        transcriber = create_transcriber(Settings(provider="mock"))
-        self.assertEqual(transcriber.provider_name, "mock")
+    def test_creates_faster_whisper_provider(self) -> None:
+        original = factory.FasterWhisperStreamingTranscriber
+        RecordingTranscriber.calls = []
+        factory.FasterWhisperStreamingTranscriber = RecordingTranscriber
+        try:
+            transcriber = factory.create_transcriber(Settings(provider="faster-whisper"))
+        finally:
+            factory.FasterWhisperStreamingTranscriber = original
+
+        self.assertEqual(transcriber.provider_name, "recording")
+        self.assertEqual(RecordingTranscriber.calls[0]["model_name"], "large-v3")
 
     def test_creates_mlx_provider(self) -> None:
-        with patch("meeting_backend.transcription.factory.MlxWhisperStreamingTranscriber") as transcriber:
-            create_transcriber(Settings(provider="mlx-whisper"))
+        original = factory.MlxWhisperStreamingTranscriber
+        RecordingTranscriber.calls = []
+        factory.MlxWhisperStreamingTranscriber = RecordingTranscriber
+        try:
+            transcriber = factory.create_transcriber(Settings(provider="mlx-whisper"))
+        finally:
+            factory.MlxWhisperStreamingTranscriber = original
 
-        transcriber.assert_called_once()
+        self.assertEqual(transcriber.provider_name, "recording")
+        self.assertEqual(RecordingTranscriber.calls[0]["model_name"], "large-v3")
 
     def test_rejects_unknown_provider(self) -> None:
         with self.assertRaises(ValueError):
-            create_transcriber(Settings(provider="missing"))
+            factory.create_transcriber(Settings(provider="missing"))
 
 
 if __name__ == "__main__":
