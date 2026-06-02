@@ -11,21 +11,67 @@ drawings:
   persist: false
 ---
 
-# emeet
+# emeet - 本地即時會議輔助工具
 
-macOS App 畢業專題報告
+毛宥鈞・百川專題探索報告
 
-<div class="subtitle">
-即時逐字稿、回覆建議、追問問題、會議筆記、下一步行動，以及可切換的 AI provider。
-</div>
-
-<div class="meta">
-private · native · realtime · model-selectable
-</div>
 
 <!--
 開場先用一句話講清楚：這不是單純會後摘要工具，而是會議進行中輔助使用者思考和回應的桌面副駕。
 今天的報告順序是先 demo，讓大家看到系統真的能跑，再回頭說明我研究了哪些技術線、最後為什麼這樣選。
+-->
+
+---
+
+# Project Goal
+
+* 讓會議的過程更順利
+  * 讓大家都可以輕鬆 catch up 跟上討論
+  * 避免尷尬的空白
+* 完成會議記錄與行動項目
+  * 讓會議結束後不會忘記誰說了什麼、下一步要做什麼
+
+---
+
+# Why This Is Interesting
+
+現有產品多半擅長：
+
+- 會後摘要
+- 搜尋逐字稿
+- 產生 action items
+- 和 Zoom、Teams、Notion、CRM 整合
+
+本專題想切的空間是：
+
+<div class="callout">
+本地能跑、跨會議平台的即時會議輔助工具。
+</div>
+
+<!--
+研究競品後發現，摘要和 action items 已經是基本功能。差異化不能只說我也會摘要，而是要強調會議當下能幫忙回話。
+-->
+
+---
+
+# Product Positioning
+
+進行大量研究之後把目標放在：
+
+<div class="quote">
+當我正在對話裡，我可以快速知道下一句該怎麼回、還能問什麼、以及後續要做什麼。
+</div>
+
+因此第一版鎖定：
+
+- macOS 原生 App
+- 私密、透明、可停止
+- 逐字稿作為所有 AI 功能的 grounding
+- 使用者按鈕觸發建議，不讓 AI 自動替人發言
+
+<!--
+可以提到研究來源是 docs/research/translated/01-產品定位與競爭分析.md。
+這張要帶出 MVP 的克制：不是要做所有會議工作流，而是要把即時副駕這個 loop 做完整。
 -->
 
 ---
@@ -34,17 +80,9 @@ layout: section
 
 # 先看 Live Demo
 
-先展示可跑的系統，再回頭解釋研究與技術選型。
-
-<!--
-這張是轉場。不要先講太多架構，先進 demo，讓觀眾知道接下來談的不是空泛概念。
--->
-
 ---
 
 # Demo Flow
-
-<div class="steps">
 
 1. 啟動 backend。
 2. 打開 macOS App。
@@ -56,12 +94,6 @@ layout: section
 8. 等待 30 秒自動整理 Meeting Notes。
 9. 匯出 Markdown 會議紀錄。
 10. 切換 provider/model，展示模型可選。
-
-</div>
-
-<!--
-Demo 時照著這個順序走。重點不是每個按鈕都很花俏，而是完整 loop：聽到聲音、轉成逐字稿、把逐字稿變成輔助、最後留下紀錄。
--->
 
 ---
 
@@ -95,17 +127,15 @@ open .build/app/emeet.app
 
 <!--
 如果現場是 Apple Silicon，就優先用 mlx-whisper；如果環境比較保守，就用 faster-whisper。
-可以提醒聽眾：App 預設連到本機 backend，因此 demo 不需要先部署雲端服務。
+App 預設連到本機 backend，因此 demo 不需要先部署雲端服務。
 -->
 
 ---
 
 # Demo Script
 
-可以用這段固定對話測試：
-
 <div class="quote">
-這個工具和一般會後摘要產品最大的差異是什麼？如果 demo 現場辨識不穩定，你要怎麼處理？
+這個工具和一般會後摘要產品最大的差異是什麼？
 </div>
 
 點擊 `What should I say?` 後，期待 AI 產生：
@@ -117,118 +147,6 @@ open .build/app/emeet.app
 <!--
 這裡可以請同學問這句，或播放準備好的音訊。
 如果 STT 不穩，仍可用已準備 transcript flow 展示右側 AI 功能，因為產品架構上 assistant 只依賴 final transcript。
--->
-
----
-
-# Demo Screen: What To Point Out
-
-<div class="grid two">
-
-<div>
-
-## Left
-
-- Microphone level
-- System audio level
-- Screen Recording permission state
-- Event log
-
-</div>
-
-<div>
-
-## Center / Right
-
-- Transcript lines
-- Source label: `Self` / `Other`
-- Provider/model/thinking controls
-- Reply and follow-up buttons
-- Auto-summary countdown
-- Notes and next actions
-
-</div>
-
-</div>
-
-<!--
-Demo 時不要只唸功能。要指給大家看：左邊證明聲音進來了，中間證明逐字稿事件正在更新，右邊證明模型 provider 可以切換，而且 AI 的輸出被整理成 drafts、notes、actions。
--->
-
----
-layout: section
----
-
-# 我想做什麼
-
-不是另一個會後摘要工具，而是會議中的即時輔助層。
-
-<!--
-Demo 結束後回到問題本身：我到底要做什麼軟體，以及為什麼這題值得做。
--->
-
----
-
-# Project Goal
-
-<div class="statement">
-讓使用者在會議中「聽得清楚、回得自然、記得住下一步」。
-</div>
-
-核心功能：
-
-- 生成即時逐字稿。
-- 分析對方問題並生成可直接說出口的回覆建議。
-- 產生追問問題，協助釐清需求、限制、責任與時程。
-- 同步整理會議筆記與下一步行動。
-- 提供可切換 provider/model 的 AI layer。
-
-<!--
-這裡用使用者語言講，不用先講 AVAudioEngine 或 Whisper。
-產品價值是降低會議中的認知負擔：聽、想、回、記，這四件事同時發生時人很容易漏掉東西。
--->
-
----
-
-# Why This Is Interesting
-
-現有產品多半擅長：
-
-- 會後摘要
-- 搜尋逐字稿
-- 產生 action items
-- 和 Zoom、Teams、Notion、CRM 整合
-
-本專題想切的空間是：
-
-<div class="callout">
-macOS 上個人可用、低摩擦、跨會議平台、由使用者主動觸發的即時對話副駕。
-</div>
-
-<!--
-研究競品後發現，摘要和 action items 已經是基本功能。差異化不能只說我也會摘要，而是要強調會議當下能幫忙回話。
--->
-
----
-
-# Product Positioning
-
-研究文件的結論：
-
-<div class="quote">
-不要把 MVP 做成完整會議平台。先證明一個最有價值的互動：當我正在對話裡，我可以快速知道下一句該怎麼回、還能問什麼、以及後續要做什麼。
-</div>
-
-因此第一版鎖定：
-
-- macOS 原生 App
-- 私密、透明、可停止
-- 逐字稿作為所有 AI 功能的 grounding
-- 使用者按鈕觸發建議，不讓 AI 自動替人發言
-
-<!--
-可以提到研究來源是 docs/research/translated/01-產品定位與競爭分析.md。
-這張要帶出 MVP 的克制：不是要做所有會議工作流，而是要把即時副駕這個 loop 做完整。
 -->
 
 ---
@@ -286,106 +204,7 @@ layout: section
 
 ---
 
-# Research To Implementation
-
-```mermaid
-flowchart LR
-    A[產品定位<br/>即時副駕] --> B[音訊擷取<br/>mic + system]
-    B --> C[音訊格式<br/>16 kHz mono PCM16]
-    C --> D[Realtime transport<br/>100 ms WebSocket frames]
-    D --> E[STT segmentation<br/>speech windows]
-    E --> F[Assistant actions<br/>reply / follow-up / notes]
-    F --> G[JSON contract<br/>drafts / notes / actions]
-    G --> H[SQLite + Markdown export]
-```
-
-<!--
-這張用一條線把研究變成實作。
-研究結論不是分散的：最後它們收斂成目前 repo 裡的端到端架構。
--->
-
----
-
-# What I Learned First
-
-最早的錯誤直覺是：
-
-<div class="bad">
-把聲音每幾秒丟給 AI，讓 AI 一次做完轉錄、理解、回答、筆記。
-</div>
-
-研究後的結論是：
-
-<div class="good">
-音訊、STT、逐字稿狀態、LLM 輔助、筆記與儲存都要分層，因為它們的延遲、容錯與資料契約完全不同。
-</div>
-
-<!--
-這是整個研究歷程最重要的轉折。會議助理不是一個模型問題，而是一個即時系統問題。
--->
-
----
-
-# TTS or STT?
-
-需求裡常會口語化說「把聲音丟 AI 做 TTS」，但這裡核心其實是：
-
-<div class="grid two">
-
-<div>
-
-## STT / ASR
-
-Speech to Text
-
-語音轉文字
-
-本專題核心：
-
-- 即時逐字稿
-- 逐字稿餵給 LLM
-- 由文字產生建議與筆記
-
-</div>
-
-<div>
-
-## TTS
-
-Text to Speech
-
-文字轉語音
-
-延伸功能：
-
-- 把 AI 建議念出來
-- 風險較高
-- MVP 不做，避免 AI 代替使用者說話
-
-</div>
-
-</div>
-
-<!--
-這張要把名詞釐清。我的 MVP 不是讓 AI 自動開口講話，而是把語音轉成文字，再把文字轉成草稿。
-這個界線也跟隱私和倫理有關：AI 只能輔助，不替使用者發言。
--->
-
----
-layout: section
----
-
 # 系統架構
-
-一個本地優先、backend 可替換、UI 契約穩定的原型。
-
-<!--
-接下來開始進入架構。先看整體資料流，再拆技術線。
--->
-
----
-
-# End-to-End Architecture
 
 ```mermaid
 flowchart LR
@@ -411,49 +230,6 @@ flowchart LR
 -->
 
 ---
-
-# Code Evidence
-
-<div class="grid two">
-
-<div>
-
-## macOS App
-
-- `MicrophoneCaptureService.swift`
-- `SystemAudioCaptureService.swift`
-- `PCM16AudioConverter.swift`
-- `SampleBufferPCM16AudioConverter.swift`
-- `TranscriptionWebSocketClient.swift`
-- `CaptureViewModel.swift`
-- `AssistantWorkspace.swift`
-
-</div>
-
-<div>
-
-## Backend
-
-- `main.py`
-- `sessions.py`
-- `transcription/segmenter.py`
-- `transcription/faster_whisper_provider.py`
-- `transcription/mlx_whisper_provider.py`
-- `assistant/prompts.py`
-- `assistant/schema.py`
-- `assistant/service.py`
-- `storage.py`
-
-</div>
-
-</div>
-
-<!--
-這張是為了讓評審知道簡報中的架構不是假想圖，而是對應到 repo 中實際模組。
-後面每條技術線都會回來引用這些檔案。
--->
-
----
 layout: section
 ---
 
@@ -473,7 +249,7 @@ layout: section
 |---|---|---|---|
 | `AVAudioEngine` | 麥克風 | 官方、低延遲、易 demo | 只聽得到自己或房間聲音 |
 | `ScreenCaptureKit` | 系統/會議音訊 | 不需安裝 driver，可抓遠端聲音 | 需要 Screen Recording 權限 |
-| 虛擬音訊裝置 | Big Sur/Monterey 回退 | 路由可控 | 使用者設定成本高 |
+| 虛擬音訊裝置 | Big Sur/Monterey fallback | 路由可控 | 使用者設定成本高 |
 | 會議 SDK / WebRTC | 自己控制會議堆疊 | 可拿原始 track | 產品範圍變重 |
 | Core Audio taps | 新版 OS 特定路線 | 可做更細音訊來源控制 | 版本限制與實作成本高 |
 
@@ -513,10 +289,6 @@ Research: `docs/research/translated/02-音訊擷取技術研究.md`
 
 </div>
 
-Code evidence:
-
-- `Audio/MicrophoneCaptureService.swift`
-- `ScreenCapture/SystemAudioCaptureService.swift`
 
 <!--
 可以說明：這不是完整 speaker diarization，但對第一版 demo 已足夠。
@@ -543,12 +315,6 @@ Why:
 - PCM16 容易除錯，不必先解 Opus。
 - 先把 capture rate 和 ASR input rate 分開，降低 provider 依賴。
 
-Code evidence:
-
-- `PCM16AudioConverter.swift`
-- `SampleBufferPCM16AudioConverter.swift`
-- `TranscriptionWebSocketClient.swift`
-
 <!--
 這裡說明為什麼不是直接把原始音訊丟給每個 provider。
 格式統一後，後端 STT provider 才能替換。
@@ -560,7 +326,7 @@ layout: section
 
 # 技術線二：即時逐字稿
 
-STT 不是單一模型問題，而是事件流問題。
+資料怎麼串接？多久串一次？
 
 <!--
 逐字稿系統有兩個問題：選哪個模型，以及怎麼把結果變成 UI 可用的事件。
@@ -577,11 +343,6 @@ STT 不是單一模型問題，而是事件流問題。
 | `mlx-whisper` | 本機 backend | Apple Silicon demo 快 | 目前採用 |
 | `faster-whisper` | Python backend | VPS/GPU/CPU 彈性 | 目前採用 |
 | OpenAI / Gemini realtime | 雲端 | 串流與整合成熟 | future provider |
-
-Research:
-
-- `03-即時逐字稿系統研究.md`
-- `12-Apple-Silicon即時會議助理技術可行性.md`
 
 <!--
 我最後沒有直接把 WhisperKit 放進 Swift app，是因為先用 Python backend 能更快替換 provider，也更容易測試。
@@ -636,9 +397,6 @@ vad_rms_threshold = 0.012
 - 聽到 speech 後才開始累積。
 - 靜音夠久就 finalize。
 - 一直有人講話時，用 max duration 強制切段。
-- session end 時 flush。
-
-Code evidence: `meeting_backend/transcription/segmenter.py`
 
 <!--
 這個策略對 demo 很重要，因為它避免把空白和雜音一直送進模型。
@@ -707,28 +465,6 @@ Realtime 在這個專題裡分成很多層，每層預算不同。
 
 ---
 
-# Why Not Send Every Chunk To LLM?
-
-如果每 100 ms 呼叫 LLM：
-
-- token 成本會爆炸。
-- 模型會一直看到未完成句子。
-- 建議會跟著 partial transcript 抖動。
-- UI 會變得吵且不可信。
-
-目前選擇：
-
-- `What should I say?`：使用者按下時才送最近 transcript。
-- `Follow-up questions`：使用者按下時才送最近 transcript。
-- `meeting_notes`：每 30 秒只送 final transcript。
-
-<!--
-這裡可以用「音訊熱路徑」和「語意冷一點的路徑」來說。
-不是越即時越好，因為會議紀錄需要可信。
--->
-
----
-
 # Latency Observability
 
 macOS client 目前有兩種 latency 訊號：
@@ -745,12 +481,6 @@ audio timeline end_ms -> transcript event arrival
 
 用於 transcription latency 粗估。
 
-Code evidence:
-
-- `TranscriptionWebSocketClient.startHeartbeat`
-- `handlePong`
-- `handleTranscriptionLatency`
-
 <!--
 這不是完整 benchmark harness，但已經讓原型能觀察 backend 是否活著，以及 transcript 事件是否有明顯延遲。
 未來可以把這些擴充成 p50/p95 指標。
@@ -762,8 +492,6 @@ layout: section
 
 # 技術線四：AI 建議與模型選擇
 
-模型可選，但 UI 契約不能跟著模型漂移。
-
 <!--
 接著進入 assistant。研究重點是 provider abstraction，而不是綁死單一 API。
 -->
@@ -771,8 +499,6 @@ layout: section
 ---
 
 # Assistant Provider Layer
-
-Current providers:
 
 | Provider | Purpose |
 |---|---|
@@ -796,73 +522,7 @@ Codex/Copilot CLI 是展示 extensibility 的實驗路線，不是低延遲會�
 
 ---
 
-# Why Provider Abstraction?
-
-研究結論：
-
-- 不同模型適合不同任務。
-- 即時建議需要低延遲和保守語氣。
-- 會議筆記需要忠實度和結構。
-- 本機模型適合隱私模式。
-- CLI agent 適合展示 extensibility，但不適合高頻會議 hot path。
-
-因此 UI 讓使用者選：
-
-- provider
-- model
-- thinking setting
-
-但 backend 統一回：
-
-- `drafts`
-- `notes`
-- `actions`
-
-<!--
-重點是契約穩定。UI 不應該知道某個 provider 輸出的自然語言格式長什麼樣子。
--->
-
----
-
-# Assistant Request
-
-```json
-{
-  "action": "what_should_i_say",
-  "provider": "ollama",
-  "model": "llama3.2",
-  "thinking": "medium",
-  "transcript": [
-    {
-      "source": "system",
-      "source_label": "Other",
-      "speaker_hint": "other",
-      "start_ms": 1200,
-      "end_ms": 4200,
-      "text": "對方剛剛問的問題",
-      "is_final": true
-    }
-  ]
-}
-```
-
-目前只送逐字稿文字與 metadata，不把原始音訊直接送給 LLM。
-
-<!--
-這裡可以強調資料最小化。LLM 不需要原始音訊，只需要 transcript context。
-不同 provider 可以在後端轉接，但 request shape 對 UI 仍然穩。
--->
-
----
-
 # Prompt Strategy
-
-`assistant/prompts.py` 將任務拆開：
-
-- `what_should_i_say`
-- `follow_up_questions`
-- `meeting_notes`
-- `chat`
 
 System prompt 重點：
 
@@ -915,45 +575,6 @@ System prompt 重點：
 -->
 
 ---
-
-# Safety Rules
-
-AI 在本專題中是草稿產生器，不是自動代理。
-
-<div class="grid two">
-
-<div>
-
-## Allowed
-
-- 建議怎麼回
-- 建議追問什麼
-- 草擬會議筆記
-- 草擬下一步行動
-- 匯出使用者可檢查的 Markdown
-
-</div>
-
-<div>
-
-## Not Allowed
-
-- 自動替使用者發言
-- 自動寄信或發訊息
-- 自動承諾 deadline
-- 猜 owner、預算、日期
-- 靜默錄音或無提示保存
-
-</div>
-
-</div>
-
-<!--
-這張把倫理邊界說清楚。會議助理最危險的是從「幫我想」變成「替我做」。
-MVP 必須保持人在迴路中。
--->
-
----
 layout: section
 ---
 
@@ -969,47 +590,14 @@ layout: section
 
 # Meeting Notes Strategy
 
-研究結論：
-
-- 會中筆記要短、保守、可逆。
-- 會後紀錄可以較完整。
-- action item 必須避免猜 owner 和 due date。
-- 最好保留 evidence segment ids。
-
-目前原型：
-
 - final transcript 來了先更新 local draft。
 - `Start Meeting` 後啟動 30 秒倒數。
 - 倒數到 0 時呼叫 `meeting_notes` action。
 - 回傳 `notes` / `actions` 後替換 UI draft。
 
-Research: `docs/research/translated/07-會議筆記與行動項目格式設計.md`
-
 <!--
 這裡要說明為什麼不是每句話都摘要：筆記是要保守和可信，不是最即時。
 未來會加 evidence_segment_ids 讓筆記能回鏈到逐字稿。
--->
-
----
-
-# SQLite MVP Schema
-
-目前 backend 實作 append-first local storage：
-
-| Table | Stores |
-|---|---|
-| `sessions` | WebSocket session and source metadata |
-| `transcript_segments` | transcript partial/final events |
-| `assistant_runs` | request metadata and latency |
-| `assistant_suggestions` | reply drafts and follow-up suggestions |
-| `notes` | meeting notes |
-| `actions` | next actions |
-
-研究中的完整 schema 包含 meeting-level objects、FTS5、memory snapshots、provider configs。MVP 先保留最小可驗證事件。
-
-<!--
-研究文件 16 建議直接用 SQLite 作為本機事實來源。
-目前實作是簡化版，重點是能保存 session、逐字稿和 assistant 輸出。
 -->
 
 ---
@@ -1026,137 +614,8 @@ macOS App 目前可匯出 Markdown：
 - AI Suggestions
 - Transcript
 
-Code evidence:
-
-- `CaptureViewModel.exportMeetingRecords`
-- `CaptureViewModel.exportMarkdown`
-
 <!--
 Export 是 demo 的收尾。它證明這個系統不只是會中看一下，也能留下可讀、可分享、可追蹤的紀錄。
--->
-
----
-layout: section
----
-
-# 最後選擇的技術線
-
-研究建議很多，MVP 需要保守收斂。
-
-<!--
-這段開始收斂：我最後做了什麼，為什麼這樣取捨。
--->
-
----
-
-# Final Stack
-
-<div class="grid two">
-
-<div>
-
-## Client
-
-- SwiftUI macOS App
-- `AVAudioEngine`
-- `ScreenCaptureKit`
-- PCM16 converter
-- WebSocket client
-- Provider/model controls
-- Markdown export
-
-</div>
-
-<div>
-
-## Backend
-
-- FastAPI
-- WebSocket STT endpoint
-- speech-window segmenter
-- `faster-whisper` / `mlx-whisper`
-- assistant provider abstraction
-- JSON schema validation
-- SQLite storage
-
-</div>
-
-</div>
-
-<!--
-這張是 final stack 的總結。可以說這不是最佳終局，而是最適合一學期專題 demo 的路線。
--->
-
----
-
-# Why This Stack
-
-<div class="decision">
-MVP 的目標不是證明某個模型最強，而是證明完整會議輔助 loop 可行。
-</div>
-
-所以我選：
-
-- 官方 macOS 音訊 API，降低環境依賴。
-- Python backend，讓 STT provider 和 assistant provider 快速替換。
-- 16 kHz PCM16 protocol，容易測試和除錯。
-- source-based `Self` / `Other`，先避免 diarization 風險。
-- JSON output contract，讓 UI 穩定。
-- 30 秒 notes，避免 LLM 過度頻繁。
-
-<!--
-這裡要把「為什麼」講清楚：不是因為其他路線不好，而是本專題優先要完成可展示、可解釋、可延伸的 loop。
--->
-
----
-
-# What Changed From The Research Plan
-
-| 研究建議 | 實作取捨 |
-|---|---|
-| WhisperKit / Apple SpeechAnalyzer 很適合本機路線 | 先用 backend `mlx-whisper`，降低 Swift 模型生命週期成本 |
-| 完整 SQLite schema | 先用 append-first MVP schema |
-| 完整 speaker diarization | 先用 source separation |
-| 即時建議可預先生成 | 先用按鈕觸發，降低干擾 |
-| 多 provider BYOK UI | 先支援 provider discovery 和 OpenAI-compatible endpoint |
-| 完整 floating panel | 先做 main workspace，之後再抽出 companion panel |
-
-<!--
-這張要誠實說明研究和實作的差距。
-畢業專題的重點是合理取捨，而不是把所有 future work 都塞進第一版。
--->
-
----
-
-# Privacy Boundary
-
-目前資料邊界：
-
-- 原始音訊只送到本機 backend STT WebSocket。
-- Assistant API 只收逐字稿文字和 metadata。
-- Ollama 和 localhost OpenAI-compatible 可留在本機。
-- 外部 OpenAI-compatible endpoint 會收到逐字稿文字。
-- API key 由 backend environment 提供，macOS App 不直接保存 key。
-
-<div class="callout">
-錄音、轉寫、模型處理和保存期限都必須對使用者可見，且可以停止、刪除、匯出。
-</div>
-
-<!--
-這張連到研究文件 11 的隱私安全。
-目前 MVP 還不是完整合規產品，但已有清楚邊界：不自動發言、不自動外部動作、不把 secrets 存 SQLite。
--->
-
----
-layout: section
----
-
-# 展望
-
-讓原型變成更完整、更可驗證的研究成果。
-
-<!--
-最後講 future work。分成工程、研究評估、產品延伸。
 -->
 
 ---
@@ -1176,66 +635,6 @@ layout: section
 如果時間有限，優先做 evidence ids 和 latency benchmark，因為它們對研究報告最有說服力。
 -->
 
----
-
-# Research Metrics
-
-評估不只看「模型回答漂不漂亮」。
-
-| 面向 | 指標 |
-|---|---|
-| STT | WER/CER、final latency、revision rate |
-| Source label | `Self` / `Other` attribution accuracy |
-| Suggestion | usefulness、speakability、acceptance rate |
-| Follow-up | information gain、non-duplicate rate |
-| Notes | faithfulness、action item precision/recall |
-| UX | interruption cost、SUS、demo task success |
-
-<!--
-這張是把專題變成研究成果的關鍵。
-未來如果要寫書面報告，可以用這些指標設計實驗。
--->
-
----
-
-# Product Next Steps
-
-可以延伸的方向：
-
-- 更完整的浮動 companion panel。
-- 本機 STT provider：WhisperKit 或 Apple SpeechAnalyzer。
-- 本機 LLM provider：Ollama、LM Studio、MLX。
-- 會前 context：議程、客戶資料、文件摘要。
-- 會後整理：決策、風險、未解問題、action item evidence。
-- Connector：Notion、Google Docs、GitHub Issues、Jira。
-- 高隱私模式：local-only、短 TTL、手動刪除。
-
-<!--
-這裡可以說明產品可以往很多方向走，但核心仍是會中即時副駕。
-不要把 future work 說成要做大型會議平台，而是逐步補強目前 loop。
--->
-
----
-
-# Final Takeaway
-
-<div class="statement">
-這個專題的核心不是單一 AI 模型，而是把會議中的聲音變成可信的事件流，再把事件流轉成可用的即時輔助。
-</div>
-
-我最後選擇的路線：
-
-- macOS 官方音訊擷取
-- 本地優先 backend
-- STT provider abstraction
-- 低頻穩定 LLM 呼叫
-- 結構化 JSON contract
-- 可切換模型/provider
-- 明確的隱私邊界
-
-<!--
-收尾時回到一句話定位。強調這是一個完整系統，而不是套一個 LLM API。
--->
 
 ---
 layout: end
@@ -1243,108 +642,8 @@ layout: end
 
 # Q&A
 
-Demo repo:
-
-```text
-README.md
-AGENTS.md
-docs/slides/slides.md
-docs/research/translated/
-```
-
 <!--
 最後留給問題。
 如果被問最大風險：回答 STT 穩定性、系統音訊權限、長會議 context 和即時延遲。
 如果被問最大價值：回答會議當下的回覆輔助，而不只是會後摘要。
 -->
-
-<style>
-.slidev-layout {
-  font-size: 30px;
-  line-height: 1.35;
-  letter-spacing: 0;
-}
-
-.slidev-layout h1,
-.slidev-layout h2,
-.slidev-layout h3 {
-  letter-spacing: 0;
-}
-
-.slidev-layout table {
-  font-size: 20px;
-}
-
-.slidev-layout code {
-  font-size: 0.82em;
-}
-
-.slidev-layout pre code {
-  font-size: 0.72em;
-  line-height: 1.3;
-}
-
-.subtitle {
-  margin-top: 24px;
-  max-width: 940px;
-  color: var(--comment);
-  font-size: 34px;
-}
-
-.meta {
-  margin-top: 54px;
-  color: var(--cyan);
-  font-weight: 700;
-}
-
-.grid.two {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 34px;
-  align-items: start;
-}
-
-.steps {
-  font-size: 30px;
-}
-
-.callout,
-.quote,
-.statement,
-.decision,
-.good,
-.bad {
-  border: 1px solid rgb(248 248 242 / 18%);
-  border-radius: 8px;
-  padding: 20px 24px;
-  background: rgb(68 71 90 / 55%);
-  box-shadow: 0 18px 50px rgb(0 0 0 / 16%);
-}
-
-.quote {
-  font-size: 30px;
-  color: var(--foreground);
-}
-
-.statement {
-  font-size: 38px;
-  font-weight: 760;
-}
-
-.decision {
-  border-color: rgb(189 147 249 / 40%);
-  background: rgb(189 147 249 / 14%);
-  font-size: 34px;
-  font-weight: 700;
-}
-
-.good {
-  border-color: rgb(80 250 123 / 40%);
-  background: rgb(80 250 123 / 12%);
-}
-
-.bad {
-  border-color: rgb(255 85 85 / 42%);
-  background: rgb(255 85 85 / 12%);
-}
-</style>

@@ -1,10 +1,6 @@
 # emeet
 
-emeet 是一個以 macOS App 實作的即時會議輔助工具。它的目標不是再做一個會後摘要平台，而是在會議進行中把目前通話逐字稿轉成下一句可說的話、可追問的問題、會議筆記與下一步行動。
-
-一句話定位：
-
-> 一個私密、macOS 原生、低摩擦、模型可選的即時會議副駕。
+emeet 是一個以一個本地、macOS 原生 App 實作的即時會議輔助工具。在會議進行中把目前通話逐字稿轉成下一句可說的話、可追問的問題、會議筆記與下一步行動。
 
 ## Current MVP
 
@@ -20,8 +16,6 @@ emeet 是一個以 macOS App 實作的即時會議輔助工具。它的目標不
 - `Follow-up questions` 產生可推進對話的追問。
 - Meeting Notes 每 30 秒根據 final transcript 自動整理重點與 Next Actions。
 - 可刪除紀錄與匯出 Markdown meeting record。
-
-本專題目前做的是 STT/ASR（speech-to-text，語音轉文字），不是 TTS（text-to-speech，文字轉語音）。TTS 會代表把 AI 建議唸出來，屬於未來延伸；MVP 先讓 AI 產生草稿，不自動替使用者發言。
 
 ## Project Layout
 
@@ -44,8 +38,6 @@ emeet 是一個以 macOS App 實作的即時會議輔助工具。它的目標不
 └── README.md                            # 專案入口文件
 ```
 
-子目錄 README 已清除。重要資訊請集中維護在 `README.md`、`AGENTS.md`、`docs/research/translated/` 與 `docs/slides/slides.md`。
-
 ## Architecture
 
 ```mermaid
@@ -66,40 +58,7 @@ flowchart LR
     JSON --> SQLite[(SQLite)]
 ```
 
-設計重點是把音訊、逐字稿事件、assistant 請求與會議紀錄拆開。音訊可以高頻傳輸，但 LLM 呼叫應低頻且語意化：按鈕由使用者觸發，筆記只使用 final transcript 低頻更新。
-
-## Important Modules
-
-macOS App: `apps/macos/emeet`
-
-- `Audio/MicrophoneCaptureService.swift`：麥克風擷取。
-- `ScreenCapture/SystemAudioCaptureService.swift`：系統音訊擷取。
-- `Audio/PCM16AudioConverter.swift`：麥克風音訊轉 16 kHz mono PCM16。
-- `Audio/SampleBufferPCM16AudioConverter.swift`：`CMSampleBuffer` 系統音訊轉 PCM16。
-- `Transcription/TranscriptionWebSocketClient.swift`：session metadata、100 ms audio frames、heartbeat ping、transcript events。
-- `App/CaptureViewModel.swift`：capture 狀態、逐字稿、assistant provider、30 秒自動摘要、刪除與匯出。
-- `UI/ContentView.swift`、`UI/TranscriptWorkspace.swift`、`UI/AssistantWorkspace.swift`：目前主工作區 UI。
-
-Backend: `apps/backend`
-
-- `meeting_backend/main.py`：`/health`、`/v1/transcribe/ws` 與 assistant router。
-- `meeting_backend/sessions.py`：WebSocket STT session 管理與 transcript event 記錄。
-- `meeting_backend/transcription/segmenter.py`：RMS threshold、trailing silence、max duration speech-window segmentation。
-- `meeting_backend/transcription/faster_whisper_provider.py`：`faster-whisper` provider。
-- `meeting_backend/transcription/mlx_whisper_provider.py`：Apple Silicon demo 用 `mlx-whisper` provider。
-- `meeting_backend/assistant/prompts.py`：各 action 的 prompt。
-- `meeting_backend/assistant/schema.py`：assistant JSON 驗證與正規化。
-- `meeting_backend/assistant/service.py`：`ollama`、`openai-compatible`、`codex-cli`、`github-copilot-cli` dispatch。
-- `meeting_backend/storage.py`：SQLite local append-first storage。
-
-Primary endpoints:
-
-```text
-GET  /health
-GET  /v1/assistant/providers
-POST /v1/assistant/respond
-WS   /v1/transcribe/ws
-```
+設計重點是把音訊、逐字稿事件、assistant 請求與會議紀錄拆開。音訊可以高頻傳輸，LLM 呼叫低頻且語意化：按鈕由使用者觸發，筆記只使用 final transcript 低頻更新。
 
 ## Run the Prototype
 
