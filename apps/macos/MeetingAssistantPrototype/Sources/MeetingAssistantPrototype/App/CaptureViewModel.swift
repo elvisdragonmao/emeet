@@ -39,6 +39,9 @@ final class CaptureViewModel: ObservableObject {
     @Published private(set) var actionDrafts: [MeetingActionDraft] = [
         MeetingActionDraft(title: "整理下一步", owner: "Unassigned", state: "Pending")
     ]
+    @Published private(set) var autoSummaryRemainingSeconds = 30
+    @Published private(set) var autoSummaryStatusLabel = "Connect STT to start"
+    @Published private(set) var autoSummaryIsGenerating = false
     @Published private(set) var eventLog: [String] = [
         "Ready. Start microphone and system audio capture to test inputs."
     ]
@@ -51,6 +54,10 @@ final class CaptureViewModel: ObservableObject {
     private let assistantClient: AssistantAPIClient
     private let maxHistoryCount = 96
     private let maxTranscriptLineCount = 24
+    private let autoSummaryIntervalSeconds = 30
+    private var autoSummaryTask: Task<Void, Never>?
+    private var hasAutomaticSummary = false
+    private var autoSummaryRequestGeneration = 0
 
     init(transcriptionBackend: TranscriptionBackendConfig = .fromEnvironment()) {
         self.transcriptionBackend = transcriptionBackend
@@ -184,6 +191,15 @@ final class CaptureViewModel: ObservableObject {
         }
     }
 
+    var autoSummaryProgress: Double {
+        guard autoSummaryIntervalSeconds > 0 else {
+            return 0
+        }
+
+        let elapsedSeconds = autoSummaryIntervalSeconds - autoSummaryRemainingSeconds
+        return min(max(Double(elapsedSeconds) / Double(autoSummaryIntervalSeconds), 0), 1)
+    }
+
     func startAll() {
         startMicrophone()
         startSystemAudio()
@@ -249,9 +265,12 @@ final class CaptureViewModel: ObservableObject {
         transcriptionStatus = .starting
         transcriptLines.removeAll()
         resetLatencyReadings()
+        resetMeetingDrafts()
+        hasAutomaticSummary = false
         appendLog("Connecting transcription backend at \(transcriptionBackend.displayAddress)...")
         microphoneTranscriptionClient.connect()
         systemTranscriptionClient.connect()
+        startAutoSummaryCountdown()
 
         if microphoneStatus != .running && microphoneStatus != .starting {
             startMicrophone()
@@ -267,6 +286,7 @@ final class CaptureViewModel: ObservableObject {
         systemTranscriptionClient.disconnect()
         transcriptionStatus = .idle
         resetLatencyReadings()
+        stopAutoSummaryCountdown()
         appendLog("Transcription backend disconnected.")
     }
 
@@ -487,8 +507,9 @@ final class CaptureViewModel: ObservableObject {
         appendLog("Assistant response ready: \(response.provider) \(response.model) \(response.latencyMs)ms.")
     }
 
-    private func assistantTranscriptPayload() -> [AssistantTranscriptLinePayload] {
-        transcriptLines.suffix(16).map {
+    private func assistantTranscriptPayload(finalOnly: Bool = false) -> [AssistantTranscriptLinePayload] {
+        let sourceLines = finalOnly ? transcriptLines.filter(\.isFinal) : transcriptLines
+        return sourceLines.suffix(16).map {
             AssistantTranscriptLinePayload(
                 source: $0.source,
                 sourceLabel: $0.sourceLabel,
@@ -499,6 +520,135 @@ final class CaptureViewModel: ObservableObject {
                 isFinal: $0.isFinal
             )
         }
+    }
+
+    private func startAutoSummaryCountdown() {
+        autoSummaryTask?.cancel()
+        autoSummaryRequestGeneration += 1
+        autoSummaryRemainingSeconds = autoSummaryIntervalSeconds
+        autoSummaryStatusLabel = "Next summary in \(autoSummaryIntervalSeconds)s"
+        autoSummaryIsGenerating = false
+
+        autoSummaryTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                guard !Task.isCancelled else {
+                    break
+                }
+                guard let self else {
+                    break
+                }
+                self.tickAutoSummaryCountdown()
+            }
+        }
+    }
+
+    private func stopAutoSummaryCountdown() {
+        autoSummaryTask?.cancel()
+        autoSummaryTask = nil
+        autoSummaryRequestGeneration += 1
+        autoSummaryIsGenerating = false
+        autoSummaryRemainingSeconds = autoSummaryIntervalSeconds
+        autoSummaryStatusLabel = "Connect STT to start"
+    }
+
+    private func tickAutoSummaryCountdown() {
+        guard transcriptionStatus == .starting || transcriptionStatus == .running else {
+            autoSummaryRemainingSeconds = autoSummaryIntervalSeconds
+            autoSummaryStatusLabel = "Waiting for STT"
+            return
+        }
+
+        guard !autoSummaryIsGenerating else {
+            return
+        }
+
+        if autoSummaryRemainingSeconds > 1 {
+            autoSummaryRemainingSeconds -= 1
+            autoSummaryStatusLabel = "Next summary in \(autoSummaryRemainingSeconds)s"
+            return
+        }
+
+        autoSummaryRemainingSeconds = 0
+        runAutomaticMeetingSummary()
+    }
+
+    private func runAutomaticMeetingSummary() {
+        guard !autoSummaryIsGenerating else {
+            return
+        }
+
+        let transcript = assistantTranscriptPayload(finalOnly: true)
+        guard !transcript.isEmpty else {
+            resetAutoSummaryCountdown(status: "Waiting for final transcript")
+            return
+        }
+
+        autoSummaryIsGenerating = true
+        autoSummaryStatusLabel = "Summarizing now"
+        appendLog("Auto summarizing meeting notes and next actions...")
+        autoSummaryRequestGeneration += 1
+        let requestGeneration = autoSummaryRequestGeneration
+
+        let request = AssistantRespondRequest(
+            action: "meeting_notes",
+            provider: assistantProviderID,
+            model: assistantModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? "mock-conversation"
+                : assistantModel,
+            thinking: assistantThinking,
+            transcript: transcript
+        )
+
+        Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+            guard self.autoSummaryRequestGeneration == requestGeneration else {
+                return
+            }
+
+            do {
+                let response = try await self.assistantClient.respond(request)
+                guard self.autoSummaryRequestGeneration == requestGeneration else {
+                    return
+                }
+                self.applyAutomaticSummaryResponse(response)
+                self.resetAutoSummaryCountdown(status: "Updated \(self.shortTimeLabel())")
+            } catch {
+                guard self.autoSummaryRequestGeneration == requestGeneration else {
+                    return
+                }
+                self.autoSummaryStatusLabel = "Summary failed"
+                self.appendLog("Auto summary failed: \(error.localizedDescription)")
+                self.resetAutoSummaryCountdown(status: "Retry in \(self.autoSummaryIntervalSeconds)s")
+            }
+
+            self.autoSummaryIsGenerating = false
+        }
+    }
+
+    private func applyAutomaticSummaryResponse(_ response: AssistantRespondResponse) {
+        hasAutomaticSummary = true
+
+        if !response.notes.isEmpty {
+            noteDrafts = response.notes.map {
+                MeetingNoteDraft(title: $0.title, detail: $0.detail)
+            }
+        }
+
+        if !response.actions.isEmpty {
+            actionDrafts = response.actions.map {
+                MeetingActionDraft(title: $0.title, owner: $0.owner, state: $0.state)
+            }
+        }
+
+        appendLog("Auto summary ready: \(response.provider) \(response.model) \(response.latencyMs)ms.")
+    }
+
+    private func resetAutoSummaryCountdown(status: String) {
+        autoSummaryRemainingSeconds = autoSummaryIntervalSeconds
+        autoSummaryStatusLabel = status
     }
 
     private func updateBackendLatency(_ latencyMs: Int, for source: CaptureSource) {
@@ -527,12 +677,26 @@ final class CaptureViewModel: ObservableObject {
     }
 
     private func refreshDraftNotes(with line: TranscriptLine) {
+        guard !hasAutomaticSummary else {
+            return
+        }
+
         noteDrafts = [
             MeetingNoteDraft(title: "最新重點", detail: line.text),
             MeetingNoteDraft(title: "時間範圍", detail: "\(line.timeRangeLabel) · \(line.sourceLabel)")
         ]
         actionDrafts = [
             MeetingActionDraft(title: "Review transcript segment", owner: line.sourceLabel, state: "Draft")
+        ]
+    }
+
+    private func resetMeetingDrafts() {
+        noteDrafts = [
+            MeetingNoteDraft(title: "討論重點", detail: "逐字稿定稿後會累積 highlights。"),
+            MeetingNoteDraft(title: "未決問題", detail: "尚未確認的風險、限制與依賴會放在這裡。")
+        ]
+        actionDrafts = [
+            MeetingActionDraft(title: "整理下一步", owner: "Unassigned", state: "Pending")
         ]
     }
 
@@ -547,6 +711,12 @@ final class CaptureViewModel: ObservableObject {
         }
 
         return trimmed.count > 24 ? "\(trimmed.prefix(24))..." : trimmed
+    }
+
+    private func shortTimeLabel() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss"
+        return formatter.string(from: Date())
     }
 
     private func appendLog(_ message: String) {

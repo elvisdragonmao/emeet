@@ -39,6 +39,33 @@ class AssistantServiceTest(unittest.TestCase):
         self.assertGreaterEqual(len(result.drafts), 1)
         self.assertIn("Friday", result.raw_text or "")
 
+    def test_mock_provider_generates_meeting_notes_and_actions(self) -> None:
+        request = AssistantRequest(
+            action="meeting_notes",
+            provider="mock",
+            model="mock-conversation",
+            thinking="medium",
+            temperature=0.2,
+            max_tokens=700,
+            transcript=[
+                AssistantTranscriptLine(
+                    source="system",
+                    source_label="Other",
+                    speaker_hint="other",
+                    start_ms=0,
+                    end_ms=1200,
+                    text="We need Eva to confirm the demo checklist.",
+                    is_final=True,
+                )
+            ],
+        )
+
+        result = generate_assistant_response(Settings(), request)
+
+        self.assertGreaterEqual(len(result.notes), 1)
+        self.assertGreaterEqual(len(result.actions), 1)
+        self.assertIn("demo checklist", result.raw_text or "")
+
     def test_provider_descriptors_include_mock_and_cli_entries(self) -> None:
         descriptors = list_provider_descriptors(Settings())
         provider_ids = [provider["id"] for provider in descriptors["providers"]]

@@ -97,6 +97,10 @@ struct ContentView: View {
                 drafts: viewModel.assistantDrafts,
                 notes: viewModel.noteDrafts,
                 actions: viewModel.actionDrafts,
+                autoSummaryRemainingSeconds: viewModel.autoSummaryRemainingSeconds,
+                autoSummaryProgress: viewModel.autoSummaryProgress,
+                autoSummaryStatusLabel: viewModel.autoSummaryStatusLabel,
+                autoSummaryIsGenerating: viewModel.autoSummaryIsGenerating,
                 refreshProvidersAction: viewModel.refreshAssistantProviders,
                 whatShouldISayAction: viewModel.prepareWhatShouldISay,
                 followUpAction: viewModel.prepareFollowUpQuestions
