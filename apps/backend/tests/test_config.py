@@ -17,6 +17,9 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(settings.segment_min_ms, 800)
         self.assertEqual(settings.segment_silence_ms, 700)
         self.assertEqual(settings.segment_max_ms, 12000)
+        self.assertEqual(settings.assistant_provider, "mock")
+        self.assertEqual(settings.assistant_model, "mock-conversation")
+        self.assertEqual(settings.assistant_thinking, "medium")
 
     def test_supports_short_model_alias_and_port(self) -> None:
         with patch.dict(
@@ -25,6 +28,9 @@ class ConfigTest(unittest.TestCase):
                 "MEETING_BACKEND_MODEL": "medium",
                 "MEETING_BACKEND_HOST": "0.0.0.0",
                 "MEETING_BACKEND_PORT": "9000",
+                "MEETING_BACKEND_ASSISTANT_PROVIDER": "ollama",
+                "MEETING_BACKEND_ASSISTANT_MODEL": "llama3.2",
+                "MEETING_BACKEND_ASSISTANT_THINKING": "high",
             },
             clear=True,
         ):
@@ -32,6 +38,9 @@ class ConfigTest(unittest.TestCase):
 
         self.assertEqual(settings.whisper_model, "medium")
         self.assertEqual(settings.websocket_url, "ws://0.0.0.0:9000/v1/transcribe/ws")
+        self.assertEqual(settings.assistant_provider, "ollama")
+        self.assertEqual(settings.assistant_model, "llama3.2")
+        self.assertEqual(settings.assistant_thinking, "high")
 
     def test_supports_explicit_websocket_url(self) -> None:
         with patch.dict(

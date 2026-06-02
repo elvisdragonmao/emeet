@@ -114,6 +114,15 @@ MEETING_BACKEND_WS_URL=
 MEETING_BACKEND_WHISPER_DEVICE=cpu
 MEETING_BACKEND_WHISPER_COMPUTE_TYPE=int8
 MEETING_BACKEND_WHISPER_LANGUAGE=
+MEETING_BACKEND_ASSISTANT_PROVIDER=mock
+MEETING_BACKEND_ASSISTANT_MODEL=mock-conversation
+MEETING_BACKEND_ASSISTANT_THINKING=medium
+MEETING_BACKEND_ASSISTANT_OLLAMA_BASE_URL=http://127.0.0.1:11434
+MEETING_BACKEND_ASSISTANT_OPENAI_BASE_URL=http://127.0.0.1:1234/v1
+MEETING_BACKEND_ASSISTANT_API_KEY=
+MEETING_BACKEND_ASSISTANT_TIMEOUT_MS=20000
+MEETING_BACKEND_ASSISTANT_MAX_TOKENS=700
+MEETING_BACKEND_ASSISTANT_TEMPERATURE=0.2
 MEETING_BACKEND_PARTIAL_INTERVAL_MS=800
 MEETING_BACKEND_FINAL_INTERVAL_MS=2400
 MEETING_BACKEND_SEGMENT_MIN_MS=800
@@ -139,6 +148,44 @@ For local macOS demo speed, prefer:
 MEETING_BACKEND_PROVIDER=mlx-whisper
 MEETING_BACKEND_MODEL=large-v3-turbo
 ```
+
+For assistant responses, the macOS app can override provider, model, and thinking per request. Backend defaults are set through environment variables:
+
+```bash
+MEETING_BACKEND_ASSISTANT_PROVIDER=ollama \
+MEETING_BACKEND_ASSISTANT_MODEL=llama3.2 \
+MEETING_BACKEND_ASSISTANT_THINKING=medium \
+./scripts/dev.sh
+```
+
+For LM Studio, vLLM, llama.cpp, or an OpenAI-compatible endpoint:
+
+```bash
+MEETING_BACKEND_ASSISTANT_PROVIDER=openai-compatible \
+MEETING_BACKEND_ASSISTANT_OPENAI_BASE_URL=http://127.0.0.1:1234/v1 \
+MEETING_BACKEND_ASSISTANT_MODEL=local-model \
+./scripts/dev.sh
+```
+
+For the OpenAI API, use the same OpenAI-compatible adapter and keep the key in the backend environment:
+
+```bash
+MEETING_BACKEND_ASSISTANT_PROVIDER=openai-compatible \
+MEETING_BACKEND_ASSISTANT_OPENAI_BASE_URL=https://api.openai.com/v1 \
+MEETING_BACKEND_ASSISTANT_MODEL=gpt-5.4-mini \
+MEETING_BACKEND_ASSISTANT_THINKING=low \
+OPENAI_API_KEY=... \
+./scripts/dev.sh
+```
+
+CLI providers are also listed when installed:
+
+```text
+codex-cli
+github-copilot-cli
+```
+
+These run official local CLIs only. The backend does not read provider config files, keychains, browser sessions, or hidden credentials.
 
 For Linux VPS or NVIDIA GPU deployments, prefer:
 
@@ -203,6 +250,34 @@ The server replies on the same websocket:
   "ping_id": "ping-1",
   "client_sent_at_ms": 1717315200000,
   "server_sent_at_ms": 1717315200042
+}
+```
+
+Assistant provider discovery:
+
+```http
+GET /v1/assistant/providers
+```
+
+Assistant response generation:
+
+```json
+{
+  "action": "what_should_i_say",
+  "provider": "ollama",
+  "model": "llama3.2",
+  "thinking": "medium",
+  "transcript": [
+    {
+      "source": "system",
+      "source_label": "Other",
+      "speaker_hint": "other",
+      "start_ms": 0,
+      "end_ms": 1800,
+      "text": "Can we finish the demo by Friday?",
+      "is_final": true
+    }
+  ]
 }
 ```
 

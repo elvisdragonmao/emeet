@@ -3,6 +3,15 @@ import Foundation
 struct TranscriptionBackendConfig {
     let websocketURL: URL
 
+    var httpBaseURL: URL {
+        var components = URLComponents(url: websocketURL, resolvingAgainstBaseURL: false)
+        components?.scheme = websocketURL.scheme == "wss" ? "https" : "http"
+        components?.path = ""
+        components?.query = nil
+        components?.fragment = nil
+        return components?.url ?? websocketURL
+    }
+
     var displayAddress: String {
         let components = URLComponents(url: websocketURL, resolvingAgainstBaseURL: false)
         if let host = components?.host, let port = components?.port {

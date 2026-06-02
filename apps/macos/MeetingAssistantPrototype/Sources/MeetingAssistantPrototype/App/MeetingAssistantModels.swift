@@ -54,3 +54,28 @@ struct MeetingActionDraft: Identifiable, Equatable {
     let owner: String
     let state: String
 }
+
+enum AssistantThinking: String, CaseIterable, Identifiable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .none:
+            return "None"
+        case .low:
+            return "Low"
+        case .medium:
+            return "Medium"
+        case .high:
+            return "High"
+        case .xhigh:
+            return "XHigh"
+        }
+    }
+}

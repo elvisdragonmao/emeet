@@ -2,9 +2,16 @@ import SwiftUI
 
 struct AssistantWorkspace: View {
     let modeLabel: String
+    let statusLabel: String
+    let providerOptions: [AssistantProviderDescriptor]
+    let selectedProviderID: Binding<String>
+    let model: Binding<String>
+    let modelOptions: [String]
+    let thinking: Binding<String>
     let drafts: [AssistantDraft]
     let notes: [MeetingNoteDraft]
     let actions: [MeetingActionDraft]
+    let refreshProvidersAction: () -> Void
     let whatShouldISayAction: () -> Void
     let followUpAction: () -> Void
 
@@ -21,7 +28,20 @@ struct AssistantWorkspace: View {
                     }
 
                     Spacer()
+
+                    Text(statusLabel)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
                 }
+
+                AssistantSettingsBar(
+                    providerOptions: providerOptions,
+                    selectedProviderID: selectedProviderID,
+                    model: model,
+                    modelOptions: modelOptions,
+                    thinking: thinking,
+                    refreshAction: refreshProvidersAction
+                )
 
                 HStack(spacing: 10) {
                     AssistantActionButton(
@@ -49,6 +69,69 @@ struct AssistantWorkspace: View {
 
             NotesWorkspace(notes: notes, actions: actions)
         }
+    }
+}
+
+private struct AssistantSettingsBar: View {
+    let providerOptions: [AssistantProviderDescriptor]
+    let selectedProviderID: Binding<String>
+    let model: Binding<String>
+    let modelOptions: [String]
+    let thinking: Binding<String>
+    let refreshAction: () -> Void
+
+    var body: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                Picker("Provider", selection: selectedProviderID) {
+                    ForEach(providerOptions) { provider in
+                        Text(providerLabel(provider))
+                            .tag(provider.id)
+                    }
+                }
+                .labelsHidden()
+                .frame(maxWidth: .infinity)
+
+                Picker("Thinking", selection: thinking) {
+                    ForEach(AssistantThinking.allCases) { item in
+                        Text(item.label)
+                            .tag(item.rawValue)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 106)
+
+                Button(action: refreshAction) {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .help("Refresh providers")
+            }
+
+            HStack(spacing: 8) {
+                TextField("Model", text: model)
+                    .textFieldStyle(.roundedBorder)
+
+                Menu {
+                    if modelOptions.isEmpty {
+                        Text("No models")
+                    } else {
+                        ForEach(modelOptions, id: \.self) { option in
+                            Button(option) {
+                                model.wrappedValue = option
+                            }
+                        }
+                    }
+                } label: {
+                    Image(systemName: "cube.box")
+                }
+                .menuStyle(.borderlessButton)
+                .help("Model options")
+            }
+        }
+    }
+
+    private func providerLabel(_ provider: AssistantProviderDescriptor) -> String {
+        provider.available ? provider.label : "\(provider.label) unavailable"
     }
 }
 

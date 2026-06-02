@@ -79,9 +79,25 @@ struct ContentView: View {
 
             AssistantWorkspace(
                 modeLabel: viewModel.assistantModeLabel,
+                statusLabel: viewModel.assistantStatusLabel,
+                providerOptions: viewModel.assistantProviderOptions,
+                selectedProviderID: Binding(
+                    get: { viewModel.assistantProviderID },
+                    set: { viewModel.selectAssistantProvider($0) }
+                ),
+                model: Binding(
+                    get: { viewModel.assistantModel },
+                    set: { viewModel.updateAssistantModel($0) }
+                ),
+                modelOptions: viewModel.assistantModelOptions,
+                thinking: Binding(
+                    get: { viewModel.assistantThinking },
+                    set: { viewModel.updateAssistantThinking($0) }
+                ),
                 drafts: viewModel.assistantDrafts,
                 notes: viewModel.noteDrafts,
                 actions: viewModel.actionDrafts,
+                refreshProvidersAction: viewModel.refreshAssistantProviders,
                 whatShouldISayAction: viewModel.prepareWhatShouldISay,
                 followUpAction: viewModel.prepareFollowUpQuestions
             )

@@ -3,6 +3,9 @@ from dataclasses import dataclass
 
 DEFAULT_PROVIDER = "faster-whisper"
 DEFAULT_WHISPER_MODEL = "large-v3"
+DEFAULT_ASSISTANT_PROVIDER = "mock"
+DEFAULT_ASSISTANT_MODEL = "mock-conversation"
+DEFAULT_ASSISTANT_THINKING = "medium"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
 DEFAULT_WS_PATH = "/v1/transcribe/ws"
@@ -26,6 +29,15 @@ class Settings:
     whisper_compute_type: str = "int8"
     whisper_language: str = ""
     websocket_url_override: str = ""
+    assistant_provider: str = DEFAULT_ASSISTANT_PROVIDER
+    assistant_model: str = DEFAULT_ASSISTANT_MODEL
+    assistant_thinking: str = DEFAULT_ASSISTANT_THINKING
+    assistant_ollama_base_url: str = "http://127.0.0.1:11434"
+    assistant_openai_base_url: str = "http://127.0.0.1:1234/v1"
+    assistant_api_key: str = ""
+    assistant_timeout_ms: int = 20_000
+    assistant_max_tokens: int = 700
+    assistant_temperature: float = 0.2
 
     @property
     def websocket_url(self) -> str:
@@ -63,6 +75,33 @@ def get_settings() -> Settings:
         whisper_compute_type=os.getenv("MEETING_BACKEND_WHISPER_COMPUTE_TYPE", "int8"),
         whisper_language=os.getenv("MEETING_BACKEND_WHISPER_LANGUAGE", ""),
         websocket_url_override=env_first("MEETING_BACKEND_WS_URL"),
+        assistant_provider=env_first(
+            "MEETING_BACKEND_ASSISTANT_PROVIDER",
+            default=DEFAULT_ASSISTANT_PROVIDER,
+        ),
+        assistant_model=env_first(
+            "MEETING_BACKEND_ASSISTANT_MODEL",
+            default=DEFAULT_ASSISTANT_MODEL,
+        ),
+        assistant_thinking=env_first(
+            "MEETING_BACKEND_ASSISTANT_THINKING",
+            default=DEFAULT_ASSISTANT_THINKING,
+        ),
+        assistant_ollama_base_url=env_first(
+            "MEETING_BACKEND_ASSISTANT_OLLAMA_BASE_URL",
+            default="http://127.0.0.1:11434",
+        ),
+        assistant_openai_base_url=env_first(
+            "MEETING_BACKEND_ASSISTANT_OPENAI_BASE_URL",
+            default="http://127.0.0.1:1234/v1",
+        ),
+        assistant_api_key=env_first(
+            "MEETING_BACKEND_ASSISTANT_API_KEY",
+            "OPENAI_API_KEY",
+        ),
+        assistant_timeout_ms=int(os.getenv("MEETING_BACKEND_ASSISTANT_TIMEOUT_MS", "20000")),
+        assistant_max_tokens=int(os.getenv("MEETING_BACKEND_ASSISTANT_MAX_TOKENS", "700")),
+        assistant_temperature=float(os.getenv("MEETING_BACKEND_ASSISTANT_TEMPERATURE", "0.2")),
     )
 
 

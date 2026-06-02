@@ -1,9 +1,11 @@
 from fastapi import FastAPI, WebSocket
 
+from meeting_backend.assistant.api import router as assistant_router
 from meeting_backend.config import get_settings
 from meeting_backend.sessions import TranscriptionSession
 
 app = FastAPI(title="Meeting Assistant Backend", version="0.1.0")
+app.include_router(assistant_router)
 
 
 @app.get("/health")
@@ -19,6 +21,9 @@ async def health():
         "segment_min_ms": settings.segment_min_ms,
         "segment_silence_ms": settings.segment_silence_ms,
         "segment_max_ms": settings.segment_max_ms,
+        "assistant_provider": settings.assistant_provider,
+        "assistant_model": settings.assistant_model,
+        "assistant_thinking": settings.assistant_thinking,
     }
 
 

@@ -19,6 +19,11 @@ final class CaptureViewModel: ObservableObject {
     @Published private(set) var microphoneTranscriptionLatencyMs: Int?
     @Published private(set) var systemTranscriptionLatencyMs: Int?
     @Published private(set) var assistantModeLabel = "Ready"
+    @Published private(set) var assistantStatus: CaptureStatus = .idle
+    @Published private(set) var assistantProviders: [AssistantProviderDescriptor] = []
+    @Published private(set) var assistantProviderID = "mock"
+    @Published private(set) var assistantModel = "mock-conversation"
+    @Published private(set) var assistantThinking = AssistantThinking.medium.rawValue
     @Published private(set) var assistantDrafts: [AssistantDraft] = [
         AssistantDraft(
             title: "回覆策略",
@@ -43,12 +48,14 @@ final class CaptureViewModel: ObservableObject {
     private let transcriptionBackend: TranscriptionBackendConfig
     private let microphoneTranscriptionClient: TranscriptionWebSocketClient
     private let systemTranscriptionClient: TranscriptionWebSocketClient
+    private let assistantClient: AssistantAPIClient
     private let maxHistoryCount = 96
     private let maxTranscriptLineCount = 24
 
     init(transcriptionBackend: TranscriptionBackendConfig = .fromEnvironment()) {
         self.transcriptionBackend = transcriptionBackend
         transcriptionEndpointLabel = transcriptionBackend.displayAddress
+        assistantClient = AssistantAPIClient(baseURL: transcriptionBackend.httpBaseURL)
         microphoneTranscriptionClient = TranscriptionWebSocketClient(
             url: transcriptionBackend.websocketURL,
             source: "microphone"
@@ -102,6 +109,8 @@ final class CaptureViewModel: ObservableObject {
             source: .systemAudio,
             label: "System audio"
         )
+
+        refreshAssistantProviders()
     }
 
     var isAnyRunning: Bool {
@@ -132,6 +141,47 @@ final class CaptureViewModel: ObservableObject {
         }
 
         return "Connected"
+    }
+
+    var assistantProviderOptions: [AssistantProviderDescriptor] {
+        assistantProviders.isEmpty
+            ? [
+                AssistantProviderDescriptor(
+                    id: "mock",
+                    label: "Mock Assistant",
+                    kind: "local_server",
+                    installed: true,
+                    available: true,
+                    models: ["mock-conversation"],
+                    capabilities: ["chat"],
+                    riskLevel: "low",
+                    authMode: "none",
+                    endpoint: "",
+                    binaryPath: "",
+                    notes: []
+                )
+            ]
+            : assistantProviders
+    }
+
+    var assistantModelOptions: [String] {
+        assistantProviderOptions
+            .first(where: { $0.id == assistantProviderID })?
+            .models
+            .filter { !$0.isEmpty } ?? []
+    }
+
+    var assistantStatusLabel: String {
+        switch assistantStatus {
+        case .idle:
+            return "Ready"
+        case .starting:
+            return "Generating"
+        case .running:
+            return "Ready"
+        case .failed(let message):
+            return message
+        }
     }
 
     func startAll() {
@@ -221,48 +271,48 @@ final class CaptureViewModel: ObservableObject {
     }
 
     func prepareWhatShouldISay() {
-        assistantModeLabel = "What should I say?"
-        let context = latestTranscriptText()
-        assistantDrafts = [
-            AssistantDraft(
-                title: "先確認問題",
-                detail: "我先確認一下，你目前最想釐清的是 \(context)，對嗎？",
-                badge: "Placeholder",
-                iconName: "quote.bubble"
-            ),
-            AssistantDraft(
-                title: "保守回覆",
-                detail: "我可以先給一個初步方向，細節我會再確認後補上。",
-                badge: "Safe",
-                iconName: "checkmark.seal"
-            )
-        ]
-        appendLog("Prepared What should I say placeholders.")
+        runAssistant(action: "what_should_i_say", label: "What should I say?")
     }
 
     func prepareFollowUpQuestions() {
-        assistantModeLabel = "Follow-up questions"
-        assistantDrafts = [
-            AssistantDraft(
-                title: "釐清目標",
-                detail: "你希望我們優先解決的是時程、品質，還是成本？",
-                badge: "Clarify",
-                iconName: "questionmark.bubble"
-            ),
-            AssistantDraft(
-                title: "確認下一步",
-                detail: "下一步誰負責、什麼時間前需要完成？",
-                badge: "Action",
-                iconName: "arrowshape.turn.up.right"
-            ),
-            AssistantDraft(
-                title: "補齊風險",
-                detail: "目前有沒有任何限制或依賴，是我們還沒討論到的？",
-                badge: "Risk",
-                iconName: "exclamationmark.triangle"
-            )
-        ]
-        appendLog("Prepared Follow-up question placeholders.")
+        runAssistant(action: "follow_up_questions", label: "Follow-up questions")
+    }
+
+    func refreshAssistantProviders() {
+        assistantStatus = .starting
+        appendLog("Loading assistant providers...")
+
+        Task {
+            do {
+                let response = try await assistantClient.fetchProviders()
+                assistantProviders = response.providers
+                assistantProviderID = response.defaults.provider
+                assistantModel = response.defaults.model
+                assistantThinking = response.defaults.thinking
+                assistantStatus = .idle
+                assistantModeLabel = "Ready"
+                appendLog("Assistant providers loaded: \(response.providers.count).")
+            } catch {
+                assistantStatus = .failed(error.localizedDescription)
+                appendLog("Assistant provider load failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func selectAssistantProvider(_ providerID: String) {
+        assistantProviderID = providerID
+        if let firstModel = assistantProviderOptions.first(where: { $0.id == providerID })?.models.first,
+           !firstModel.isEmpty {
+            assistantModel = firstModel
+        }
+    }
+
+    func updateAssistantModel(_ model: String) {
+        assistantModel = model
+    }
+
+    func updateAssistantThinking(_ thinking: String) {
+        assistantThinking = thinking
     }
 
     func openMicrophoneSettings() {
@@ -360,6 +410,94 @@ final class CaptureViewModel: ObservableObject {
                 self?.transcriptionStatus = .failed(message)
                 self?.appendLog("\(label) transcription error: \(message)")
             }
+        }
+    }
+
+    private func runAssistant(action: String, label: String) {
+        assistantStatus = .starting
+        assistantModeLabel = "\(label) · \(assistantProviderID)"
+        assistantDrafts = [
+            AssistantDraft(
+                title: "Generating",
+                detail: "AI 正在根據最近逐字稿產生建議。",
+                badge: assistantThinking,
+                iconName: "sparkles"
+            )
+        ]
+        appendLog("Requesting assistant response: \(label).")
+
+        let request = AssistantRespondRequest(
+            action: action,
+            provider: assistantProviderID,
+            model: assistantModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? "mock-conversation"
+                : assistantModel,
+            thinking: assistantThinking,
+            transcript: assistantTranscriptPayload()
+        )
+
+        Task {
+            do {
+                let response = try await assistantClient.respond(request)
+                applyAssistantResponse(response, label: label)
+            } catch {
+                assistantStatus = .failed(error.localizedDescription)
+                assistantModeLabel = "AI error"
+                assistantDrafts = [
+                    AssistantDraft(
+                        title: "Assistant error",
+                        detail: error.localizedDescription,
+                        badge: "Error",
+                        iconName: "exclamationmark.triangle"
+                    )
+                ]
+                appendLog("Assistant response failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    private func applyAssistantResponse(_ response: AssistantRespondResponse, label: String) {
+        assistantStatus = .running
+        assistantModeLabel = "\(label) · \(response.provider) · \(response.model) · \(response.latencyMs) ms"
+        assistantProviderID = response.provider
+        assistantModel = response.model
+        assistantThinking = response.thinking
+
+        assistantDrafts = response.drafts.map {
+            AssistantDraft(
+                title: $0.title,
+                detail: $0.detail,
+                badge: $0.badge,
+                iconName: $0.iconName
+            )
+        }
+
+        if !response.notes.isEmpty {
+            noteDrafts = response.notes.map {
+                MeetingNoteDraft(title: $0.title, detail: $0.detail)
+            }
+        }
+
+        if !response.actions.isEmpty {
+            actionDrafts = response.actions.map {
+                MeetingActionDraft(title: $0.title, owner: $0.owner, state: $0.state)
+            }
+        }
+
+        appendLog("Assistant response ready: \(response.provider) \(response.model) \(response.latencyMs)ms.")
+    }
+
+    private func assistantTranscriptPayload() -> [AssistantTranscriptLinePayload] {
+        transcriptLines.suffix(16).map {
+            AssistantTranscriptLinePayload(
+                source: $0.source,
+                sourceLabel: $0.sourceLabel,
+                speakerHint: $0.speakerHint,
+                startMs: $0.startMs,
+                endMs: $0.endMs,
+                text: $0.text,
+                isFinal: $0.isFinal
+            )
         }
     }
 
