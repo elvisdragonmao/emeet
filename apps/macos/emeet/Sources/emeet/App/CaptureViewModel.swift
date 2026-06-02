@@ -46,7 +46,6 @@ final class CaptureViewModel: ObservableObject {
     private let maxTranscriptLineCount = 24
     private let autoSummaryIntervalSeconds = 30
     private var autoSummaryTask: Task<Void, Never>?
-    private var hasAutomaticSummary = false
     private var autoSummaryRequestGeneration = 0
     private var assistantRequestGeneration = 0
     private var didRequestScreenRecordingPermission = false
@@ -323,7 +322,6 @@ final class CaptureViewModel: ObservableObject {
         transcriptLines.removeAll()
         resetLatencyReadings()
         resetMeetingDrafts()
-        hasAutomaticSummary = false
         appendLog("Connecting transcription backend at \(transcriptionBackend.displayAddress)...")
         microphoneTranscriptionClient.connect()
         systemTranscriptionClient.connect()
@@ -354,7 +352,6 @@ final class CaptureViewModel: ObservableObject {
         resetLatencyReadings()
         resetMeetingDrafts()
         resetAssistantDrafts()
-        hasAutomaticSummary = false
 
         if transcriptionStatus == .starting || transcriptionStatus == .running {
             resetAutoSummaryCountdown(status: "Records cleared")
@@ -492,9 +489,6 @@ final class CaptureViewModel: ObservableObject {
             transcriptLines = Array(transcriptLines.suffix(maxTranscriptLineCount))
         }
 
-        if line.isFinal {
-            refreshDraftNotes(with: line)
-        }
     }
 
     private func configureTranscriptionClient(
@@ -585,18 +579,6 @@ final class CaptureViewModel: ObservableObject {
                 badge: $0.badge,
                 iconName: $0.iconName
             )
-        }
-
-        if !response.notes.isEmpty {
-            noteDrafts = response.notes.map {
-                MeetingNoteDraft(title: $0.title, detail: $0.detail)
-            }
-        }
-
-        if !response.actions.isEmpty {
-            actionDrafts = response.actions.map {
-                MeetingActionDraft(title: $0.title, owner: $0.owner, state: $0.state)
-            }
         }
 
         appendLog("Assistant response ready: \(response.provider) \(response.model) \(response.latencyMs)ms.")
@@ -724,8 +706,6 @@ final class CaptureViewModel: ObservableObject {
     }
 
     private func applyAutomaticSummaryResponse(_ response: AssistantRespondResponse) {
-        hasAutomaticSummary = true
-
         if !response.notes.isEmpty {
             noteDrafts = response.notes.map {
                 MeetingNoteDraft(title: $0.title, detail: $0.detail)
@@ -769,20 +749,6 @@ final class CaptureViewModel: ObservableObject {
         systemBackendLatencyMs = nil
         microphoneTranscriptionLatencyMs = nil
         systemTranscriptionLatencyMs = nil
-    }
-
-    private func refreshDraftNotes(with line: TranscriptLine) {
-        guard !hasAutomaticSummary else {
-            return
-        }
-
-        noteDrafts = [
-            MeetingNoteDraft(title: "最新重點", detail: line.text),
-            MeetingNoteDraft(title: "時間範圍", detail: "\(line.timeRangeLabel) · \(line.sourceLabel)")
-        ]
-        actionDrafts = [
-            MeetingActionDraft(title: "Review transcript segment", owner: line.sourceLabel, state: "Draft")
-        ]
     }
 
     private func resetMeetingDrafts() {
