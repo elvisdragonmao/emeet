@@ -57,6 +57,16 @@ final class PCM16AudioConverter {
         return pcm16Data(from: outputBuffer)
     }
 
+    static func pcm16Data(from samples: [Float]) -> Data? {
+        guard !samples.isEmpty else {
+            return nil
+        }
+
+        return samples.withUnsafeBufferPointer { buffer in
+            pcm16Data(from: buffer)
+        }
+    }
+
     private func formatDescriptor(for format: AVAudioFormat) -> String {
         [
             String(format.sampleRate),
@@ -76,11 +86,15 @@ final class PCM16AudioConverter {
             return nil
         }
 
-        var pcm = [Int16]()
-        pcm.reserveCapacity(frameLength)
+        return Self.pcm16Data(from: UnsafeBufferPointer(start: samples, count: frameLength))
+    }
 
-        for frame in 0..<frameLength {
-            let clamped = min(max(samples[frame], -1), 1)
+    private static func pcm16Data(from samples: UnsafeBufferPointer<Float>) -> Data {
+        var pcm = [Int16]()
+        pcm.reserveCapacity(samples.count)
+
+        for sample in samples {
+            let clamped = min(max(sample, -1), 1)
             let scaled = clamped < 0
                 ? clamped * 32_768
                 : clamped * Float(Int16.max)

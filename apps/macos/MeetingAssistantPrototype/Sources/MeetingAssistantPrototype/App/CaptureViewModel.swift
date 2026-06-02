@@ -37,14 +37,22 @@ final class CaptureViewModel: ObservableObject {
     private let microphoneService = MicrophoneCaptureService()
     private let systemAudioService = SystemAudioCaptureService()
     private let transcriptionBackend: TranscriptionBackendConfig
-    private let transcriptionClient: TranscriptionWebSocketClient
+    private let microphoneTranscriptionClient: TranscriptionWebSocketClient
+    private let systemTranscriptionClient: TranscriptionWebSocketClient
     private let maxHistoryCount = 96
     private let maxTranscriptLineCount = 24
 
     init(transcriptionBackend: TranscriptionBackendConfig = .fromEnvironment()) {
         self.transcriptionBackend = transcriptionBackend
         transcriptionEndpointLabel = transcriptionBackend.displayAddress
-        transcriptionClient = TranscriptionWebSocketClient(url: transcriptionBackend.websocketURL)
+        microphoneTranscriptionClient = TranscriptionWebSocketClient(
+            url: transcriptionBackend.websocketURL,
+            source: "microphone"
+        )
+        systemTranscriptionClient = TranscriptionWebSocketClient(
+            url: transcriptionBackend.websocketURL,
+            source: "system"
+        )
 
         microphoneService.onLevel = { [weak self] level in
             Task { @MainActor in
@@ -53,7 +61,7 @@ final class CaptureViewModel: ObservableObject {
         }
 
         microphoneService.onAudioChunk = { [weak self] data in
-            self?.transcriptionClient.sendAudio(data)
+            self?.microphoneTranscriptionClient.sendAudio(data)
         }
 
         microphoneService.onError = { [weak self] message in
@@ -69,6 +77,10 @@ final class CaptureViewModel: ObservableObject {
             }
         }
 
+        systemAudioService.onAudioChunk = { [weak self] data in
+            self?.systemTranscriptionClient.sendAudio(data)
+        }
+
         systemAudioService.onError = { [weak self] message in
             Task { @MainActor in
                 self?.systemAudioStatus = .failed(message)
@@ -76,18 +88,8 @@ final class CaptureViewModel: ObservableObject {
             }
         }
 
-        transcriptionClient.onEvent = { [weak self] event in
-            Task { @MainActor in
-                self?.handleTranscriptionEvent(event)
-            }
-        }
-
-        transcriptionClient.onError = { [weak self] message in
-            Task { @MainActor in
-                self?.transcriptionStatus = .failed(message)
-                self?.appendLog("Transcription error: \(message)")
-            }
-        }
+        configureTranscriptionClient(microphoneTranscriptionClient, label: "Microphone")
+        configureTranscriptionClient(systemTranscriptionClient, label: "System audio")
     }
 
     var isAnyRunning: Bool {
@@ -165,15 +167,21 @@ final class CaptureViewModel: ObservableObject {
         transcriptionStatus = .starting
         transcriptLines.removeAll()
         appendLog("Connecting transcription backend at \(transcriptionBackend.displayAddress)...")
-        transcriptionClient.connect()
+        microphoneTranscriptionClient.connect()
+        systemTranscriptionClient.connect()
 
         if microphoneStatus != .running && microphoneStatus != .starting {
             startMicrophone()
         }
+
+        if systemAudioStatus != .running && systemAudioStatus != .starting {
+            startSystemAudio()
+        }
     }
 
     func disconnectTranscription() {
-        transcriptionClient.disconnect()
+        microphoneTranscriptionClient.disconnect()
+        systemTranscriptionClient.disconnect()
         transcriptionStatus = .idle
         appendLog("Transcription backend disconnected.")
     }
@@ -287,6 +295,21 @@ final class CaptureViewModel: ObservableObject {
 
         if line.isFinal {
             refreshDraftNotes(with: line)
+        }
+    }
+
+    private func configureTranscriptionClient(_ client: TranscriptionWebSocketClient, label: String) {
+        client.onEvent = { [weak self] event in
+            Task { @MainActor in
+                self?.handleTranscriptionEvent(event)
+            }
+        }
+
+        client.onError = { [weak self] message in
+            Task { @MainActor in
+                self?.transcriptionStatus = .failed(message)
+                self?.appendLog("\(label) transcription error: \(message)")
+            }
         }
     }
 

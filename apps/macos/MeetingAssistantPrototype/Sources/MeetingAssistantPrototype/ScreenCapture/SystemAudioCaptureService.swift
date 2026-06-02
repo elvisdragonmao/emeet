@@ -6,9 +6,11 @@ import ScreenCaptureKit
 
 final class SystemAudioCaptureService: NSObject {
     var onLevel: ((AudioLevel) -> Void)?
+    var onAudioChunk: ((Data) -> Void)?
     var onError: ((String) -> Void)?
 
     private let sampleQueue = DispatchQueue(label: "MeetingAssistantPrototype.SystemAudioCapture")
+    private let pcm16Converter = SampleBufferPCM16AudioConverter()
     private var stream: SCStream?
     private var isRunning = false
 
@@ -75,6 +77,10 @@ extension SystemAudioCaptureService: SCStreamOutput {
         }
 
         onLevel?(AudioLevelAnalyzer.levels(from: sampleBuffer))
+
+        if let chunk = pcm16Converter.convert(sampleBuffer), !chunk.isEmpty {
+            onAudioChunk?(chunk)
+        }
     }
 }
 

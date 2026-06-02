@@ -20,6 +20,7 @@ final class TranscriptionWebSocketClient {
     var onError: ((String) -> Void)?
 
     private let url: URL
+    private let source: String
     private let session: URLSession
     private let queue = DispatchQueue(label: "MeetingAssistantPrototype.TranscriptionWebSocketClient")
     private let chunkByteCount = PCM16AudioConverter.outputSampleRate * PCM16AudioConverter.sampleWidth / 10
@@ -33,8 +34,9 @@ final class TranscriptionWebSocketClient {
     private var bufferedAudio = Data()
     private var sessionID = "macos-local"
 
-    init(url: URL, session: URLSession = .shared) {
+    init(url: URL, source: String = "microphone", session: URLSession = .shared) {
         self.url = url
+        self.source = source
         self.session = session
     }
 
@@ -45,7 +47,7 @@ final class TranscriptionWebSocketClient {
             }
 
             let task = self.session.webSocketTask(with: self.url)
-            self.sessionID = "macos-\(UUID().uuidString.lowercased())"
+            self.sessionID = "macos-\(self.source)-\(UUID().uuidString.lowercased())"
             self.bufferedAudio.removeAll(keepingCapacity: true)
             self.task = task
 
@@ -92,7 +94,7 @@ final class TranscriptionWebSocketClient {
         let payload: [String: Any] = [
             "type": "session.start",
             "session_id": sessionID,
-            "source": "microphone",
+            "source": source,
             "sample_rate": PCM16AudioConverter.outputSampleRate,
             "channels": Int(PCM16AudioConverter.outputChannels),
             "sample_width": PCM16AudioConverter.sampleWidth
