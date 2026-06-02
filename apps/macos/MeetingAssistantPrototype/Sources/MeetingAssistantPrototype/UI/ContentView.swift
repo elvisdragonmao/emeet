@@ -37,9 +37,12 @@ struct ContentView: View {
             )
 
             Button {
-                viewModel.startAll()
+                viewModel.toggleMeeting()
             } label: {
-                Label("Start Meeting", systemImage: "record.circle")
+                Label(
+                    viewModel.isMeetingActive ? "Stop Meeting" : "Start Meeting",
+                    systemImage: viewModel.isMeetingActive ? "stop.fill" : "record.circle"
+                )
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
@@ -60,13 +63,6 @@ struct ContentView: View {
             .buttonStyle(.bordered)
             .controlSize(.large)
 
-            Button {
-                viewModel.stopAll()
-            } label: {
-                Label("Stop", systemImage: "stop.fill")
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.large)
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 18)
@@ -126,8 +122,7 @@ struct ContentView: View {
                 status: viewModel.microphoneStatus,
                 level: viewModel.microphoneLevel,
                 history: viewModel.microphoneHistory,
-                startAction: viewModel.startMicrophone,
-                stopAction: viewModel.stopMicrophone,
+                toggleAction: viewModel.toggleMicrophone,
                 settingsAction: viewModel.openMicrophoneSettings
             )
 
@@ -136,8 +131,7 @@ struct ContentView: View {
                 status: viewModel.systemAudioStatus,
                 level: viewModel.systemAudioLevel,
                 history: viewModel.systemAudioHistory,
-                startAction: viewModel.startSystemAudio,
-                stopAction: viewModel.stopSystemAudio,
+                toggleAction: viewModel.toggleSystemAudio,
                 settingsAction: viewModel.openScreenRecordingSettings
             )
 

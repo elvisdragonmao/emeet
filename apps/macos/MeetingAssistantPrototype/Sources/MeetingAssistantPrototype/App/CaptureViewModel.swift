@@ -25,21 +25,9 @@ final class CaptureViewModel: ObservableObject {
     @Published private(set) var assistantProviderID = "mock"
     @Published private(set) var assistantModel = "mock-conversation"
     @Published private(set) var assistantThinking = AssistantThinking.medium.rawValue
-    @Published private(set) var assistantDrafts: [AssistantDraft] = [
-        AssistantDraft(
-            title: "回覆策略",
-            detail: "等待逐字稿事件後，這裡會放可直接說出口的短句草稿。",
-            badge: "Draft",
-            iconName: "quote.bubble"
-        )
-    ]
-    @Published private(set) var noteDrafts: [MeetingNoteDraft] = [
-        MeetingNoteDraft(title: "討論重點", detail: "逐字稿定稿後會累積 highlights。"),
-        MeetingNoteDraft(title: "未決問題", detail: "尚未確認的風險、限制與依賴會放在這裡。")
-    ]
-    @Published private(set) var actionDrafts: [MeetingActionDraft] = [
-        MeetingActionDraft(title: "整理下一步", owner: "Unassigned", state: "Pending")
-    ]
+    @Published private(set) var assistantDrafts: [AssistantDraft] = []
+    @Published private(set) var noteDrafts: [MeetingNoteDraft] = []
+    @Published private(set) var actionDrafts: [MeetingActionDraft] = []
     @Published private(set) var autoSummaryRemainingSeconds = 30
     @Published private(set) var autoSummaryStatusLabel = "Start Meeting to begin"
     @Published private(set) var autoSummaryIsGenerating = false
@@ -126,6 +114,15 @@ final class CaptureViewModel: ObservableObject {
         microphoneStatus == .running || systemAudioStatus == .running
     }
 
+    var isMeetingActive: Bool {
+        transcriptionStatus == .starting
+            || transcriptionStatus == .running
+            || microphoneStatus == .starting
+            || microphoneStatus == .running
+            || systemAudioStatus == .starting
+            || systemAudioStatus == .running
+    }
+
     var transcriptCountsLabel: String {
         let finalCount = transcriptLines.filter(\.isFinal).count
         let partialCount = transcriptLines.count - finalCount
@@ -206,6 +203,14 @@ final class CaptureViewModel: ObservableObject {
         connectTranscription()
     }
 
+    func toggleMeeting() {
+        if isMeetingActive {
+            stopAll()
+        } else {
+            startAll()
+        }
+    }
+
     func requestScreenRecordingPermissionOnLaunch() {
         guard !didRequestScreenRecordingPermission else {
             return
@@ -249,6 +254,14 @@ final class CaptureViewModel: ObservableObject {
         }
     }
 
+    func toggleMicrophone() {
+        if microphoneStatus == .running || microphoneStatus == .starting {
+            stopMicrophone()
+        } else {
+            startMicrophone()
+        }
+    }
+
     func stopMicrophone() {
         microphoneService.stop()
         microphoneStatus = .idle
@@ -268,6 +281,14 @@ final class CaptureViewModel: ObservableObject {
                 systemAudioStatus = .failed(error.localizedDescription)
                 appendLog("System audio failed: \(error.localizedDescription)")
             }
+        }
+    }
+
+    func toggleSystemAudio() {
+        if systemAudioStatus == .running || systemAudioStatus == .starting {
+            stopSystemAudio()
+        } else {
+            startSystemAudio()
         }
     }
 
@@ -751,26 +772,14 @@ final class CaptureViewModel: ObservableObject {
     }
 
     private func resetMeetingDrafts() {
-        noteDrafts = [
-            MeetingNoteDraft(title: "討論重點", detail: "逐字稿定稿後會累積 highlights。"),
-            MeetingNoteDraft(title: "未決問題", detail: "尚未確認的風險、限制與依賴會放在這裡。")
-        ]
-        actionDrafts = [
-            MeetingActionDraft(title: "整理下一步", owner: "Unassigned", state: "Pending")
-        ]
+        noteDrafts = []
+        actionDrafts = []
     }
 
     private func resetAssistantDrafts() {
         assistantModeLabel = "Ready"
         assistantStatus = .idle
-        assistantDrafts = [
-            AssistantDraft(
-                title: "回覆策略",
-                detail: "等待逐字稿事件後，這裡會放可直接說出口的短句草稿。",
-                badge: "Draft",
-                iconName: "quote.bubble"
-            )
-        ]
+        assistantDrafts = []
     }
 
     private func latestTranscriptText() -> String {

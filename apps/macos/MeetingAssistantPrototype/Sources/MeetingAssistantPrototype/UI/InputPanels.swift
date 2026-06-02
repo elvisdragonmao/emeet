@@ -5,8 +5,7 @@ struct CompactInputPanel: View {
     let status: CaptureStatus
     let level: AudioLevel
     let history: [Float]
-    let startAction: () -> Void
-    let stopAction: () -> Void
+    let toggleAction: () -> Void
     let settingsAction: () -> Void
 
     var body: some View {
@@ -38,15 +37,10 @@ struct CompactInputPanel: View {
             }
 
             HStack(spacing: 8) {
-                Button(action: startAction) {
-                    Image(systemName: "play.fill")
+                Button(action: toggleAction) {
+                    Image(systemName: isActive ? "stop.fill" : "play.fill")
                 }
-                .help("Start")
-
-                Button(action: stopAction) {
-                    Image(systemName: "stop.fill")
-                }
-                .help("Stop")
+                .help(isActive ? "Stop" : "Start")
 
                 Button(action: settingsAction) {
                     Image(systemName: "gear")
@@ -63,6 +57,10 @@ struct CompactInputPanel: View {
             .buttonStyle(.bordered)
         }
         .panelStyle()
+    }
+
+    private var isActive: Bool {
+        status == .starting || status == .running
     }
 
     private var statusColor: Color {
