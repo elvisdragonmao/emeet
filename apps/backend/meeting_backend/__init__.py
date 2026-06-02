@@ -1,0 +1,2 @@
+"""Meeting assistant backend package."""
+

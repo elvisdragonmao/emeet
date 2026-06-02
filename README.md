@@ -7,6 +7,8 @@
 ```text
 .
 ├── apps/
+│   ├── backend/
+│   │   └── meeting_backend/             # self-host STT backend
 │   └── macos/
 │       └── MeetingAssistantPrototype/   # macOS App 原型
 ├── docs/
@@ -29,6 +31,6 @@
 1. 麥克風擷取與音波/音量確認。
 2. ScreenCaptureKit 螢幕錄製權限與畫面預覽。
 3. 麥克風音訊與系統/會議音訊分路處理。
-4. 即時逐字稿 provider protocol。
+4. self-host 即時逐字稿 backend 與 provider protocol。
 5. AI assistant provider protocol，支援自帶 API key 與模型選擇。
 6. 會議筆記、行動項目、對話輔助按鈕。

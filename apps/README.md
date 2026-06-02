@@ -4,6 +4,10 @@
 
 ```text
 apps/
+├── backend/
 └── macos/
     └── MeetingAssistantPrototype/
 ```
+
+- `backend/`：VPS/local 都能跑的 self-host 逐字稿服務。
+- `macos/`：原生 SwiftUI macOS App。
