@@ -100,8 +100,13 @@ class AssistantServiceTest(unittest.TestCase):
         self.assertIn("openai-compatible", provider_ids)
         self.assertIn("codex-cli", provider_ids)
         self.assertEqual(descriptors["defaults"]["provider"], "codex-cli")
-        self.assertEqual(descriptors["defaults"]["model"], "fast")
+        self.assertEqual(descriptors["defaults"]["model"], "gpt-5.5")
         self.assertEqual(descriptors["defaults"]["thinking"], "medium")
+
+        codex = next(provider for provider in descriptors["providers"] if provider["id"] == "codex-cli")
+        self.assertEqual(codex["risk_level"], "low")
+        self.assertIn("text_output", codex["capabilities"])
+        self.assertIn("gpt-5.5", codex["models"])
 
     def test_openai_compatible_descriptor_discovers_candidate_and_lmstudio_models(self) -> None:
         original_openai = service.list_openai_compatible_models
@@ -168,6 +173,7 @@ class AssistantServiceTest(unittest.TestCase):
         )
 
         self.assertNotIn("--ask-for-approval", command)
+        self.assertNotIn("--risk-level", command)
         self.assertIn("--sandbox", command)
         self.assertIn("read-only", command)
         self.assertEqual(command[-1], "-")

@@ -315,13 +315,14 @@ def codex_cli_descriptor(settings: Settings) -> AssistantProviderDescriptor:
         available=installed,
         binary_path=binary,
         models=dedupe(models),
-        capabilities=["chat", "repo_context"],
-        risk_level="medium",
+        capabilities=["chat", "text_output"],
+        risk_level="low",
         auth_mode="provider_owned",
         notes=[
-            "Runs codex exec in read-only sandbox with approvals disabled.",
+            "Runs codex exec with read-only sandbox, ephemeral session, and text output capture.",
             "Authentication stays inside Codex CLI.",
             "Model list is not a stable machine-readable CLI API; use configured, default, or manual model.",
+            "Codex CLI does not take a risk-level parameter; this provider only returns text for this app.",
         ],
     )
 

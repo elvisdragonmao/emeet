@@ -4,7 +4,7 @@ from dataclasses import dataclass
 DEFAULT_PROVIDER = "faster-whisper"
 DEFAULT_WHISPER_MODEL = "large-v3-turbo"
 DEFAULT_ASSISTANT_PROVIDER = "codex-cli"
-DEFAULT_ASSISTANT_MODEL = "fast"
+DEFAULT_ASSISTANT_MODEL = "gpt-5.5"
 DEFAULT_ASSISTANT_THINKING = "medium"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765

@@ -23,7 +23,7 @@ final class CaptureViewModel: ObservableObject {
     @Published private(set) var assistantStatus: CaptureStatus = .idle
     @Published private(set) var assistantProviders: [AssistantProviderDescriptor] = []
     @Published private(set) var assistantProviderID = "codex-cli"
-    @Published private(set) var assistantModel = "fast"
+    @Published private(set) var assistantModel = "gpt-5.5"
     @Published private(set) var assistantThinking = AssistantThinking.medium.rawValue
     @Published private(set) var assistantDrafts: [AssistantDraft] = []
     @Published private(set) var noteDrafts: [MeetingNoteDraft] = []
@@ -158,9 +158,9 @@ final class CaptureViewModel: ObservableObject {
                     kind: "cli_agent",
                     installed: false,
                     available: false,
-                    models: ["fast"],
-                    capabilities: ["chat", "repo_context"],
-                    riskLevel: "medium",
+                    models: ["gpt-5.5"],
+                    capabilities: ["chat", "text_output"],
+                    riskLevel: "low",
                     authMode: "provider_owned",
                     endpoint: "",
                     binaryPath: "",
@@ -531,7 +531,7 @@ final class CaptureViewModel: ObservableObject {
             action: action,
             provider: assistantProviderID,
             model: assistantModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                ? "fast"
+                ? "gpt-5.5"
                 : assistantModel,
             thinking: assistantThinking,
             transcript: assistantTranscriptPayload()
@@ -675,7 +675,7 @@ final class CaptureViewModel: ObservableObject {
             action: "meeting_notes",
             provider: assistantProviderID,
             model: assistantModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                ? "fast"
+                ? "gpt-5.5"
                 : assistantModel,
             thinking: assistantThinking,
             transcript: transcript
