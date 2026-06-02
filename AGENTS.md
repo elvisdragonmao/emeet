@@ -1,40 +1,42 @@
-我這學期要做一個畢業專題，是要做出一個會議輔助工具。預計以 macOS App 的方式做到。
+本專題是一個 macOS App 形式的即時會議輔助工具。協作者與 coding agent 應先理解產品定位，再改程式或文件。
 
-功能包括：
+## Product Goal
 
-* 生成即時的逐字稿
-* 即時對話輔助：在通話或線上會議中，AI 會即時聆聽對話內容，分析對方提出的問題，並自動生成自然的回應建議或話術。
-* 會議筆記與下一步行動：除了應答之外，它也能在通話中同步記錄重點，並歸納出後續的執行步驟。
-* 有即時的對話框可以問 AI。
-* 可以點擊按鈕：`What should I say?`、`Follow-up questions`。
-* 模型要能夠自己選擇，可以串自己的 API，如 GitHub Copilot、Codex。
+emeet 的目標是做出一個可 demo 的即時會議副駕：
 
-## Repository Guidance
+* 生成即時逐字稿。
+* 在通話或線上會議中分析目前對話，產生自然、保守、可直接說出口的回覆建議。
+* 產生追問問題，協助釐清需求、限制、風險與下一步。
+* 同步整理 Meeting Notes 與 Next Actions。
+* 提供即時 AI 對話框作為未來會議 Q&A 路線。
+* 提供 `What should I say?` 與 `Follow-up questions` 兩個主要按鈕。
+* 模型與 provider 要可切換，可接本機模型、OpenAI-compatible endpoint、Codex CLI、GitHub Copilot CLI 等實驗 provider。
 
-這個 repo 的文件入口集中在：
-
-* `README.md`：專案總覽、執行方式、簡報入口。
-* `AGENTS.md`：給協作者和 coding agent 的需求、架構、選型、限制與開發規範。
-* `docs/research/translated/`：中文研究整理版，簡報與技術選型的主要依據。
-* `docs/slides/slides.md`：Slidev 畢業專題報告。
-
-子目錄 README 已清除，後續不要再新增 `apps/**/README.md`、`docs/**/README.md` 這類分散文件。若有重要資訊，整理到根 `README.md` 或本檔；若是研究長文，放到 `docs/research/`；若是簡報，放到 `docs/slides/slides.md`。
-
-## Product Positioning
-
-研究結論指出，會議摘要與 action items 已是成熟競品的基本功能；本專題的差異化應是：
+產品定位：
 
 **一個私密、macOS 原生、低摩擦、模型可選的即時會議副駕，把目前通話逐字稿轉成下一句可說的話、可追問的問題、會議筆記和下一步行動。**
 
-第一版應避免做成「所有會議工作流平台」，而是專注在可 demo 的端到端體驗：
+第一版不要做成「所有會議工作流平台」。MVP 應專注在一個可展示的端到端 loop：
 
 1. Start Meeting。
 2. 收到麥克風與系統音訊。
 3. 顯示即時逐字稿。
-4. 按下 `What should I say?` 取得保守、自然、可直接說出口的建議。
-5. 按下 `Follow-up questions` 取得追問。
-6. 右側 Meeting Notes 每 30 秒用 final transcript 整理重點與下一步。
+4. 按 `What should I say?` 取得回覆建議。
+5. 按 `Follow-up questions` 取得追問。
+6. 右側 Meeting Notes 每 30 秒根據 final transcript 更新。
 7. 匯出 Markdown 會議紀錄。
+8. 切換 provider/model 展示模型抽象層。
+
+## Documentation Rules
+
+這個 repo 的文件入口集中在：
+
+* `README.md`：專案總覽、執行方式、demo flow、簡報入口。
+* `AGENTS.md`：給協作者和 coding agent 的需求、架構、選型、限制與開發規範。
+* `docs/research/translated/`：中文研究整理版，簡報與技術選型的主要依據。
+* `docs/slides/slides.md`：Slidev 畢業專題報告。
+
+不要新增 `apps/**/README.md`、`docs/**/README.md` 這類分散文件。若有重要資訊，整理到根 `README.md` 或本檔；若是研究長文，放到 `docs/research/`；若是簡報，放到 `docs/slides/slides.md`。
 
 ## Current Architecture
 
@@ -45,7 +47,8 @@ flowchart LR
     Mac --> PCM[16 kHz mono PCM16]
     PCM --> WS[WebSocket<br/>100 ms frames]
     WS --> Backend[FastAPI backend]
-    Backend --> STT[STT provider]
+    Backend --> Seg[Speech-window<br/>segmentation]
+    Seg --> STT[faster-whisper / mlx-whisper]
     STT --> Transcript[transcript events]
     Transcript --> UI[SwiftUI state]
     UI --> Assistant[Assistant request]
@@ -69,7 +72,7 @@ Important modules:
 * `App/CaptureViewModel.swift` owns capture status, transcript state, assistant provider selection, automatic 30 second summaries, delete/export actions.
 * `UI/ContentView.swift`, `UI/TranscriptWorkspace.swift`, `UI/AssistantWorkspace.swift` compose the prototype workspace.
 
-The UI currently has:
+Current UI:
 
 * left input panels for microphone/system audio levels,
 * center transcript panel,
@@ -117,8 +120,9 @@ Chosen MVP line:
 Rationale:
 
 * Official macOS APIs and no driver install for the demo target.
-* Better than mixing both sources into one track.
-* Avoids full speaker diarization complexity in MVP.
+* More controllable than mixing local and remote audio into one track.
+* Source-based `Self` / `Other` labels are enough for MVP.
+* Full speaker diarization is deferred.
 
 Deferred:
 
@@ -126,7 +130,7 @@ Deferred:
 * Meeting SDK/WebRTC raw participant tracks.
 * Core Audio per-process taps as a later OS/version-specific route.
 
-### STT / ASR
+### STT / ASR, Not TTS
 
 Research sources:
 
@@ -134,17 +138,18 @@ Research sources:
 * `docs/research/translated/04-音訊分塊與即時處理策略.md`
 * `docs/research/translated/12-Apple-Silicon即時會議助理技術可行性.md`
 
+This project currently implements STT/ASR: speech-to-text. TTS means text-to-speech and would make the AI speak aloud. TTS is not in the MVP because the product should not automatically speak for the user.
+
 Chosen MVP line:
 
 * Client sends 16 kHz mono PCM16 to backend over WebSocket.
 * Backend segments speech windows, then runs `faster-whisper` or `mlx-whisper`.
 * Apple Silicon demo preference: `mlx-whisper` with `large-v3-turbo`.
-
-Important distinction:
-
-* This project is STT/ASR, not TTS. TTS would mean speaking AI output aloud and is not in the MVP because the product should not automatically speak for the user.
+* `faster-whisper` remains the CPU-compatible route.
 
 ### Realtime Chunking
+
+Research source: `docs/research/translated/04-音訊分塊與即時處理策略.md`
 
 Current implementation:
 
@@ -164,6 +169,8 @@ Research conclusion:
 * STT transport can be high-frequency.
 * LLM calls should be low-frequency and semantic.
 * Notes should use final transcript, not unstable partial transcript.
+* `What should I say?` and `Follow-up questions` are user-triggered.
+* Meeting notes update every 30 seconds.
 
 ### Assistant / Model Provider
 
@@ -180,11 +187,12 @@ Current provider strategy:
 * `codex-cli`: experimental CLI provider, read-only sandbox, text output capture.
 * `github-copilot-cli`: experimental CLI provider through GitHub CLI/Copilot CLI.
 
-Architecture rule:
+Architecture rules:
 
 * UI must consume normalized `drafts`, `notes`, `actions`.
 * UI should not parse arbitrary model prose.
 * CLI agent providers are optional experiments, not the safest low-latency default.
+* Secrets must not be stored in SQLite. Future BYOK UI should use Keychain or backend-scoped ephemeral credentials.
 
 ### Prompt and Schema
 
@@ -249,7 +257,26 @@ Current MVP storage:
 
 Current storage is append-first and local. Full meeting-level schema, FTS5, rolling memory snapshots, evidence links, and export/query APIs are future work.
 
-Secrets must not be stored in SQLite. Future BYOK UI should store user keys in Keychain or route through backend-scoped ephemeral credentials.
+## Report / Slides Guidance
+
+`docs/slides/slides.md` is the single Slidev graduation-project deck. Keep the deck focused on this narrative:
+
+1. What software is being built.
+2. Live demo first.
+3. Research process and product positioning.
+4. Technical lines:
+   * microphone capture,
+   * system audio capture,
+   * STT/ASR rather than TTS,
+   * realtime chunking,
+   * model/provider selection,
+   * notes/actions storage.
+5. Evidence from `docs/research/translated/`.
+6. Evidence from actual code modules.
+7. Final selected stack.
+8. Known limits and future work.
+
+Presenter notes should live inside `docs/slides/slides.md` as Slidev HTML comments. Do not recreate `docs/slides/demo-script.md`.
 
 ## Run Commands
 
