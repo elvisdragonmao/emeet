@@ -61,7 +61,7 @@ ws://127.0.0.1:8765/v1/transcribe/ws
 
 在 App 裡按 `Connect STT` 會自動開始麥克風擷取，並把音訊串流到 backend。若 backend 使用 `mock` provider，會先看到假的 partial/final transcript；若使用 `faster-whisper` provider，會跑本機開源模型。
 
-右側的 action buttons 目前先產生本地 placeholder draft，尚未串接 LLM provider。後續可把按鈕事件接到獨立的 assistant backend route。
+右側的 action buttons 會呼叫 assistant backend，根據最近逐字稿產生 `What should I say?` 與 `Follow-up questions`。Meeting Notes 區塊會在 `Connect STT` 後顯示 30 秒圓形倒數，倒數結束時自動用 `meeting_notes` action 整理筆記與下一步行動。
 
 Apple Silicon 本機 demo 建議用 MLX backend：
 
