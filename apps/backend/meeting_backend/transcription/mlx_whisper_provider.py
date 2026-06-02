@@ -1,10 +1,10 @@
 import os
 import tempfile
 import wave
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
-from meeting_backend.protocol import SessionStart, status_event, transcript_event
-from meeting_backend.transcription.segmenter import SpeechSegment, SpeechSegmenterConfig, SpeechWindowSegmenter
+from meeting_backend.transcription.segmented import SegmentedStreamingTranscriber, TranscriptionResult
+from meeting_backend.transcription.segmenter import SpeechSegmenterConfig
 
 MLX_MODEL_ALIASES = {
     "tiny": "mlx-community/whisper-tiny",
@@ -17,7 +17,7 @@ MLX_MODEL_ALIASES = {
 }
 
 
-class MlxWhisperStreamingTranscriber:
+class MlxWhisperStreamingTranscriber(SegmentedStreamingTranscriber):
     provider_name = "mlx-whisper"
 
     def __init__(
@@ -34,61 +34,21 @@ class MlxWhisperStreamingTranscriber:
                 "mlx-whisper provider requires `python -m pip install -e \".[mlx-whisper]\"`"
             ) from error
 
+        super().__init__(segmenter_config=segmenter_config)
         self._mlx_whisper = mlx_whisper
         self.model_name = model_name
         self.resolved_model_name = resolve_mlx_model_name(model_name)
         self.language = language
-        self.session: Optional[SessionStart] = None
-        self.segmenter_config = segmenter_config
-        self.segmenter: Optional[SpeechWindowSegmenter] = None
-        self.segment_index = 1
 
-    def start(self, session: SessionStart) -> List[Dict]:
-        self.session = session
-        self.segmenter = SpeechWindowSegmenter(
-            sample_rate=session.sample_rate,
-            channels=session.channels,
-            config=self.segmenter_config,
+    def status_message(self) -> str:
+        return "mlx-whisper provider ready: {} ({})".format(
+            self.model_name,
+            self.resolved_model_name,
         )
-        return [
-            status_event(
-                "mlx-whisper provider ready: {} ({})".format(
-                    self.model_name,
-                    self.resolved_model_name,
-                ),
-                provider=self.provider_name,
-            )
-        ]
 
-    def accept_audio(self, audio: bytes) -> List[Dict]:
-        if self.session is None or self.segmenter is None:
-            return []
-
-        events: List[Dict] = []
-        for segment in self.segmenter.accept_audio(audio):
-            event = self._transcribe_segment(segment)
-            if event is not None:
-                events.append(event)
-        return events
-
-    def finish(self) -> List[Dict]:
-        if self.session is None or self.segmenter is None:
-            return []
-
-        events = []
-        for segment in self.segmenter.finish():
-            event = self._transcribe_segment(segment)
-            if event is not None:
-                events.append(event)
-        return events
-
-    def _transcribe_segment(self, segment: SpeechSegment) -> Optional[Dict]:
-        if self.session is None:
-            return None
-
-        audio = segment.audio
+    def transcribe_audio(self, audio: bytes) -> TranscriptionResult:
         if not audio:
-            return None
+            return TranscriptionResult(text="")
 
         wav_path = self._write_temp_wav(audio)
         try:
@@ -96,24 +56,7 @@ class MlxWhisperStreamingTranscriber:
         finally:
             os.unlink(wav_path)
 
-        text = str(result.get("text") or "").strip()
-        if not text:
-            text = "[no speech detected]"
-
-        event = transcript_event(
-            event_type="transcript.final",
-            session=self.session,
-            segment_index=self.segment_index,
-            start_ms=segment.start_ms,
-            end_ms=segment.end_ms,
-            text=text,
-            revision=1,
-            is_final=True,
-            provider=self.provider_name,
-            confidence=None,
-        )
-        self.segment_index += 1
-        return event
+        return TranscriptionResult(text=str(result.get("text") or ""))
 
     def _transcribe_wav(self, wav_path: str) -> Dict:
         kwargs = {"path_or_hf_repo": self.resolved_model_name}
