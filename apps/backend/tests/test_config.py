@@ -18,7 +18,7 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(settings.segment_min_ms, 800)
         self.assertEqual(settings.segment_silence_ms, 700)
         self.assertEqual(settings.segment_max_ms, 8000)
-        self.assertEqual(settings.assistant_provider, "ollama")
+        self.assertEqual(settings.assistant_provider, "codex-cli")
         self.assertEqual(settings.assistant_model, "fast")
         self.assertEqual(settings.assistant_thinking, "medium")
         self.assertEqual(settings.database_path, "data/meeting-assistant.sqlite3")

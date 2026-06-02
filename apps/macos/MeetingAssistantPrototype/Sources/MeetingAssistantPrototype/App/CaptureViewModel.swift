@@ -22,7 +22,7 @@ final class CaptureViewModel: ObservableObject {
     @Published private(set) var assistantModeLabel = "Ready"
     @Published private(set) var assistantStatus: CaptureStatus = .idle
     @Published private(set) var assistantProviders: [AssistantProviderDescriptor] = []
-    @Published private(set) var assistantProviderID = "ollama"
+    @Published private(set) var assistantProviderID = "codex-cli"
     @Published private(set) var assistantModel = "fast"
     @Published private(set) var assistantThinking = AssistantThinking.medium.rawValue
     @Published private(set) var assistantDrafts: [AssistantDraft] = []
@@ -153,18 +153,18 @@ final class CaptureViewModel: ObservableObject {
         assistantProviders.isEmpty
             ? [
                 AssistantProviderDescriptor(
-                    id: "ollama",
-                    label: "Ollama",
-                    kind: "local_server",
+                    id: "codex-cli",
+                    label: "Codex CLI",
+                    kind: "cli_agent",
                     installed: false,
                     available: false,
                     models: ["fast"],
-                    capabilities: ["chat", "json_output"],
-                    riskLevel: "low",
-                    authMode: "none",
-                    endpoint: "http://127.0.0.1:11434",
+                    capabilities: ["chat", "repo_context"],
+                    riskLevel: "medium",
+                    authMode: "provider_owned",
+                    endpoint: "",
                     binaryPath: "",
-                    notes: ["Provider discovery failed. Start the backend and Ollama, then refresh."]
+                    notes: ["Provider discovery failed. Start the backend and install Codex CLI, then refresh."]
                 )
             ]
             : assistantProviders

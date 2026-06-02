@@ -99,7 +99,7 @@ class AssistantServiceTest(unittest.TestCase):
         self.assertIn("ollama", provider_ids)
         self.assertIn("openai-compatible", provider_ids)
         self.assertIn("codex-cli", provider_ids)
-        self.assertEqual(descriptors["defaults"]["provider"], "ollama")
+        self.assertEqual(descriptors["defaults"]["provider"], "codex-cli")
         self.assertEqual(descriptors["defaults"]["model"], "fast")
         self.assertEqual(descriptors["defaults"]["thinking"], "medium")
 
