@@ -285,8 +285,9 @@ open .build/app/MeetingAssistantPrototype.app
 Slidev:
 
 ```bash
+cd docs/slides
 pnpm install
-pnpm slides:dev
+pnpm dev
 ```
 
 Tests:

@@ -1,14 +1,12 @@
 ---
-theme: default
+theme: ./_shared/theme-em
 title: 即時會議輔助工具
 info: macOS App based real-time meeting assistant capstone presentation
-transition: slide-left
+transition: fade
 mdc: true
 lineNumbers: false
 aspectRatio: 16/9
 canvasWidth: 1280
-fonts:
-  sans: "Inter, Noto Sans TC, PingFang TC"
 drawings:
   persist: false
 ---
@@ -901,37 +899,15 @@ docs/research/translated/
 ```
 
 <style>
-:root {
-  --ma-ink: #16202a;
-  --ma-muted: #64707d;
-  --ma-blue: #2563eb;
-  --ma-green: #15803d;
-  --ma-line: #d8dee8;
-  --ma-panel: #f6f8fb;
-}
-
 .slidev-layout {
-  color: var(--ma-ink);
   font-size: 30px;
   line-height: 1.35;
   letter-spacing: 0;
 }
 
-.slidev-layout h1 {
-  color: var(--ma-ink);
-  font-weight: 760;
-  letter-spacing: 0;
-}
-
+.slidev-layout h1,
 .slidev-layout h2 {
-  color: var(--ma-ink);
-  font-weight: 700;
   letter-spacing: 0;
-}
-
-.slidev-layout p,
-.slidev-layout li {
-  color: var(--ma-ink);
 }
 
 .slidev-layout table {
@@ -945,13 +921,13 @@ docs/research/translated/
 .subtitle {
   margin-top: 24px;
   max-width: 900px;
-  color: var(--ma-muted);
+  color: var(--comment);
   font-size: 34px;
 }
 
 .meta {
   margin-top: 56px;
-  color: var(--ma-blue);
+  color: var(--cyan);
   font-weight: 700;
 }
 
@@ -972,15 +948,16 @@ docs/research/translated/
 .decision,
 .good,
 .bad {
-  border: 1px solid var(--ma-line);
+  border: 1px solid rgb(248 248 242 / 18%);
   border-radius: 8px;
   padding: 20px 24px;
-  background: var(--ma-panel);
+  background: rgb(68 71 90 / 55%);
+  box-shadow: 0 18px 50px rgb(0 0 0 / 16%);
 }
 
 .quote {
   font-size: 30px;
-  color: #273342;
+  color: var(--foreground);
 }
 
 .statement {
@@ -989,19 +966,19 @@ docs/research/translated/
 }
 
 .decision {
-  border-color: rgba(37, 99, 235, 0.35);
-  background: rgba(37, 99, 235, 0.08);
+  border-color: rgb(189 147 249 / 40%);
+  background: rgb(189 147 249 / 14%);
   font-size: 34px;
   font-weight: 700;
 }
 
 .good {
-  border-color: rgba(21, 128, 61, 0.35);
-  background: rgba(21, 128, 61, 0.08);
+  border-color: rgb(80 250 123 / 40%);
+  background: rgb(80 250 123 / 12%);
 }
 
 .bad {
-  border-color: rgba(185, 28, 28, 0.35);
-  background: rgba(185, 28, 28, 0.07);
+  border-color: rgb(255 85 85 / 42%);
+  background: rgb(255 85 85 / 12%);
 }
 </style>

@@ -33,10 +33,11 @@
 │   │   ├── translated/                  # 中文整理版，簡報主要依據
 │   │   └── notes/                       # 較短的開發筆記
 │   └── slides/
+│       ├── package.json                 # Slidev tooling
+│       ├── pnpm-lock.yaml
 │       └── slides.md                    # Slidev 畢業專題簡報
 ├── AGENTS.md                            # 專案需求、技術選型與協作規範
-├── README.md                            # 專案入口文件
-└── package.json                         # Slidev tooling
+└── README.md                            # 專案入口文件
 ```
 
 子目錄 README 已移除，避免同一份執行方式和技術說明分散維護。重要背景請集中看 `README.md`、`AGENTS.md`、`docs/research/translated/` 和 `docs/slides/slides.md`。
@@ -204,8 +205,9 @@ docs/slides/slides.md
 啟動簡報：
 
 ```bash
+cd docs/slides
 pnpm install
-pnpm slides:dev
+pnpm dev
 ```
 
 預設 URL：
@@ -217,7 +219,8 @@ http://127.0.0.1:3030
 產生靜態版：
 
 ```bash
-pnpm slides:build
+cd docs/slides
+pnpm build
 ```
 
 ## Validation
@@ -249,7 +252,8 @@ cd apps/macos/MeetingAssistantPrototype
 Slidev:
 
 ```bash
-pnpm slides:build
+cd docs/slides
+pnpm build
 ```
 
 ## Current Limitations
