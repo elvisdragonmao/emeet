@@ -3,8 +3,8 @@ import tempfile
 import wave
 from typing import Dict, List, Optional
 
-from meeting_backend.audio import pcm16_duration_ms
 from meeting_backend.protocol import SessionStart, status_event, transcript_event
+from meeting_backend.transcription.segmenter import SpeechSegment, SpeechSegmenterConfig, SpeechWindowSegmenter
 
 MLX_MODEL_ALIASES = {
     "tiny": "mlx-community/whisper-tiny",
@@ -25,7 +25,7 @@ class MlxWhisperStreamingTranscriber:
         *,
         model_name: str,
         language: Optional[str],
-        final_interval_ms: int = 2400,
+        segmenter_config: SpeechSegmenterConfig,
     ) -> None:
         try:
             import mlx_whisper
@@ -38,17 +38,18 @@ class MlxWhisperStreamingTranscriber:
         self.model_name = model_name
         self.resolved_model_name = resolve_mlx_model_name(model_name)
         self.language = language
-        self.final_interval_ms = final_interval_ms
         self.session: Optional[SessionStart] = None
-        self.total_ms = 0
+        self.segmenter_config = segmenter_config
+        self.segmenter: Optional[SpeechWindowSegmenter] = None
         self.segment_index = 1
-        self.segment_start_ms = 0
-        self.segment_audio = bytearray()
-        self.next_final_ms = final_interval_ms
-        self.revision = 0
 
     def start(self, session: SessionStart) -> List[Dict]:
         self.session = session
+        self.segmenter = SpeechWindowSegmenter(
+            sample_rate=session.sample_rate,
+            channels=session.channels,
+            config=self.segmenter_config,
+        )
         return [
             status_event(
                 "mlx-whisper provider ready: {} ({})".format(
@@ -60,36 +61,32 @@ class MlxWhisperStreamingTranscriber:
         ]
 
     def accept_audio(self, audio: bytes) -> List[Dict]:
-        if self.session is None:
+        if self.session is None or self.segmenter is None:
             return []
 
-        self.segment_audio.extend(audio)
-        self.total_ms += pcm16_duration_ms(
-            len(audio),
-            sample_rate=self.session.sample_rate,
-            channels=self.session.channels,
-        )
-
-        if self.total_ms < self.next_final_ms:
-            return []
-
-        event = self._transcribe_current_segment()
-        self._rotate_segment()
-        return [event] if event is not None else []
+        events: List[Dict] = []
+        for segment in self.segmenter.accept_audio(audio):
+            event = self._transcribe_segment(segment)
+            if event is not None:
+                events.append(event)
+        return events
 
     def finish(self) -> List[Dict]:
-        if self.session is None or not self.segment_audio:
+        if self.session is None or self.segmenter is None:
             return []
 
-        event = self._transcribe_current_segment()
-        self.segment_audio.clear()
-        return [event] if event is not None else []
+        events = []
+        for segment in self.segmenter.finish():
+            event = self._transcribe_segment(segment)
+            if event is not None:
+                events.append(event)
+        return events
 
-    def _transcribe_current_segment(self) -> Optional[Dict]:
+    def _transcribe_segment(self, segment: SpeechSegment) -> Optional[Dict]:
         if self.session is None:
             return None
 
-        audio = bytes(self.segment_audio)
+        audio = segment.audio
         if not audio:
             return None
 
@@ -103,19 +100,20 @@ class MlxWhisperStreamingTranscriber:
         if not text:
             text = "[no speech detected]"
 
-        self.revision += 1
-        return transcript_event(
+        event = transcript_event(
             event_type="transcript.final",
             session=self.session,
             segment_index=self.segment_index,
-            start_ms=self.segment_start_ms,
-            end_ms=self.total_ms,
+            start_ms=segment.start_ms,
+            end_ms=segment.end_ms,
             text=text,
-            revision=self.revision,
+            revision=1,
             is_final=True,
             provider=self.provider_name,
             confidence=None,
         )
+        self.segment_index += 1
+        return event
 
     def _transcribe_wav(self, wav_path: str) -> Dict:
         kwargs = {"path_or_hf_repo": self.resolved_model_name}
@@ -138,13 +136,6 @@ class MlxWhisperStreamingTranscriber:
             wav.writeframes(audio)
 
         return path
-
-    def _rotate_segment(self) -> None:
-        self.segment_index += 1
-        self.segment_start_ms = self.total_ms
-        self.segment_audio.clear()
-        self.next_final_ms = self.total_ms + self.final_interval_ms
-        self.revision = 0
 
 
 def resolve_mlx_model_name(model_name: str) -> str:

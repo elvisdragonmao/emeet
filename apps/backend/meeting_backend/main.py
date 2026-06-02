@@ -16,6 +16,9 @@ async def health():
         "host": settings.host,
         "port": settings.port,
         "websocket_url": settings.websocket_url,
+        "segment_min_ms": settings.segment_min_ms,
+        "segment_silence_ms": settings.segment_silence_ms,
+        "segment_max_ms": settings.segment_max_ms,
     }
 
 

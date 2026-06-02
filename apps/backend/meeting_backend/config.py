@@ -17,6 +17,10 @@ class Settings:
     default_channels: int = 1
     partial_interval_ms: int = 800
     final_interval_ms: int = 2_400
+    segment_min_ms: int = 800
+    segment_silence_ms: int = 700
+    segment_max_ms: int = 12_000
+    vad_rms_threshold: float = 0.012
     whisper_model: str = DEFAULT_WHISPER_MODEL
     whisper_device: str = "cpu"
     whisper_compute_type: str = "int8"
@@ -40,6 +44,16 @@ def get_settings() -> Settings:
         default_channels=int(os.getenv("MEETING_BACKEND_CHANNELS", "1")),
         partial_interval_ms=int(os.getenv("MEETING_BACKEND_PARTIAL_INTERVAL_MS", "800")),
         final_interval_ms=int(os.getenv("MEETING_BACKEND_FINAL_INTERVAL_MS", "2400")),
+        segment_min_ms=int(os.getenv("MEETING_BACKEND_SEGMENT_MIN_MS", "800")),
+        segment_silence_ms=int(os.getenv("MEETING_BACKEND_SEGMENT_SILENCE_MS", "700")),
+        segment_max_ms=int(
+            env_first(
+                "MEETING_BACKEND_SEGMENT_MAX_MS",
+                "MEETING_BACKEND_FINAL_INTERVAL_MS",
+                default="12000",
+            )
+        ),
+        vad_rms_threshold=float(os.getenv("MEETING_BACKEND_VAD_RMS_THRESHOLD", "0.012")),
         whisper_model=env_first(
             "MEETING_BACKEND_MODEL",
             "MEETING_BACKEND_WHISPER_MODEL",

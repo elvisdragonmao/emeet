@@ -14,6 +14,9 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(settings.host, "127.0.0.1")
         self.assertEqual(settings.port, 8765)
         self.assertEqual(settings.websocket_url, "ws://127.0.0.1:8765/v1/transcribe/ws")
+        self.assertEqual(settings.segment_min_ms, 800)
+        self.assertEqual(settings.segment_silence_ms, 700)
+        self.assertEqual(settings.segment_max_ms, 12000)
 
     def test_supports_short_model_alias_and_port(self) -> None:
         with patch.dict(
@@ -39,6 +42,24 @@ class ConfigTest(unittest.TestCase):
             settings = get_settings()
 
         self.assertEqual(settings.websocket_url, "ws://localhost:9999/custom")
+
+    def test_supports_segmentation_environment(self) -> None:
+        with patch.dict(
+            "os.environ",
+            {
+                "MEETING_BACKEND_SEGMENT_MIN_MS": "600",
+                "MEETING_BACKEND_SEGMENT_SILENCE_MS": "500",
+                "MEETING_BACKEND_SEGMENT_MAX_MS": "9000",
+                "MEETING_BACKEND_VAD_RMS_THRESHOLD": "0.02",
+            },
+            clear=True,
+        ):
+            settings = get_settings()
+
+        self.assertEqual(settings.segment_min_ms, 600)
+        self.assertEqual(settings.segment_silence_ms, 500)
+        self.assertEqual(settings.segment_max_ms, 9000)
+        self.assertEqual(settings.vad_rms_threshold, 0.02)
 
 
 if __name__ == "__main__":

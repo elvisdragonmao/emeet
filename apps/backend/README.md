@@ -116,9 +116,22 @@ MEETING_BACKEND_WHISPER_COMPUTE_TYPE=int8
 MEETING_BACKEND_WHISPER_LANGUAGE=
 MEETING_BACKEND_PARTIAL_INTERVAL_MS=800
 MEETING_BACKEND_FINAL_INTERVAL_MS=2400
+MEETING_BACKEND_SEGMENT_MIN_MS=800
+MEETING_BACKEND_SEGMENT_SILENCE_MS=700
+MEETING_BACKEND_SEGMENT_MAX_MS=12000
+MEETING_BACKEND_VAD_RMS_THRESHOLD=0.012
 ```
 
 `MEETING_BACKEND_MODEL` is the preferred short alias. `MEETING_BACKEND_WHISPER_MODEL` is still supported for compatibility. The default model is `large-v3`, the largest standard Whisper model supported by faster-whisper. On macOS CPU this can be slow; use `large-v3-turbo`, `medium`, or `small` when latency matters more than maximum accuracy.
+
+Whisper providers use speech windows instead of a fixed timer:
+
+- `MEETING_BACKEND_SEGMENT_MIN_MS`: minimum speech window before silence can finalize it.
+- `MEETING_BACKEND_SEGMENT_SILENCE_MS`: trailing silence needed to finalize a segment.
+- `MEETING_BACKEND_SEGMENT_MAX_MS`: forced split for very long utterances.
+- `MEETING_BACKEND_VAD_RMS_THRESHOLD`: simple RMS threshold for speech detection.
+
+`MEETING_BACKEND_FINAL_INTERVAL_MS` is still accepted as a compatibility alias for `MEETING_BACKEND_SEGMENT_MAX_MS` when `MEETING_BACKEND_SEGMENT_MAX_MS` is not set.
 
 For local macOS demo speed, prefer:
 
