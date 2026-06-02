@@ -1,4 +1,4 @@
-# Model Provider and BYOK Research for a macOS Meeting Assistant
+# Model Provider and BYOK Research for emeet
 
 ## Executive answer
 

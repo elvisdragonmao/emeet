@@ -168,7 +168,7 @@ def codex_cli_completion(
         raise RuntimeError("codex CLI is not installed")
 
     prompt = cli_prompt(messages, model, thinking)
-    with tempfile.NamedTemporaryFile(prefix="meeting-assistant-codex-", suffix=".txt") as output:
+    with tempfile.NamedTemporaryFile(prefix="emeet-codex-", suffix=".txt") as output:
         command = build_codex_exec_command(binary, model, thinking, output.name)
         completed = run_command(command, prompt, settings.assistant_timeout_ms)
         output.seek(0)
@@ -237,7 +237,7 @@ def github_copilot_cli_completion(
 def cli_prompt(messages: List[Dict[str, str]], model: str, thinking: str) -> str:
     content = "\n\n".join("{}:\n{}".format(message["role"], message["content"]) for message in messages)
     return (
-        "You are being used as a meeting assistant provider. "
+        "You are being used as the emeet assistant provider. "
         "Model setting: {model}. Thinking setting: {thinking}. "
         "Return JSON only.\n\n{content}"
     ).format(model=model, thinking=thinking, content=content)

@@ -27,7 +27,7 @@ final class TranscriptionWebSocketClient {
     private let url: URL
     private let source: String
     private let session: URLSession
-    private let queue = DispatchQueue(label: "MeetingAssistantPrototype.TranscriptionWebSocketClient")
+    private let queue = DispatchQueue(label: "emeet.TranscriptionWebSocketClient")
     private let chunkByteCount = PCM16AudioConverter.outputSampleRate * PCM16AudioConverter.sampleWidth / 10
     private let heartbeatInterval: TimeInterval = 5
     private let decoder: JSONDecoder = {

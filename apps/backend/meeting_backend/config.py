@@ -9,7 +9,7 @@ DEFAULT_ASSISTANT_THINKING = "medium"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
 DEFAULT_WS_PATH = "/v1/transcribe/ws"
-DEFAULT_DATABASE_PATH = "data/meeting-assistant.sqlite3"
+DEFAULT_DATABASE_PATH = "data/emeet.sqlite3"
 
 
 @dataclass(frozen=True)

@@ -40,7 +40,7 @@ struct ContentView: View {
 
     private var headerTitle: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Meeting Assistant")
+            Text("emeet")
                 .font(.system(size: 23, weight: .semibold))
             Text(viewModel.transcriptionEndpointLabel)
                 .font(.caption)

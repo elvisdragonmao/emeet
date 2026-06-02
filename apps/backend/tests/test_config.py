@@ -21,7 +21,7 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(settings.assistant_provider, "codex-cli")
         self.assertEqual(settings.assistant_model, "gpt-5.5")
         self.assertEqual(settings.assistant_thinking, "medium")
-        self.assertEqual(settings.database_path, "data/meeting-assistant.sqlite3")
+        self.assertEqual(settings.database_path, "data/emeet.sqlite3")
 
     def test_supports_short_model_alias_and_port(self) -> None:
         with patched_environ(

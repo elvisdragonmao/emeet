@@ -1,6 +1,6 @@
 ---
 theme: ./_shared/theme-em
-title: 即時會議輔助工具
+title: emeet
 info: macOS App based real-time meeting assistant capstone presentation
 transition: fade
 mdc: true
@@ -11,7 +11,7 @@ drawings:
   persist: false
 ---
 
-# 即時會議輔助工具
+# emeet
 
 macOS App 畢業專題報告
 
@@ -20,7 +20,7 @@ macOS App 畢業專題報告
 </div>
 
 <div class="meta">
-Meeting Assistant Capstone
+emeet
 </div>
 
 <!--
@@ -79,9 +79,9 @@ MEETING_BACKEND_MODEL=large-v3-turbo \
 macOS App:
 
 ```bash
-cd apps/macos/MeetingAssistantPrototype
+cd apps/macos/emeet
 ./Scripts/build-app.sh
-open .build/app/MeetingAssistantPrototype.app
+open .build/app/emeet.app
 ```
 
 ---
@@ -426,7 +426,7 @@ sequenceDiagram
 ```text
 min_segment_ms = 800
 silence_ms = 700
-max_segment_ms = 12000
+max_segment_ms = 8000
 vad_rms_threshold = 0.012
 ```
 

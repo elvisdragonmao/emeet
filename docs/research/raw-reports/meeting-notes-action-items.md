@@ -1,4 +1,4 @@
-# Designing Meeting Notes and Action Item Formats for a macOS Meeting Assistant
+# Designing Meeting Notes and Action Item Formats for emeet
 
 ## Executive Summary
 
@@ -245,7 +245,7 @@ The team aligned on delaying the SSO rollout to sprint 14 until legal signs off.
 | Send two client-review slides | Ava | Friday | Requested during client-review preparation | Proposed | 0.79 |
 | Review external SSO wording | Legal | Unclear | Blocking release communications | Proposed | 0.58 |
 
-The last row is important. The correct UX is **not** to discard it and **not** to export it immediately. The correct UX is to keep it as a visible but unresolved item: “Owner/date unclear — confirm after meeting.” That behavior is directly motivated by contextual ambiguity findings in meeting-assistant HCI work. citeturn33view1
+The last row is important. The correct UX is **not** to discard it and **not** to export it immediately. The correct UX is to keep it as a visible but unresolved item: “Owner/date unclear — confirm after meeting.” That behavior is directly motivated by contextual ambiguity findings in meeting assistant HCI work. citeturn33view1
 
 ## Evaluation and Data Strategy
 

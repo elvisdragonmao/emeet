@@ -4,7 +4,7 @@ from meeting_backend.assistant.api import router as assistant_router
 from meeting_backend.config import get_settings
 from meeting_backend.sessions import TranscriptionSession
 
-app = FastAPI(title="Meeting Assistant Backend", version="0.1.0")
+app = FastAPI(title="emeet Backend", version="0.1.0")
 app.include_router(assistant_router)
 
 

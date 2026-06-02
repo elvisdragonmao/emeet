@@ -293,4 +293,4 @@ Release candidates 的 pass/fail gate 可以簡單且嚴格：
 
 ## 開放問題與限制
 
-這個領域中的部分資訊並未以標準化、apples-to-apples 的方式發布。特別是，供應商通常不會在相同硬體與網路假設下，發布可直接比較的 meeting-assistant TTFT、stable-transcript latency，或真實世界 1–4 小時 degradation curves。Apple 的原生語音與 foundation-model stacks 也比 Whisper/llama 風格生態系更新，因此公開第三方 benchmark coverage 比開源 runtimes 更少。基於這些原因，本報告中最重要的數字是**量測框架與每元件延遲預算**，而不是任何位於你自己的目標裝置與工作負載之外的單一 headline benchmark。
+這個領域中的部分資訊並未以標準化、apples-to-apples 的方式發布。特別是，供應商通常不會在相同硬體與網路假設下，發布可直接比較的 emeet-style TTFT、stable-transcript latency，或真實世界 1–4 小時 degradation curves。Apple 的原生語音與 foundation-model stacks 也比 Whisper/llama 風格生態系更新，因此公開第三方 benchmark coverage 比開源 runtimes 更少。基於這些原因，本報告中最重要的數字是**量測框架與每元件延遲預算**，而不是任何位於你自己的目標裝置與工作負載之外的單一 headline benchmark。

@@ -9,7 +9,7 @@ final class SystemAudioCaptureService: NSObject {
     var onAudioChunk: ((Data) -> Void)?
     var onError: ((String) -> Void)?
 
-    private let sampleQueue = DispatchQueue(label: "MeetingAssistantPrototype.SystemAudioCapture")
+    private let sampleQueue = DispatchQueue(label: "emeet.SystemAudioCapture")
     private let pcm16Converter = SampleBufferPCM16AudioConverter()
     private var stream: SCStream?
     private var isRunning = false

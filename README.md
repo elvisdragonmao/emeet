@@ -1,6 +1,6 @@
-# Meeting Assistant Capstone
+# emeet
 
-這是一個以 macOS App 實作的即時會議輔助工具。目標是在會議中同時提供即時逐字稿、回覆建議、追問問題、會議筆記、下一步行動，以及可切換模型/provider 的 AI 助理工作台。
+emeet 是一個以 macOS App 實作的即時會議輔助工具。目標是在會議中同時提供即時逐字稿、回覆建議、追問問題、會議筆記、下一步行動，以及可切換模型/provider 的 AI 助理工作台。
 
 目前原型採用本地優先的混合式架構：macOS App 負責音訊擷取、UI、逐字稿狀態與使用者操作；FastAPI backend 負責 STT session、assistant provider dispatch、JSON 結構驗證與 SQLite append-first 儲存。
 
@@ -26,7 +26,7 @@
 ├── apps/
 │   ├── backend/                         # FastAPI STT + assistant backend
 │   └── macos/
-│       └── MeetingAssistantPrototype/   # SwiftUI macOS App prototype
+│       └── emeet/                       # SwiftUI macOS App
 ├── docs/
 │   ├── research/
 │   │   ├── raw-reports/                 # 原始研究輸出
@@ -95,7 +95,7 @@ flowchart LR
 ```text
 MEETING_BACKEND_SEGMENT_MIN_MS=800
 MEETING_BACKEND_SEGMENT_SILENCE_MS=700
-MEETING_BACKEND_SEGMENT_MAX_MS=12000
+MEETING_BACKEND_SEGMENT_MAX_MS=8000
 MEETING_BACKEND_VAD_RMS_THRESHOLD=0.012
 ```
 
@@ -106,7 +106,7 @@ MEETING_BACKEND_VAD_RMS_THRESHOLD=0.012
 - STT provider：把 audio segment 轉 transcript。
 - Assistant provider：把 transcript context 轉 structured JSON。
 
-目前 assistant provider 支援 `ollama`、`openai-compatible`、`codex-cli`、`github-copilot-cli`。預設 assistant 設定是 provider `ollama`、model `fast`、thinking `high`。Codex CLI 和 GitHub Copilot CLI 是展示「可串自己的 agent / API」的實驗線；正式低延遲會議話術仍應優先使用 chat provider 或本機 LLM。
+目前 assistant provider 支援 `ollama`、`openai-compatible`、`codex-cli`、`github-copilot-cli`。預設 assistant 設定是 provider `codex-cli`、model `gpt-5.5`、thinking `medium`。Codex CLI 和 GitHub Copilot CLI 是展示「可串自己的 agent / API」的實驗線；正式低延遲會議話術仍應優先使用 chat provider 或本機 LLM。
 
 ### Prompt and Output Contract
 
@@ -152,6 +152,17 @@ MEETING_BACKEND_MODEL=large-v3-turbo \
 ./scripts/dev.sh
 ```
 
+Codex CLI assistant default:
+
+```bash
+cd apps/backend
+source .venv/bin/activate
+MEETING_BACKEND_ASSISTANT_PROVIDER=codex-cli \
+MEETING_BACKEND_ASSISTANT_MODEL=gpt-5.5 \
+MEETING_BACKEND_ASSISTANT_THINKING=medium \
+./scripts/dev.sh
+```
+
 Ollama assistant demo:
 
 ```bash
@@ -159,7 +170,7 @@ cd apps/backend
 source .venv/bin/activate
 MEETING_BACKEND_ASSISTANT_PROVIDER=ollama \
 MEETING_BACKEND_ASSISTANT_MODEL=fast \
-MEETING_BACKEND_ASSISTANT_THINKING=high \
+MEETING_BACKEND_ASSISTANT_THINKING=medium \
 ./scripts/dev.sh
 ```
 
@@ -171,16 +182,16 @@ source .venv/bin/activate
 MEETING_BACKEND_ASSISTANT_PROVIDER=openai-compatible \
 MEETING_BACKEND_ASSISTANT_OPENAI_BASE_URL=http://127.0.0.1:1234/v1 \
 MEETING_BACKEND_ASSISTANT_MODEL=local-model \
-MEETING_BACKEND_ASSISTANT_THINKING=high \
+MEETING_BACKEND_ASSISTANT_THINKING=medium \
 ./scripts/dev.sh
 ```
 
 Build and open the macOS app:
 
 ```bash
-cd apps/macos/MeetingAssistantPrototype
+cd apps/macos/emeet
 ./Scripts/build-app.sh
-open .build/app/MeetingAssistantPrototype.app
+open .build/app/emeet.app
 ```
 
 第一次測試需要授權：
@@ -245,7 +256,7 @@ python scripts/send_test_audio.py
 macOS build:
 
 ```bash
-cd apps/macos/MeetingAssistantPrototype
+cd apps/macos/emeet
 ./Scripts/build-app.sh
 ```
 

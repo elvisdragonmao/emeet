@@ -57,7 +57,7 @@ flowchart LR
 
 ### macOS App
 
-Location: `apps/macos/MeetingAssistantPrototype`
+Location: `apps/macos/emeet`
 
 Important modules:
 
@@ -155,7 +155,7 @@ Current implementation:
 ```text
 MEETING_BACKEND_SEGMENT_MIN_MS=800
 MEETING_BACKEND_SEGMENT_SILENCE_MS=700
-MEETING_BACKEND_SEGMENT_MAX_MS=12000
+MEETING_BACKEND_SEGMENT_MAX_MS=8000
 MEETING_BACKEND_VAD_RMS_THRESHOLD=0.012
 ```
 
@@ -177,7 +177,7 @@ Current provider strategy:
 
 * `ollama`: local LLM.
 * `openai-compatible`: LM Studio, vLLM, llama.cpp server, OpenAI API, or any compatible endpoint.
-* `codex-cli`: experimental CLI provider, read-only sandbox, approvals disabled.
+* `codex-cli`: experimental CLI provider, read-only sandbox, text output capture.
 * `github-copilot-cli`: experimental CLI provider through GitHub CLI/Copilot CLI.
 
 Architecture rule:
@@ -277,9 +277,9 @@ MEETING_BACKEND_MODEL=large-v3-turbo \
 macOS App:
 
 ```bash
-cd apps/macos/MeetingAssistantPrototype
+cd apps/macos/emeet
 ./Scripts/build-app.sh
-open .build/app/MeetingAssistantPrototype.app
+open .build/app/emeet.app
 ```
 
 Slidev:
@@ -303,7 +303,7 @@ python -m pytest
 Use this order for the graduation project live demo:
 
 1. Start backend with `MEETING_BACKEND_PROVIDER=mlx-whisper` for Apple Silicon local STT, or `faster-whisper` for a CPU-compatible route.
-2. Open `MeetingAssistantPrototype.app`.
+2. Open `emeet.app`.
 3. Press `Start Meeting`.
 4. Show microphone and system audio level meters.
 5. Speak a short question or play a meeting audio clip.

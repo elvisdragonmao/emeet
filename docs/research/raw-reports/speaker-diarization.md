@@ -12,7 +12,7 @@
 
 第四，**如果你能直接拿到每位參與者的獨立音軌，speaker attribution 會從「統計推斷」變成「來源事實」**。Zoom RTMS 已支援 per-participant audio packet，且也支援 mixed stream 或最多 3 位 active speakers 的 multi-stream 輸出；Zoom 本機錄製也可輸出「每位參與者一個 audio file」。WebRTC 若是你自己控制的應用，遠端音訊本來就是 track-based；但若你是對黑盒會議 app 或瀏覽器做 OS-level 擷取，通常只會拿到**已混合後的 app output**。Teams 的真正即時 raw media access 則走 application-hosted media bot 路線，要求 C#/.NET 與 Windows Server on Azure，官方甚至明確寫出這條路**不建議當作 AI meeting agent 的主要做法**。citeturn33view1turn33view0turn33view2turn31view0turn28search2turn28search9turn31view3turn31view4
 
-綜合來看，對你這個 macOS meeting-assistant app，**最務實的產品路線是 hybrid**：本機先做低延遲 ASR 與「我 vs 其他人」分離；真正多人 diarization 與會後高品質整併，則用 SpeakerKit / pyannote / 雲端 API 在 rolling window 或 post-pass 補正。若你未來要深度整合 Zoom，RTMS 幾乎會是所有方案裡「最像正解」的一條路；若是 Teams，則平台層整合成本與限制明顯更高。citeturn13view1turn13view5turn31view2turn31view3turn31view4
+綜合來看，對 emeet 這個 macOS app，**最務實的產品路線是 hybrid**：本機先做低延遲 ASR 與「我 vs 其他人」分離；真正多人 diarization 與會後高品質整併，則用 SpeakerKit / pyannote / 雲端 API 在 rolling window 或 post-pass 補正。若你未來要深度整合 Zoom，RTMS 幾乎會是所有方案裡「最像正解」的一條路；若是 Teams，則平台層整合成本與限制明顯更高。citeturn13view1turn13view5turn31view2turn31view3turn31view4
 
 ## 方案比較
 

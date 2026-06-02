@@ -159,16 +159,16 @@ flowchart LR
 import SwiftUI
 
 @main
-struct MeetingAssistantApp: App {
+struct EmeetApp: App {
     @State private var appState = AppState()
 
     var body: some Scene {
-        Window("會議助理", id: "main") {
+        Window("emeet", id: "main") {
             MainWorkspaceView()
                 .environment(appState)
         }
 
-        MenuBarExtra("會議助理", systemImage: "text.bubble") {
+        MenuBarExtra("emeet", systemImage: "text.bubble") {
             MenuBarStatusView()
                 .environment(appState)
         }

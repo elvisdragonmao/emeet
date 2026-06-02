@@ -1,4 +1,4 @@
-# Building an MVP macOS Meeting Assistant for a Semester Capstone
+# Building an emeet MVP for a Semester Capstone
 
 ## Executive summary
 
@@ -238,7 +238,7 @@ A recommended application-side input bundle is:
 A good **“What should I say?”** system prompt template is:
 
 ```text
-You are a meeting-assistant that suggests brief, natural replies for the user.
+You are the emeet assistant that suggests brief, natural replies for the user.
 Your job is not to decide for the user, but to offer grounded candidate responses.
 
 Rules:
@@ -303,7 +303,7 @@ Its corresponding JSON Schema can be as simple as:
 A strong **“Follow-up questions”** system prompt template is:
 
 ```text
-You are a meeting-assistant that proposes useful follow-up questions.
+You are the emeet assistant that proposes useful follow-up questions.
 
 Rules:
 - Use only the supplied transcript and summary state.

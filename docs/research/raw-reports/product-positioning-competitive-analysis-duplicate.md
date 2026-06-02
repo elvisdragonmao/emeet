@@ -1,4 +1,4 @@
-# Product Positioning and Competitive Analysis for a macOS Meeting Assistant Graduation Project
+# Product Positioning and Competitive Analysis for emeet Graduation Project
 
 ## Executive Summary
 
@@ -112,4 +112,3 @@ gantt
 **Founder or product lead in a partner/stakeholder meeting.** In a cross-functional external meeting, the user is not following a sales script, but they still need support. The app uses an attached agenda or prep memo to ground suggestions, helping the user answer objections, remember talking points, and capture decisions without breaking eye contact to type notes. This scenario is important because it demonstrates that the assistant can expand beyond sales later, while still being useful in the same **high-stakes, live-response** interaction pattern.
 
 The three scenarios above all preserve the same core product logic: the user is actively speaking, the conversation matters, the response window is short, and the value lies in transforming a transcript into an immediate next move rather than merely an archive.
-

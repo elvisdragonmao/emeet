@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct MeetingAssistantPrototypeApp: App {
+struct EmeetApp: App {
     @StateObject private var viewModel = CaptureViewModel()
 
     var body: some Scene {

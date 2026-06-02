@@ -1,8 +1,8 @@
-# Architecture and UI/UX for a Lightweight macOS SwiftUI Meeting Assistant
+# Architecture and UI/UX for emeet
 
 ## Executive Summary
 
-For a meeting-assistant app on macOS, the strongest default architecture is **hybrid rather than single-surface**: a conventional SwiftUI app with a **main workspace window** for transcript history, notes, settings, and exports; a **MenuBarExtra** for quick status and control; and a **compact floating companion panel** for in-meeting use. This fits Apple’s windowing model better than an always-visible overlay, keeps the UI discoverable, and supports both fast “glance and act” behavior during calls and deeper post-meeting workflows afterward. Apple’s own guidance positions menu bar extras as a way to expose app-specific functionality while the app is not frontmost, and SwiftUI/AppKit now provide good window-management primitives for companion windows and utility panels. citeturn15search0turn15search9turn15search16turn12view0turn14view0
+For emeet on macOS, the strongest default architecture is **hybrid rather than single-surface**: a conventional SwiftUI app with a **main workspace window** for transcript history, notes, settings, and exports; a **MenuBarExtra** for quick status and control; and a **compact floating companion panel** for in-meeting use. This fits Apple’s windowing model better than an always-visible overlay, keeps the UI discoverable, and supports both fast “glance and act” behavior during calls and deeper post-meeting workflows afterward. Apple’s own guidance positions menu bar extras as a way to expose app-specific functionality while the app is not frontmost, and SwiftUI/AppKit now provide good window-management primitives for companion windows and utility panels. citeturn15search0turn15search9turn15search16turn12view0turn14view0
 
 If no deployment target is specified, the cleanest product strategy is a **tiered compatibility ladder**: target **macOS 13+** as the broad baseline so you can use `MenuBarExtra` and `SMAppService`; add **macOS 15+** enhancements such as SwiftUI’s `windowLevel(.floating)` for simpler floating-window behavior; and optionally unlock **macOS 26+** features such as `SpeechAnalyzer` / `SpeechTranscriber` for newer on-device speech pipelines and the `FoundationModels` framework for Apple’s on-device LLM on Apple Intelligence-capable Macs. That tiering keeps the architecture stable while letting you progressively adopt newer Apple APIs where they materially improve UX, privacy, or latency. citeturn12view1turn8search0turn27search1turn28search8turn28search17turn32search0turn32search12
 
@@ -124,7 +124,7 @@ The technical hard part is not SwiftUI. It is **audio capture on macOS under pri
 
 For **microphone capture**, AVFoundation is the straightforward path. `AVAudioEngine` is useful in real-time contexts, and `installTap` lets you observe PCM buffers while the engine runs, but Apple documents that you can have only **one tap per bus**, which means your architecture should fan out buffers from a single audio service rather than allowing every subsystem to register its own tap. That matters for live transcription, VAD, waveform rendering, and recording. citeturn25search22turn25search1
 
-For **call/system audio**, ScreenCaptureKit is the highest-confidence Apple-native route. Apple introduced it as a high-performance screen-capture framework and explicitly called out app-level audio filtering; Apple also notes that user consent for screen capture is stored in the system privacy settings. More recent ScreenCaptureKit updates added microphone capture support and improved capture control, which makes it much more relevant for meeting-assistant apps than it was at launch. citeturn2view7turn23search24turn4view5
+For **call/system audio**, ScreenCaptureKit is the highest-confidence Apple-native route. Apple introduced it as a high-performance screen-capture framework and explicitly called out app-level audio filtering; Apple also notes that user consent for screen capture is stored in the system privacy settings. More recent ScreenCaptureKit updates added microphone capture support and improved capture control, which makes it much more relevant for emeet-style apps than it was at launch. citeturn2view7turn23search24turn4view5
 
 If you need **outgoing audio from a specific process or set of processes**, Core Audio taps are another official route. Apple’s Core Audio tap documentation says an audio tap object can specify which process or group of processes it captures from and can choose mixdown options. That can be powerful when you want “conference audio only” rather than whole-screen capture, but it is a more specialized path than basic microphone capture. citeturn25search17turn3search21
 
@@ -159,16 +159,16 @@ The app should be **SwiftUI-first, AppKit-selective**. SwiftUI is now mature eno
 import SwiftUI
 
 @main
-struct MeetingAssistantApp: App {
+struct EmeetApp: App {
     @State private var appState = AppState()
 
     var body: some Scene {
-        Window("Meeting Assistant", id: "main") {
+        Window("emeet", id: "main") {
             MainWorkspaceView()
                 .environment(appState)
         }
 
-        MenuBarExtra("Meeting Assistant", systemImage: "text.bubble") {
+        MenuBarExtra("emeet", systemImage: "text.bubble") {
             MenuBarStatusView()
                 .environment(appState)
         }
@@ -363,7 +363,7 @@ For OpenAI, the clearest split is: use **Realtime** when you need persistent low
 
 For Anthropic, a similar split exists but with different mechanics. Claude tool use distinguishes **client tools** that your app executes and **server tools** that Anthropic executes, and the streaming docs note that tool use may introduce pauses while the model is assembling structured tool input. That makes Claude attractive for chat, notes, and structured tool workflows, but it is less naturally a single-stack answer for a speech-centered macOS meeting assistant unless you pair it with another STT path. citeturn21view3turn21view4
 
-For Google, **Gemini Live** is the closest analogue to an end-to-end low-latency multimedia meeting-assistant backend. Google’s official docs describe it as a stateful WebSocket API for realtime voice and vision, with raw PCM audio streaming and function calling support. That makes it a legitimate alternative to OpenAI Realtime for the “listens and responds continuously” lane. citeturn21view5turn21view6
+For Google, **Gemini Live** is the closest analogue to an end-to-end low-latency multimedia backend for an app like emeet. Google’s official docs describe it as a stateful WebSocket API for realtime voice and vision, with raw PCM audio streaming and function calling support. That makes it a legitimate alternative to OpenAI Realtime for the “listens and responds continuously” lane. citeturn21view5turn21view6
 
 For GitHub, distinguish three things that people often blur together: **GitHub Models** as an inference/control plane, **GitHub Copilot MCP** as a tool/context extension mechanism, and **Copilot/Codex-style coding agents** as specialized coding surfaces. GitHub Models lets you invoke many models through GitHub credentials and a PAT with `models` scope; GitHub also offers BYOK for GitHub Models, but the official docs say support is currently limited to OpenAI and AzureAI in public preview. GitHub’s MCP docs position MCP as the way to extend Copilot with tools and external systems across multiple Copilot surfaces. citeturn21view7turn21view8turn21view9
 
