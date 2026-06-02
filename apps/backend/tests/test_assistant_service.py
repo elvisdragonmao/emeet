@@ -1,3 +1,5 @@
+import os
+import tempfile
 import unittest
 
 from meeting_backend.assistant.models import AssistantRequest, AssistantTranscriptLine
@@ -7,6 +9,7 @@ from meeting_backend.assistant.service import (
     generate_assistant_response,
     list_provider_descriptors,
     parse_assistant_json,
+    read_codex_config_model,
 )
 from meeting_backend.config import Settings
 
@@ -17,7 +20,7 @@ class AssistantServiceTest(unittest.TestCase):
             action="what_should_i_say",
             provider="ollama",
             model="fast",
-            thinking="high",
+            thinking="medium",
             temperature=0.2,
             max_tokens=700,
             transcript=[
@@ -45,7 +48,7 @@ class AssistantServiceTest(unittest.TestCase):
 
         self.assertEqual(result.provider, "ollama")
         self.assertEqual(result.model, "fast")
-        self.assertEqual(result.thinking, "high")
+        self.assertEqual(result.thinking, "medium")
         self.assertGreaterEqual(len(result.drafts), 1)
         self.assertIn("Friday", result.raw_text or "")
 
@@ -54,7 +57,7 @@ class AssistantServiceTest(unittest.TestCase):
             action="meeting_notes",
             provider="ollama",
             model="fast",
-            thinking="high",
+            thinking="medium",
             temperature=0.2,
             max_tokens=700,
             transcript=[
@@ -98,7 +101,43 @@ class AssistantServiceTest(unittest.TestCase):
         self.assertIn("codex-cli", provider_ids)
         self.assertEqual(descriptors["defaults"]["provider"], "ollama")
         self.assertEqual(descriptors["defaults"]["model"], "fast")
-        self.assertEqual(descriptors["defaults"]["thinking"], "high")
+        self.assertEqual(descriptors["defaults"]["thinking"], "medium")
+
+    def test_openai_compatible_descriptor_discovers_candidate_and_lmstudio_models(self) -> None:
+        original_openai = service.list_openai_compatible_models
+        original_lmstudio = service.list_lmstudio_models_cli
+        service.OPENAI_COMPATIBLE_MODEL_ENDPOINTS.clear()
+
+        def fake_openai_models(base_url, _api_key, _timeout_ms):
+            if base_url == "http://127.0.0.1:8000/v1":
+                return ["qwen-fast"], ""
+            return [], "offline"
+
+        service.list_openai_compatible_models = fake_openai_models
+        service.list_lmstudio_models_cli = lambda _timeout_ms: (["local/gemma"], "")
+        try:
+            descriptor = service.openai_compatible_descriptor(Settings()).to_dict()
+        finally:
+            service.list_openai_compatible_models = original_openai
+            service.list_lmstudio_models_cli = original_lmstudio
+
+        self.assertTrue(descriptor["available"])
+        self.assertEqual(descriptor["models"], ["qwen-fast", "local/gemma"])
+        self.assertEqual(
+            service.OPENAI_COMPATIBLE_MODEL_ENDPOINTS["qwen-fast"],
+            "http://127.0.0.1:8000/v1",
+        )
+        self.assertIn("verified_local:http_models_endpoint:http://127.0.0.1:8000/v1", descriptor["notes"])
+        self.assertIn("known_to_tool:lmstudio_cli", descriptor["notes"])
+        service.OPENAI_COMPATIBLE_MODEL_ENDPOINTS.clear()
+
+    def test_reads_codex_config_model_without_credentials(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "config.toml")
+            with open(path, "w", encoding="utf-8") as config:
+                config.write('model = "gpt-fast"\napi_key = "secret"\n')
+
+            self.assertEqual(read_codex_config_model(path), "gpt-fast")
 
     def test_parse_assistant_json_extracts_object_from_text(self) -> None:
         parsed = parse_assistant_json('Here is JSON:\n{"drafts": [{"title": "A"}]}')

@@ -8,7 +8,7 @@ from meeting_backend.audio import pcm16_duration_ms, pcm16_rms
 class SpeechSegmenterConfig:
     min_segment_ms: int = 800
     silence_ms: int = 700
-    max_segment_ms: int = 12_000
+    max_segment_ms: int = 8_000
     speech_rms_threshold: float = 0.012
 
 

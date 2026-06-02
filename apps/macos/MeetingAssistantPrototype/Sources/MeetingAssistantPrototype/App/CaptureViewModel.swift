@@ -24,7 +24,7 @@ final class CaptureViewModel: ObservableObject {
     @Published private(set) var assistantProviders: [AssistantProviderDescriptor] = []
     @Published private(set) var assistantProviderID = "ollama"
     @Published private(set) var assistantModel = "fast"
-    @Published private(set) var assistantThinking = AssistantThinking.high.rawValue
+    @Published private(set) var assistantThinking = AssistantThinking.medium.rawValue
     @Published private(set) var assistantDrafts: [AssistantDraft] = []
     @Published private(set) var noteDrafts: [MeetingNoteDraft] = []
     @Published private(set) var actionDrafts: [MeetingActionDraft] = []

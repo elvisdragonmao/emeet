@@ -17,10 +17,10 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(settings.websocket_url, "ws://127.0.0.1:8765/v1/transcribe/ws")
         self.assertEqual(settings.segment_min_ms, 800)
         self.assertEqual(settings.segment_silence_ms, 700)
-        self.assertEqual(settings.segment_max_ms, 12000)
+        self.assertEqual(settings.segment_max_ms, 8000)
         self.assertEqual(settings.assistant_provider, "ollama")
         self.assertEqual(settings.assistant_model, "fast")
-        self.assertEqual(settings.assistant_thinking, "high")
+        self.assertEqual(settings.assistant_thinking, "medium")
         self.assertEqual(settings.database_path, "data/meeting-assistant.sqlite3")
 
     def test_supports_short_model_alias_and_port(self) -> None:

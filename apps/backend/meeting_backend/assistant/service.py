@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -20,6 +21,14 @@ from meeting_backend.config import DEFAULT_ASSISTANT_PROVIDER, DEFAULT_ASSISTANT
 
 
 THINKING_LEVELS = {"none", "low", "medium", "high", "xhigh"}
+OPENAI_COMPATIBLE_CANDIDATE_URLS = [
+    "http://127.0.0.1:1234/v1",
+    "http://127.0.0.1:8000/v1",
+    "http://127.0.0.1:8080/v1",
+    "http://127.0.0.1:5000/v1",
+    "http://127.0.0.1:4000/v1",
+]
+OPENAI_COMPATIBLE_MODEL_ENDPOINTS: Dict[str, str] = {}
 
 
 def list_provider_descriptors(settings: Settings) -> Dict[str, Any]:
@@ -119,7 +128,8 @@ def openai_compatible_completion(
     request: AssistantRequest,
     thinking: str,
 ) -> str:
-    url = settings.assistant_openai_base_url.rstrip("/") + "/chat/completions"
+    base_url = OPENAI_COMPATIBLE_MODEL_ENDPOINTS.get(model, settings.assistant_openai_base_url)
+    url = base_url.rstrip("/") + "/chat/completions"
     headers = {}
     if settings.assistant_api_key:
         headers["Authorization"] = "Bearer {}".format(settings.assistant_api_key)
@@ -249,7 +259,10 @@ def run_command(command: List[str], prompt: str, timeout_ms: int) -> subprocess.
 
 
 def ollama_descriptor(settings: Settings) -> AssistantProviderDescriptor:
-    models, error = list_ollama_models(settings.assistant_ollama_base_url, probe_timeout_ms(settings))
+    models, error, discovery_notes = discover_ollama_models(
+        settings.assistant_ollama_base_url,
+        probe_timeout_ms(settings),
+    )
     available = error == ""
     return AssistantProviderDescriptor(
         id="ollama",
@@ -262,13 +275,13 @@ def ollama_descriptor(settings: Settings) -> AssistantProviderDescriptor:
         capabilities=["chat", "json_output"],
         risk_level=endpoint_risk(settings.assistant_ollama_base_url),
         auth_mode="none",
-        notes=[] if available else [error or "Ollama endpoint is not reachable."],
+        notes=discovery_notes if available else [error or "Ollama endpoint is not reachable."],
     )
 
 
 def openai_compatible_descriptor(settings: Settings) -> AssistantProviderDescriptor:
-    models, error = list_openai_compatible_models(
-        settings.assistant_openai_base_url,
+    models, error, discovery_notes = discover_openai_compatible_models(
+        settings,
         settings.assistant_api_key,
         probe_timeout_ms(settings),
     )
@@ -284,14 +297,14 @@ def openai_compatible_descriptor(settings: Settings) -> AssistantProviderDescrip
         capabilities=["chat", "json_output"],
         risk_level=endpoint_risk(settings.assistant_openai_base_url),
         auth_mode="user_supplied_local_key" if settings.assistant_api_key else "none",
-        notes=[] if available else [error or "OpenAI-compatible endpoint is not reachable."],
+        notes=discovery_notes if available else [error or "OpenAI-compatible endpoint is not reachable."],
     )
 
 
 def codex_cli_descriptor(settings: Settings) -> AssistantProviderDescriptor:
     binary = shutil.which("codex") or ""
     installed = binary != ""
-    models = ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini"]
+    models = [read_codex_config_model(), "cli-default"]
     if normalize_provider(settings.assistant_provider) == "codex-cli" and settings.assistant_model:
         models.insert(0, settings.assistant_model)
     return AssistantProviderDescriptor(
@@ -308,6 +321,7 @@ def codex_cli_descriptor(settings: Settings) -> AssistantProviderDescriptor:
         notes=[
             "Runs codex exec in read-only sandbox with approvals disabled.",
             "Authentication stays inside Codex CLI.",
+            "Model list is not a stable machine-readable CLI API; use configured, default, or manual model.",
         ],
     )
 
@@ -322,15 +336,28 @@ def github_copilot_cli_descriptor(settings: Settings) -> AssistantProviderDescri
         installed=installed,
         available=installed,
         binary_path=binary,
-        models=["copilot-default"],
+        models=["cli-default"],
         capabilities=["chat"],
         risk_level="medium",
         auth_mode="provider_owned",
         notes=[
             "Runs through gh copilot. It may prompt to install Copilot CLI on first use.",
             "Authentication stays inside GitHub CLI / Copilot CLI.",
+            "Model list is not exposed as a stable machine-readable CLI API.",
         ],
     )
+
+
+def discover_ollama_models(base_url: str, timeout_ms: int) -> Tuple[List[str], str, List[str]]:
+    models, error = list_ollama_models(base_url, timeout_ms)
+    if models:
+        return models, "", ["verified_local:http_models_endpoint"]
+
+    cli_models, cli_error = list_ollama_models_cli(timeout_ms)
+    if cli_models:
+        return cli_models, "", ["verified_local:provider_cli_text"]
+
+    return [], "{}; {}".format(error, cli_error).strip("; "), []
 
 
 def list_ollama_models(base_url: str, timeout_ms: int) -> Tuple[List[str], str]:
@@ -339,6 +366,70 @@ def list_ollama_models(base_url: str, timeout_ms: int) -> Tuple[List[str], str]:
         return [str(model.get("name")) for model in response.get("models", []) if model.get("name")], ""
     except Exception as error:
         return [], str(error)
+
+
+def list_ollama_models_cli(timeout_ms: int) -> Tuple[List[str], str]:
+    binary = shutil.which("ollama")
+    if not binary:
+        return [], "ollama CLI is not installed"
+
+    try:
+        completed = subprocess.run(
+            [binary, "list"],
+            text=True,
+            capture_output=True,
+            timeout=max(1, timeout_ms / 1000),
+            check=False,
+        )
+    except Exception as error:
+        return [], str(error)
+
+    if completed.returncode != 0:
+        return [], (completed.stderr or completed.stdout or "ollama list failed").strip()
+
+    models = []
+    for index, line in enumerate(completed.stdout.splitlines()):
+        stripped = line.strip()
+        if not stripped or index == 0 and stripped.lower().startswith("name"):
+            continue
+        model = stripped.split()[0]
+        if model:
+            models.append(model)
+    return dedupe(models), ""
+
+
+def discover_openai_compatible_models(
+    settings: Settings,
+    api_key: str,
+    timeout_ms: int,
+) -> Tuple[List[str], str, List[str]]:
+    discovered_models: List[str] = []
+    notes = []
+    errors = []
+    for base_url in openai_compatible_candidate_urls(settings.assistant_openai_base_url):
+        models, error = list_openai_compatible_models(base_url, api_key, timeout_ms)
+        if models:
+            discovered_models.extend(models)
+            remember_openai_compatible_model_endpoints(base_url, models)
+            notes.append("verified_local:http_models_endpoint:{}".format(base_url))
+        elif error:
+            errors.append("{}: {}".format(base_url, error))
+
+    lmstudio_models, lmstudio_error = list_lmstudio_models_cli(timeout_ms)
+    if lmstudio_models:
+        discovered_models.extend(lmstudio_models)
+        notes.append("known_to_tool:lmstudio_cli")
+    elif lmstudio_error:
+        errors.append("lms: {}".format(lmstudio_error))
+
+    if discovered_models:
+        return dedupe(discovered_models), "", notes
+    return [], "; ".join(errors), []
+
+
+def remember_openai_compatible_model_endpoints(base_url: str, models: List[str]) -> None:
+    for model in models:
+        OPENAI_COMPATIBLE_MODEL_ENDPOINTS.setdefault(model, base_url)
 
 
 def list_openai_compatible_models(base_url: str, api_key: str, timeout_ms: int) -> Tuple[List[str], str]:
@@ -357,6 +448,69 @@ def list_openai_compatible_models(base_url: str, api_key: str, timeout_ms: int) 
         return names, ""
     except Exception as error:
         return [], str(error)
+
+
+def openai_compatible_candidate_urls(configured_base_url: str) -> List[str]:
+    configured = configured_base_url.rstrip("/")
+    candidates = [configured] if configured else []
+    if not configured or endpoint_risk(configured) == "low":
+        candidates.extend(OPENAI_COMPATIBLE_CANDIDATE_URLS)
+    return dedupe([candidate.rstrip("/") for candidate in candidates if candidate])
+
+
+def list_lmstudio_models_cli(timeout_ms: int) -> Tuple[List[str], str]:
+    binary = shutil.which("lms")
+    if not binary:
+        return [], "LM Studio CLI is not installed"
+
+    try:
+        completed = subprocess.run(
+            [binary, "ls", "--llm", "--json"],
+            text=True,
+            capture_output=True,
+            timeout=max(1, timeout_ms / 1000),
+            check=False,
+        )
+    except Exception as error:
+        return [], str(error)
+
+    if completed.returncode != 0:
+        return [], (completed.stderr or completed.stdout or "lms ls failed").strip()
+
+    try:
+        parsed = json.loads(completed.stdout)
+    except json.JSONDecodeError as error:
+        return [], str(error)
+
+    models = []
+    if isinstance(parsed, list):
+        for item in parsed:
+            if not isinstance(item, dict):
+                continue
+            model = item.get("path") or item.get("modelKey") or item.get("name")
+            if model:
+                models.append(str(model))
+    return dedupe(models), ""
+
+
+def read_codex_config_model(path: str = "~/.codex/config.toml") -> str:
+    try:
+        with open(expand_user_path(path), "r", encoding="utf-8") as config:
+            for line in config:
+                stripped = line.strip()
+                if not stripped or stripped.startswith("#") or not stripped.startswith("model"):
+                    continue
+                key, _, value = stripped.partition("=")
+                if key.strip() != "model":
+                    continue
+                return value.strip().strip('"').strip("'")
+    except OSError:
+        return ""
+    return ""
+
+
+def expand_user_path(path: str) -> str:
+    return os.path.expanduser(path)
 
 
 def get_json(url: str, headers: Optional[Dict[str, str]] = None, timeout_ms: int = 1000) -> Dict[str, Any]:
@@ -447,4 +601,4 @@ def endpoint_risk(base_url: str) -> str:
 
 
 def probe_timeout_ms(settings: Settings) -> int:
-    return min(settings.assistant_timeout_ms, 1000)
+    return min(settings.assistant_timeout_ms, 500)

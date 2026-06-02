@@ -5,7 +5,7 @@ DEFAULT_PROVIDER = "faster-whisper"
 DEFAULT_WHISPER_MODEL = "large-v3"
 DEFAULT_ASSISTANT_PROVIDER = "ollama"
 DEFAULT_ASSISTANT_MODEL = "fast"
-DEFAULT_ASSISTANT_THINKING = "high"
+DEFAULT_ASSISTANT_THINKING = "medium"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
 DEFAULT_WS_PATH = "/v1/transcribe/ws"
@@ -23,7 +23,7 @@ class Settings:
     final_interval_ms: int = 2_400
     segment_min_ms: int = 800
     segment_silence_ms: int = 700
-    segment_max_ms: int = 12_000
+    segment_max_ms: int = 8_000
     vad_rms_threshold: float = 0.012
     whisper_model: str = DEFAULT_WHISPER_MODEL
     whisper_device: str = "cpu"
@@ -64,7 +64,7 @@ def get_settings() -> Settings:
             env_first(
                 "MEETING_BACKEND_SEGMENT_MAX_MS",
                 "MEETING_BACKEND_FINAL_INTERVAL_MS",
-                default="12000",
+                default="8000",
             )
         ),
         vad_rms_threshold=float(os.getenv("MEETING_BACKEND_VAD_RMS_THRESHOLD", "0.012")),
