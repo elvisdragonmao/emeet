@@ -7,6 +7,8 @@ class AssistantTranscriptLine:
     source: str
     source_label: str
     speaker_hint: str
+    speaker_id: str
+    speaker_label: str
     start_ms: int
     end_ms: int
     text: str
@@ -22,6 +24,10 @@ class AssistantRequest:
     thinking: str
     temperature: float
     max_tokens: int
+    meeting_id: str = ""
+    rolling_summary: str = ""
+    previous_notes: List[Dict[str, str]] = field(default_factory=list)
+    previous_actions: List[Dict[str, str]] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

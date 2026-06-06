@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS transcript_segments (
     session_id TEXT NOT NULL,
     source TEXT NOT NULL,
     speaker_hint TEXT NOT NULL,
+    speaker_id TEXT NOT NULL DEFAULT '',
+    speaker_label TEXT NOT NULL DEFAULT '',
     start_ms INTEGER NOT NULL,
     end_ms INTEGER NOT NULL,
     text TEXT NOT NULL,
@@ -41,6 +43,7 @@ CREATE TABLE IF NOT EXISTS transcript_segments (
 
 CREATE TABLE IF NOT EXISTS assistant_runs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    meeting_id TEXT NOT NULL DEFAULT '',
     action TEXT NOT NULL,
     provider TEXT NOT NULL,
     model TEXT NOT NULL,
@@ -90,6 +93,24 @@ class MeetingStorage:
         self._ensure_parent_directory()
         with self._connect() as connection:
             connection.executescript(SCHEMA_SQL)
+            ensure_column(
+                connection,
+                table="transcript_segments",
+                column="speaker_id",
+                definition="TEXT NOT NULL DEFAULT ''",
+            )
+            ensure_column(
+                connection,
+                table="transcript_segments",
+                column="speaker_label",
+                definition="TEXT NOT NULL DEFAULT ''",
+            )
+            ensure_column(
+                connection,
+                table="assistant_runs",
+                column="meeting_id",
+                definition="TEXT NOT NULL DEFAULT ''",
+            )
 
     def record_session_start(self, session: SessionStart, *, provider: str, model: str) -> None:
         self.initialize()
@@ -156,14 +177,16 @@ class MeetingStorage:
             connection.execute(
                 """
                 INSERT INTO transcript_segments (
-                    segment_id, session_id, source, speaker_hint, start_ms, end_ms,
+                    segment_id, session_id, source, speaker_hint, speaker_id, speaker_label, start_ms, end_ms,
                     text, revision, is_final, confidence, provider,
                     created_at_ms, updated_at_ms
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(segment_id) DO UPDATE SET
                     source = excluded.source,
                     speaker_hint = excluded.speaker_hint,
+                    speaker_id = excluded.speaker_id,
+                    speaker_label = excluded.speaker_label,
                     start_ms = excluded.start_ms,
                     end_ms = excluded.end_ms,
                     text = excluded.text,
@@ -178,6 +201,8 @@ class MeetingStorage:
                     session_id,
                     str(event.get("source") or ""),
                     str(event.get("speaker_hint") or ""),
+                    str(event.get("speaker_id") or ""),
+                    str(event.get("speaker_label") or ""),
                     int(event.get("start_ms") or 0),
                     int(event.get("end_ms") or 0),
                     str(event.get("text") or ""),
@@ -197,11 +222,12 @@ class MeetingStorage:
             cursor = connection.execute(
                 """
                 INSERT INTO assistant_runs (
-                    action, provider, model, thinking, latency_ms, raw_text, created_at_ms
+                    meeting_id, action, provider, model, thinking, latency_ms, raw_text, created_at_ms
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
+                    request.meeting_id,
                     request.action,
                     result.provider,
                     result.model,
@@ -272,6 +298,16 @@ class MeetingStorage:
 
 def current_time_ms() -> int:
     return int(time.time() * 1000)
+
+
+def ensure_column(connection: sqlite3.Connection, *, table: str, column: str, definition: str) -> None:
+    columns = {
+        str(row[1])
+        for row in connection.execute("PRAGMA table_info({})".format(table)).fetchall()
+    }
+    if column in columns:
+        return
+    connection.execute("ALTER TABLE {} ADD COLUMN {} {}".format(table, column, definition))
 
 
 def session_id_from_segment_id(segment_id: str) -> str:

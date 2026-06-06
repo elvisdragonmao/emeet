@@ -16,18 +16,35 @@ class AssistantTranscriptLineBody(BaseModel):
     source: str = ""
     source_label: str = ""
     speaker_hint: str = ""
+    speaker_id: str = ""
+    speaker_label: str = ""
     start_ms: int = 0
     end_ms: int = 0
     text: str
     is_final: bool = True
 
 
+class MeetingNoteBody(BaseModel):
+    title: str = ""
+    detail: str = ""
+
+
+class MeetingActionBody(BaseModel):
+    title: str = ""
+    owner: str = ""
+    state: str = ""
+
+
 class AssistantRespondBody(BaseModel):
     action: str = Field(default="what_should_i_say")
+    meeting_id: str = ""
     provider: Optional[str] = None
     model: Optional[str] = None
     thinking: Optional[str] = None
     transcript: List[AssistantTranscriptLineBody] = Field(default_factory=list)
+    rolling_summary: str = ""
+    previous_notes: List[MeetingNoteBody] = Field(default_factory=list)
+    previous_actions: List[MeetingActionBody] = Field(default_factory=list)
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
 
@@ -43,6 +60,7 @@ async def respond(body: AssistantRespondBody):
     settings = get_settings()
     request = AssistantRequest(
         action=body.action,
+        meeting_id=body.meeting_id,
         provider=body.provider or settings.assistant_provider,
         model=body.model or settings.assistant_model,
         thinking=body.thinking or settings.assistant_thinking,
@@ -51,6 +69,8 @@ async def respond(body: AssistantRespondBody):
                 source=line.source,
                 source_label=line.source_label,
                 speaker_hint=line.speaker_hint,
+                speaker_id=line.speaker_id,
+                speaker_label=line.speaker_label,
                 start_ms=line.start_ms,
                 end_ms=line.end_ms,
                 text=line.text,
@@ -60,6 +80,22 @@ async def respond(body: AssistantRespondBody):
         ],
         temperature=settings.assistant_temperature if body.temperature is None else body.temperature,
         max_tokens=settings.assistant_max_tokens if body.max_tokens is None else body.max_tokens,
+        rolling_summary=body.rolling_summary,
+        previous_notes=[
+            {
+                "title": item.title,
+                "detail": item.detail,
+            }
+            for item in body.previous_notes
+        ],
+        previous_actions=[
+            {
+                "title": item.title,
+                "owner": item.owner,
+                "state": item.state,
+            }
+            for item in body.previous_actions
+        ],
     )
     try:
         result = await asyncio.to_thread(generate_assistant_response, settings, request)

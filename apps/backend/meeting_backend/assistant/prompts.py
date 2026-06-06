@@ -49,6 +49,7 @@ PROMPT_TEMPLATES: Dict[str, PromptTemplate] = {
         action="meeting_notes",
         system=BASE_SYSTEM_PROMPT,
         instruction=(
+            "Update the rolling meeting record from the previous notes/actions and the new final transcript lines. "
             "Generate a structured meeting record, not a one-sentence summary. "
             "Use the notes array as fixed meeting-record sections with these titles when applicable: "
             "討論主題與內容, 目前結論, 待討論事項, 未解決問題. "
@@ -72,16 +73,21 @@ PROMPT_TEMPLATES: Dict[str, PromptTemplate] = {
 def build_messages(request: AssistantRequest) -> List[Dict[str, str]]:
     template = prompt_template_for_action(request.action)
     transcript = transcript_context(request.transcript)
+    memory = rolling_memory_context(request)
     user = (
         "Action: {action}\n"
+        "Meeting ID: {meeting_id}\n"
         "Thinking setting requested by user: {thinking}\n"
         "Instruction: {instruction}\n\n"
+        "{memory}"
         "Transcript:\n{transcript}\n\n"
         "{output_contract}"
     ).format(
         action=request.action,
+        meeting_id=request.meeting_id or "(not provided)",
         thinking=request.thinking,
         instruction=template.instruction,
+        memory=memory,
         transcript=transcript,
         output_contract=OUTPUT_CONTRACT,
     )
@@ -101,7 +107,39 @@ def transcript_context(lines: List[AssistantTranscriptLine]) -> str:
 
     formatted = []
     for line in lines[-16:]:
-        source = line.source_label or line.source or "Unknown"
+        source = line.speaker_label or line.source_label or line.source or "Unknown"
         status = "final" if line.is_final else "partial"
-        formatted.append("[{} {}-{} {}] {}".format(source, line.start_ms, line.end_ms, status, line.text))
+        formatted.append(
+            "[{} {}-{} {}] {}".format(source, line.start_ms, line.end_ms, status, line.text)
+        )
     return "\n".join(formatted)
+
+
+def rolling_memory_context(request: AssistantRequest) -> str:
+    if not request.rolling_summary and not request.previous_notes and not request.previous_actions:
+        return ""
+
+    sections = ["Existing rolling meeting memory:"]
+    if request.rolling_summary.strip():
+        sections.append(request.rolling_summary.strip())
+
+    if request.previous_notes:
+        sections.append("Previous notes:")
+        for note in request.previous_notes:
+            title = note.get("title") or "Note"
+            detail = note.get("detail") or ""
+            sections.append("- {}: {}".format(title, detail))
+
+    if request.previous_actions:
+        sections.append("Previous actions:")
+        for action in request.previous_actions:
+            title = action.get("title") or "Next action"
+            owner = action.get("owner") or "Unassigned"
+            state = action.get("state") or "Draft"
+            sections.append("- {} / owner={} / state={}".format(title, owner, state))
+
+    sections.append(
+        "Treat the transcript below as new evidence to merge into the rolling memory. "
+        "Keep older validated notes unless the new transcript clearly revises them."
+    )
+    return "\n".join(sections) + "\n\n"
