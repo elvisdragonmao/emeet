@@ -29,6 +29,9 @@ class Settings:
     whisper_device: str = "cpu"
     whisper_compute_type: str = "int8"
     whisper_language: str = ""
+    diarization_provider: str = "local-clustering"
+    diarization_max_speakers: int = 4
+    diarization_cluster_threshold: float = 0.32
     websocket_url_override: str = ""
     assistant_provider: str = DEFAULT_ASSISTANT_PROVIDER
     assistant_model: str = DEFAULT_ASSISTANT_MODEL
@@ -76,6 +79,14 @@ def get_settings() -> Settings:
         whisper_device=os.getenv("MEETING_BACKEND_WHISPER_DEVICE", "cpu"),
         whisper_compute_type=os.getenv("MEETING_BACKEND_WHISPER_COMPUTE_TYPE", "int8"),
         whisper_language=os.getenv("MEETING_BACKEND_WHISPER_LANGUAGE", ""),
+        diarization_provider=env_first(
+            "MEETING_BACKEND_DIARIZATION_PROVIDER",
+            default="local-clustering",
+        ),
+        diarization_max_speakers=int(os.getenv("MEETING_BACKEND_DIARIZATION_MAX_SPEAKERS", "4")),
+        diarization_cluster_threshold=float(
+            os.getenv("MEETING_BACKEND_DIARIZATION_CLUSTER_THRESHOLD", "0.32")
+        ),
         websocket_url_override=env_first("MEETING_BACKEND_WS_URL"),
         assistant_provider=env_first(
             "MEETING_BACKEND_ASSISTANT_PROVIDER",

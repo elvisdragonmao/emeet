@@ -46,6 +46,8 @@ class SegmentedStreamingTranscriberTest(unittest.TestCase):
         self.assertEqual(events[0]["provider"], "unit")
         self.assertEqual(events[0]["confidence"], 0.5)
         self.assertEqual(events[0]["segment_id"], "seg_unit_0001")
+        self.assertEqual(events[0]["speaker_id"], "self")
+        self.assertEqual(events[0]["speaker_label"], "Self")
 
     def test_splits_transcript_text_into_sentence_events(self) -> None:
         transcriber = UnitSegmentedTranscriber(
@@ -71,6 +73,30 @@ class SegmentedStreamingTranscriberTest(unittest.TestCase):
         self.assertEqual([event["text"] for event in events], ["First sentence.", "第二句完成！"])
         self.assertEqual(events[0]["segment_id"], "seg_unit_0001")
         self.assertEqual(events[1]["segment_id"], "seg_unit_0002")
+
+    def test_system_audio_gets_numbered_speaker_label(self) -> None:
+        transcriber = UnitSegmentedTranscriber(
+            segmenter_config=SpeechSegmenterConfig(
+                min_segment_ms=300,
+                silence_ms=300,
+                max_segment_ms=2000,
+            )
+        )
+        session = SessionStart(
+            session_id="unit-system",
+            source="system",
+            sample_rate=16000,
+            channels=1,
+            sample_width=2,
+        )
+
+        transcriber.start(session)
+        transcriber.accept_audio(sine_pcm16(16000, 0.4))
+        events = transcriber.finish()
+
+        self.assertEqual(events[0]["speaker_hint"], "other")
+        self.assertEqual(events[0]["speaker_id"], "speaker_1")
+        self.assertEqual(events[0]["speaker_label"], "Speaker 1")
 
 
 if __name__ == "__main__":

@@ -26,6 +26,9 @@ class MlxWhisperStreamingTranscriber(SegmentedStreamingTranscriber):
         model_name: str,
         language: Optional[str],
         segmenter_config: SpeechSegmenterConfig,
+        diarization_provider: str = "local-clustering",
+        diarization_max_speakers: int = 4,
+        diarization_cluster_threshold: float = 0.32,
     ) -> None:
         try:
             import mlx_whisper
@@ -34,7 +37,12 @@ class MlxWhisperStreamingTranscriber(SegmentedStreamingTranscriber):
                 "mlx-whisper provider requires `python -m pip install -e \".[mlx-whisper]\"`"
             ) from error
 
-        super().__init__(segmenter_config=segmenter_config)
+        super().__init__(
+            segmenter_config=segmenter_config,
+            diarization_provider=diarization_provider,
+            diarization_max_speakers=diarization_max_speakers,
+            diarization_cluster_threshold=diarization_cluster_threshold,
+        )
         self._mlx_whisper = mlx_whisper
         self.model_name = model_name
         self.resolved_model_name = resolve_mlx_model_name(model_name)

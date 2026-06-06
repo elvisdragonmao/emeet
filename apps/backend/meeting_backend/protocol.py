@@ -46,6 +46,14 @@ def speaker_hint_for_source(source: str) -> str:
     return "unknown"
 
 
+def default_speaker_label(speaker_hint: str, source: str) -> str:
+    if speaker_hint == "self":
+        return "Self"
+    if speaker_hint == "other":
+        return "Other"
+    return source.capitalize() if source else "Unknown"
+
+
 def transcript_event(
     *,
     event_type: str,
@@ -58,12 +66,18 @@ def transcript_event(
     is_final: bool,
     provider: str,
     confidence: Optional[float] = None,
+    speaker_id: Optional[str] = None,
+    speaker_label: Optional[str] = None,
+    speaker_hint: Optional[str] = None,
 ) -> Dict[str, Any]:
+    resolved_speaker_hint = speaker_hint or speaker_hint_for_source(session.source)
     return {
         "type": event_type,
         "segment_id": "seg_{}_{}".format(session.session_id, str(segment_index).zfill(4)),
         "source": session.source,
-        "speaker_hint": speaker_hint_for_source(session.source),
+        "speaker_hint": resolved_speaker_hint,
+        "speaker_id": speaker_id or resolved_speaker_hint or "unknown",
+        "speaker_label": speaker_label or default_speaker_label(resolved_speaker_hint, session.source),
         "start_ms": start_ms,
         "end_ms": end_ms,
         "text": text,

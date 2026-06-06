@@ -18,6 +18,8 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(settings.segment_min_ms, 800)
         self.assertEqual(settings.segment_silence_ms, 700)
         self.assertEqual(settings.segment_max_ms, 8000)
+        self.assertEqual(settings.diarization_provider, "local-clustering")
+        self.assertEqual(settings.diarization_max_speakers, 4)
         self.assertEqual(settings.assistant_provider, "codex-cli")
         self.assertEqual(settings.assistant_model, "gpt-5.5")
         self.assertEqual(settings.assistant_thinking, "medium")
@@ -59,6 +61,9 @@ class ConfigTest(unittest.TestCase):
                 "MEETING_BACKEND_SEGMENT_SILENCE_MS": "500",
                 "MEETING_BACKEND_SEGMENT_MAX_MS": "9000",
                 "MEETING_BACKEND_VAD_RMS_THRESHOLD": "0.02",
+                "MEETING_BACKEND_DIARIZATION_PROVIDER": "source",
+                "MEETING_BACKEND_DIARIZATION_MAX_SPEAKERS": "2",
+                "MEETING_BACKEND_DIARIZATION_CLUSTER_THRESHOLD": "0.5",
             },
         ):
             settings = get_settings()
@@ -67,6 +72,9 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(settings.segment_silence_ms, 500)
         self.assertEqual(settings.segment_max_ms, 9000)
         self.assertEqual(settings.vad_rms_threshold, 0.02)
+        self.assertEqual(settings.diarization_provider, "source")
+        self.assertEqual(settings.diarization_max_speakers, 2)
+        self.assertEqual(settings.diarization_cluster_threshold, 0.5)
 
 
 @contextmanager

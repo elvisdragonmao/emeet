@@ -19,12 +19,18 @@ def create_transcriber(settings: Settings):
             compute_type=settings.whisper_compute_type,
             language=settings.whisper_language or None,
             segmenter_config=segmenter_config,
+            diarization_provider=settings.diarization_provider,
+            diarization_max_speakers=settings.diarization_max_speakers,
+            diarization_cluster_threshold=settings.diarization_cluster_threshold,
         )
     if settings.provider == "mlx-whisper":
         return MlxWhisperStreamingTranscriber(
             model_name=settings.whisper_model,
             language=settings.whisper_language or None,
             segmenter_config=segmenter_config,
+            diarization_provider=settings.diarization_provider,
+            diarization_max_speakers=settings.diarization_max_speakers,
+            diarization_cluster_threshold=settings.diarization_cluster_threshold,
         )
 
     raise ValueError("unsupported provider: {}".format(settings.provider))

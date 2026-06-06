@@ -15,6 +15,9 @@ class FasterWhisperStreamingTranscriber(SegmentedStreamingTranscriber):
         compute_type: str,
         language: Optional[str],
         segmenter_config: SpeechSegmenterConfig,
+        diarization_provider: str = "local-clustering",
+        diarization_max_speakers: int = 4,
+        diarization_cluster_threshold: float = 0.32,
     ) -> None:
         try:
             import numpy as np
@@ -24,7 +27,12 @@ class FasterWhisperStreamingTranscriber(SegmentedStreamingTranscriber):
                 "faster-whisper provider requires `python -m pip install -e \".[stt]\"`"
             ) from error
 
-        super().__init__(segmenter_config=segmenter_config)
+        super().__init__(
+            segmenter_config=segmenter_config,
+            diarization_provider=diarization_provider,
+            diarization_max_speakers=diarization_max_speakers,
+            diarization_cluster_threshold=diarization_cluster_threshold,
+        )
         self._np = np
         self.model = WhisperModel(model_name, device=device, compute_type=compute_type)
         self.model_name = model_name

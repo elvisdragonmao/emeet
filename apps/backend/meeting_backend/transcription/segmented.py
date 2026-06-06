@@ -4,6 +4,7 @@ import re
 from typing import Dict, List, Optional
 
 from meeting_backend.protocol import SessionStart, status_event, transcript_event
+from meeting_backend.speakers import LocalSpeakerAssigner, SpeakerAssignment
 from meeting_backend.transcription.segmenter import SpeechSegment, SpeechSegmenterConfig, SpeechWindowSegmenter
 
 
@@ -16,10 +17,21 @@ class TranscriptionResult:
 class SegmentedStreamingTranscriber(ABC):
     provider_name: str
 
-    def __init__(self, *, segmenter_config: SpeechSegmenterConfig) -> None:
+    def __init__(
+        self,
+        *,
+        segmenter_config: SpeechSegmenterConfig,
+        diarization_provider: str = "local-clustering",
+        diarization_max_speakers: int = 4,
+        diarization_cluster_threshold: float = 0.32,
+    ) -> None:
         self.segmenter_config = segmenter_config
+        self.diarization_provider = diarization_provider
+        self.diarization_max_speakers = diarization_max_speakers
+        self.diarization_cluster_threshold = diarization_cluster_threshold
         self.session: Optional[SessionStart] = None
         self.segmenter: Optional[SpeechWindowSegmenter] = None
+        self.speaker_assigner: Optional[LocalSpeakerAssigner] = None
         self.segment_index = 1
 
     def start(self, session: SessionStart) -> List[Dict]:
@@ -28,6 +40,13 @@ class SegmentedStreamingTranscriber(ABC):
             sample_rate=session.sample_rate,
             channels=session.channels,
             config=self.segmenter_config,
+        )
+        self.speaker_assigner = LocalSpeakerAssigner(
+            source=session.source,
+            provider=self.diarization_provider,
+            sample_rate=session.sample_rate,
+            max_speakers=self.diarization_max_speakers,
+            cluster_threshold=self.diarization_cluster_threshold,
         )
         return [status_event(self.status_message(), provider=self.provider_name)]
 
@@ -61,6 +80,7 @@ class SegmentedStreamingTranscriber(ABC):
         if self.session is None:
             return []
 
+        assignment = self._assign_speaker(segment.audio)
         result = self.transcribe_audio(segment.audio)
         text = result.text.strip()
         if not text:
@@ -86,10 +106,22 @@ class SegmentedStreamingTranscriber(ABC):
                     is_final=True,
                     provider=self.provider_name,
                     confidence=result.confidence,
+                    speaker_id=assignment.speaker_id,
+                    speaker_label=assignment.speaker_label,
+                    speaker_hint=assignment.speaker_hint,
                 )
             )
             self.segment_index += 1
         return events
+
+    def _assign_speaker(self, audio: bytes) -> SpeakerAssignment:
+        if self.speaker_assigner is None:
+            return SpeakerAssignment(
+                speaker_hint="unknown",
+                speaker_id="unknown",
+                speaker_label="Unknown",
+            )
+        return self.speaker_assigner.assign(audio)
 
 
 def split_transcript_sentences(text: str) -> List[str]:
