@@ -129,6 +129,32 @@ struct GoogleDocReplaceTextRequest: Encodable {
     let occurrence: String
 }
 
+struct GoogleDocInsertUnderHeadingRequest: Encodable {
+    let meetingID: String
+    let heading: String
+    let text: String
+}
+
+struct GoogleDocRewriteParagraphRequest: Encodable {
+    let meetingID: String
+    let anchor: String
+    let text: String
+}
+
+struct GoogleBrowserOpenRequest: Encodable {
+    let meetingID: String
+    let url: String
+}
+
+struct GoogleBrowserMeetingRequest: Encodable {
+    let meetingID: String
+}
+
+struct GoogleBrowserFindRequest: Encodable {
+    let meetingID: String
+    let text: String
+}
+
 struct GoogleDocMeetingNotesRequest: Encodable {
     let meetingID: String
     let notes: [MeetingNoteContextPayload]
@@ -143,11 +169,20 @@ struct GoogleDocSnapshotResponse: Decodable, Equatable {
     let title: String
     let revisionId: String
     let preview: String
+    let plainText: String?
     let documentBriefing: String?
     let briefingError: String?
     let snippets: [String]?
     let status: String?
     let message: String?
+}
+
+struct GoogleBrowserResponse: Decodable, Equatable {
+    let ok: Bool
+    let message: String
+    let seleniumAvailable: Bool
+    let chromedriverAvailable: Bool
+    let browserSessionActive: Bool
 }
 
 final class AssistantAPIClient {
@@ -230,6 +265,48 @@ final class AssistantAPIClient {
         let (data, response) = try await post(path: "/v1/google/docs/replace-text", body: request)
         try validate(response: response, data: data)
         return try decoder.decode(GoogleDocSnapshotResponse.self, from: data)
+    }
+
+    func insertGoogleDocTextUnderHeading(
+        _ request: GoogleDocInsertUnderHeadingRequest
+    ) async throws -> GoogleDocSnapshotResponse {
+        let (data, response) = try await post(path: "/v1/google/docs/insert-under-heading", body: request)
+        try validate(response: response, data: data)
+        return try decoder.decode(GoogleDocSnapshotResponse.self, from: data)
+    }
+
+    func rewriteGoogleDocParagraph(
+        _ request: GoogleDocRewriteParagraphRequest
+    ) async throws -> GoogleDocSnapshotResponse {
+        let (data, response) = try await post(path: "/v1/google/docs/rewrite-paragraph", body: request)
+        try validate(response: response, data: data)
+        return try decoder.decode(GoogleDocSnapshotResponse.self, from: data)
+    }
+
+    func fetchGoogleBrowserStatus() async throws -> GoogleBrowserResponse {
+        let (data, response) = try await session.data(from: url(path: "/v1/google/browser/status"))
+        try validate(response: response, data: data)
+        return try decoder.decode(GoogleBrowserResponse.self, from: data)
+    }
+
+    func openGoogleDocInBrowser(_ request: GoogleBrowserOpenRequest) async throws -> GoogleBrowserResponse {
+        let (data, response) = try await post(path: "/v1/google/browser/open", body: request)
+        try validate(response: response, data: data)
+        return try decoder.decode(GoogleBrowserResponse.self, from: data)
+    }
+
+    func scrollGoogleDocBrowserToBottom(
+        _ request: GoogleBrowserMeetingRequest
+    ) async throws -> GoogleBrowserResponse {
+        let (data, response) = try await post(path: "/v1/google/browser/scroll-bottom", body: request)
+        try validate(response: response, data: data)
+        return try decoder.decode(GoogleBrowserResponse.self, from: data)
+    }
+
+    func findVisibleGoogleDocText(_ request: GoogleBrowserFindRequest) async throws -> GoogleBrowserResponse {
+        let (data, response) = try await post(path: "/v1/google/browser/find-visible-text", body: request)
+        try validate(response: response, data: data)
+        return try decoder.decode(GoogleBrowserResponse.self, from: data)
     }
 
     private func post<T: Encodable>(path: String, body: T) async throws -> (Data, URLResponse) {

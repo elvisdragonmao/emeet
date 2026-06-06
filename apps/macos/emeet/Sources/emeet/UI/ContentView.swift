@@ -195,6 +195,29 @@ struct ContentView: View {
                 get: { viewModel.googleDocsReplaceOccurrence },
                 set: { viewModel.updateGoogleDocsReplaceOccurrence($0) }
             ),
+            googleDocsInsertHeading: Binding(
+                get: { viewModel.googleDocsInsertHeading },
+                set: { viewModel.updateGoogleDocsInsertHeading($0) }
+            ),
+            googleDocsInsertText: Binding(
+                get: { viewModel.googleDocsInsertText },
+                set: { viewModel.updateGoogleDocsInsertText($0) }
+            ),
+            googleDocsRewriteAnchor: Binding(
+                get: { viewModel.googleDocsRewriteAnchor },
+                set: { viewModel.updateGoogleDocsRewriteAnchor($0) }
+            ),
+            googleDocsRewriteText: Binding(
+                get: { viewModel.googleDocsRewriteText },
+                set: { viewModel.updateGoogleDocsRewriteText($0) }
+            ),
+            googleBrowserMessage: viewModel.googleBrowserMessage,
+            googleBrowserSeleniumAvailable: viewModel.googleBrowserSeleniumAvailable,
+            googleBrowserSessionActive: viewModel.googleBrowserSessionActive,
+            googleBrowserFindText: Binding(
+                get: { viewModel.googleBrowserFindText },
+                set: { viewModel.updateGoogleBrowserFindText($0) }
+            ),
             refreshProvidersAction: viewModel.refreshAssistantProviders,
             whatShouldISayAction: viewModel.prepareWhatShouldISay,
             followUpAction: viewModel.prepareFollowUpQuestions,
@@ -203,7 +226,13 @@ struct ContentView: View {
             googleRefreshAction: viewModel.refreshGoogleDocContext,
             googleAppendNotesAction: viewModel.appendMeetingNotesToGoogleDoc,
             googleUpdateLiveNotesAction: viewModel.updateGoogleDocLiveNotes,
-            googleApplyReplaceAction: viewModel.applyGoogleDocsReplacement
+            googleApplyReplaceAction: viewModel.applyGoogleDocsReplacement,
+            googleInsertUnderHeadingAction: viewModel.insertGoogleDocsTextUnderHeading,
+            googleRewriteParagraphAction: viewModel.rewriteGoogleDocsParagraph,
+            googleBrowserRefreshAction: viewModel.refreshGoogleBrowserStatus,
+            googleBrowserOpenAction: viewModel.openGoogleDocInBrowser,
+            googleBrowserScrollAction: viewModel.scrollGoogleDocBrowserToBottom,
+            googleBrowserFindAction: viewModel.findVisibleTextInGoogleDocBrowser
         )
     }
 

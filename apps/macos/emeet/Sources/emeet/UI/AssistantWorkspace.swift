@@ -30,6 +30,14 @@ struct AssistantWorkspace: View {
     let googleDocsFindText: Binding<String>
     let googleDocsReplaceText: Binding<String>
     let googleDocsReplaceOccurrence: Binding<GoogleDocsReplaceOccurrence>
+    let googleDocsInsertHeading: Binding<String>
+    let googleDocsInsertText: Binding<String>
+    let googleDocsRewriteAnchor: Binding<String>
+    let googleDocsRewriteText: Binding<String>
+    let googleBrowserMessage: String
+    let googleBrowserSeleniumAvailable: Bool
+    let googleBrowserSessionActive: Bool
+    let googleBrowserFindText: Binding<String>
     let refreshProvidersAction: () -> Void
     let whatShouldISayAction: () -> Void
     let followUpAction: () -> Void
@@ -39,6 +47,12 @@ struct AssistantWorkspace: View {
     let googleAppendNotesAction: () -> Void
     let googleUpdateLiveNotesAction: () -> Void
     let googleApplyReplaceAction: () -> Void
+    let googleInsertUnderHeadingAction: () -> Void
+    let googleRewriteParagraphAction: () -> Void
+    let googleBrowserRefreshAction: () -> Void
+    let googleBrowserOpenAction: () -> Void
+    let googleBrowserScrollAction: () -> Void
+    let googleBrowserFindAction: () -> Void
 
     var body: some View {
         ScrollView {
@@ -110,12 +124,26 @@ struct AssistantWorkspace: View {
                     findText: googleDocsFindText,
                     replaceText: googleDocsReplaceText,
                     occurrence: googleDocsReplaceOccurrence,
+                    insertHeading: googleDocsInsertHeading,
+                    insertText: googleDocsInsertText,
+                    rewriteAnchor: googleDocsRewriteAnchor,
+                    rewriteText: googleDocsRewriteText,
+                    browserMessage: googleBrowserMessage,
+                    browserSeleniumAvailable: googleBrowserSeleniumAvailable,
+                    browserSessionActive: googleBrowserSessionActive,
+                    browserFindText: googleBrowserFindText,
                     authAction: googleAuthAction,
                     connectAction: googleConnectAction,
                     refreshAction: googleRefreshAction,
                     appendNotesAction: googleAppendNotesAction,
                     updateLiveNotesAction: googleUpdateLiveNotesAction,
-                    applyReplaceAction: googleApplyReplaceAction
+                    applyReplaceAction: googleApplyReplaceAction,
+                    insertUnderHeadingAction: googleInsertUnderHeadingAction,
+                    rewriteParagraphAction: googleRewriteParagraphAction,
+                    browserRefreshAction: googleBrowserRefreshAction,
+                    browserOpenAction: googleBrowserOpenAction,
+                    browserScrollAction: googleBrowserScrollAction,
+                    browserFindAction: googleBrowserFindAction
                 )
 
                 NotesWorkspace(
@@ -299,12 +327,26 @@ private struct GoogleDocsWorkspace: View {
     let findText: Binding<String>
     let replaceText: Binding<String>
     let occurrence: Binding<GoogleDocsReplaceOccurrence>
+    let insertHeading: Binding<String>
+    let insertText: Binding<String>
+    let rewriteAnchor: Binding<String>
+    let rewriteText: Binding<String>
+    let browserMessage: String
+    let browserSeleniumAvailable: Bool
+    let browserSessionActive: Bool
+    let browserFindText: Binding<String>
     let authAction: () -> Void
     let connectAction: () -> Void
     let refreshAction: () -> Void
     let appendNotesAction: () -> Void
     let updateLiveNotesAction: () -> Void
     let applyReplaceAction: () -> Void
+    let insertUnderHeadingAction: () -> Void
+    let rewriteParagraphAction: () -> Void
+    let browserRefreshAction: () -> Void
+    let browserOpenAction: () -> Void
+    let browserScrollAction: () -> Void
+    let browserFindAction: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -409,8 +451,27 @@ private struct GoogleDocsWorkspace: View {
                 findText: findText,
                 replaceText: replaceText,
                 occurrence: occurrence,
+                insertHeading: insertHeading,
+                insertText: insertText,
+                rewriteAnchor: rewriteAnchor,
+                rewriteText: rewriteText,
                 isDisabled: !isConnected || isBusy,
-                applyAction: applyReplaceAction
+                applyAction: applyReplaceAction,
+                insertUnderHeadingAction: insertUnderHeadingAction,
+                rewriteParagraphAction: rewriteParagraphAction
+            )
+
+            BrowserHelperPanel(
+                message: browserMessage,
+                seleniumAvailable: browserSeleniumAvailable,
+                browserSessionActive: browserSessionActive,
+                findText: browserFindText,
+                isConnected: isConnected,
+                isBusy: isBusy,
+                refreshAction: browserRefreshAction,
+                openAction: browserOpenAction,
+                scrollAction: browserScrollAction,
+                findAction: browserFindAction
             )
 
             Text(message)
@@ -419,6 +480,77 @@ private struct GoogleDocsWorkspace: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .panelStyle()
+    }
+}
+
+private struct BrowserHelperPanel: View {
+    let message: String
+    let seleniumAvailable: Bool
+    let browserSessionActive: Bool
+    let findText: Binding<String>
+    let isConnected: Bool
+    let isBusy: Bool
+    let refreshAction: () -> Void
+    let openAction: () -> Void
+    let scrollAction: () -> Void
+    let findAction: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Browser helper")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button(action: refreshAction) {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .buttonStyle(.borderless)
+                .help("Refresh browser helper status")
+            }
+
+            HStack(spacing: 8) {
+                GoogleDocSmallButton(
+                    title: "Open",
+                    iconName: "safari",
+                    disabled: isBusy,
+                    action: openAction
+                )
+
+                GoogleDocSmallButton(
+                    title: "Bottom",
+                    iconName: "arrow.down.to.line",
+                    disabled: isBusy || !seleniumAvailable || !browserSessionActive,
+                    action: scrollAction
+                )
+            }
+
+            HStack(spacing: 8) {
+                TextField("Find visible text", text: findText)
+                    .textFieldStyle(.roundedBorder)
+                    .disabled(isBusy || !seleniumAvailable || !browserSessionActive)
+
+                Button(action: findAction) {
+                    Image(systemName: "magnifyingglass")
+                }
+                .disabled(isBusy || !seleniumAvailable || !browserSessionActive)
+                .help("Find visible text in browser")
+            }
+
+            Text(statusLine)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(9)
+        .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var statusLine: String {
+        if !isConnected {
+            return "Connect a doc first. \(message)"
+        }
+        return message
     }
 }
 
@@ -444,8 +576,14 @@ private struct DirectEditPanel: View {
     let findText: Binding<String>
     let replaceText: Binding<String>
     let occurrence: Binding<GoogleDocsReplaceOccurrence>
+    let insertHeading: Binding<String>
+    let insertText: Binding<String>
+    let rewriteAnchor: Binding<String>
+    let rewriteText: Binding<String>
     let isDisabled: Bool
     let applyAction: () -> Void
+    let insertUnderHeadingAction: () -> Void
+    let rewriteParagraphAction: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -478,6 +616,40 @@ private struct DirectEditPanel: View {
                 .buttonStyle(.borderedProminent)
                 .disabled(isDisabled)
             }
+
+            Divider()
+
+            TextField("Heading", text: insertHeading)
+                .textFieldStyle(.roundedBorder)
+                .disabled(isDisabled)
+
+            TextField("Text to insert under heading", text: insertText, axis: .vertical)
+                .textFieldStyle(.roundedBorder)
+                .lineLimit(2...4)
+                .disabled(isDisabled)
+
+            Button(action: insertUnderHeadingAction) {
+                Label("Insert Under Heading", systemImage: "text.insert")
+            }
+            .buttonStyle(.bordered)
+            .disabled(isDisabled)
+
+            Divider()
+
+            TextField("Paragraph anchor text", text: rewriteAnchor)
+                .textFieldStyle(.roundedBorder)
+                .disabled(isDisabled)
+
+            TextField("Replacement paragraph", text: rewriteText, axis: .vertical)
+                .textFieldStyle(.roundedBorder)
+                .lineLimit(2...4)
+                .disabled(isDisabled)
+
+            Button(action: rewriteParagraphAction) {
+                Label("Rewrite Paragraph", systemImage: "paragraphsign")
+            }
+            .buttonStyle(.bordered)
+            .disabled(isDisabled)
         }
         .padding(9)
         .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))

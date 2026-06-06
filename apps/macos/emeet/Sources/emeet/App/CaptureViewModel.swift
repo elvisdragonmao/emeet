@@ -42,12 +42,22 @@ final class CaptureViewModel: ObservableObject {
     @Published private(set) var googleDocsDocumentID = ""
     @Published private(set) var googleDocsRevisionID = ""
     @Published private(set) var googleDocsPreview = ""
+    @Published private(set) var googleDocsPlainText = ""
     @Published private(set) var googleDocsBriefing = ""
     @Published private(set) var googleDocsSnippets: [String] = []
     @Published private(set) var googleDocsMessage = "Google Docs not connected."
     @Published private(set) var googleDocsFindText = ""
     @Published private(set) var googleDocsReplaceText = ""
     @Published private(set) var googleDocsReplaceOccurrence: GoogleDocsReplaceOccurrence = .first
+    @Published private(set) var googleDocsInsertHeading = ""
+    @Published private(set) var googleDocsInsertText = ""
+    @Published private(set) var googleDocsRewriteAnchor = ""
+    @Published private(set) var googleDocsRewriteText = ""
+    @Published private(set) var googleBrowserMessage = "Browser helper optional."
+    @Published private(set) var googleBrowserSeleniumAvailable = false
+    @Published private(set) var googleBrowserChromeDriverAvailable = false
+    @Published private(set) var googleBrowserSessionActive = false
+    @Published private(set) var googleBrowserFindText = ""
     @Published private(set) var eventLog: [String] = [
         "Ready. Start Meeting begins capture, STT, and auto summaries."
     ]
@@ -130,6 +140,7 @@ final class CaptureViewModel: ObservableObject {
 
         refreshAssistantProviders()
         refreshGoogleAuthStatus()
+        refreshGoogleBrowserStatus()
     }
 
     var isAnyRunning: Bool {
@@ -508,6 +519,26 @@ final class CaptureViewModel: ObservableObject {
         googleDocsReplaceOccurrence = occurrence
     }
 
+    func updateGoogleDocsInsertHeading(_ heading: String) {
+        googleDocsInsertHeading = heading
+    }
+
+    func updateGoogleDocsInsertText(_ text: String) {
+        googleDocsInsertText = text
+    }
+
+    func updateGoogleDocsRewriteAnchor(_ anchor: String) {
+        googleDocsRewriteAnchor = anchor
+    }
+
+    func updateGoogleDocsRewriteText(_ text: String) {
+        googleDocsRewriteText = text
+    }
+
+    func updateGoogleBrowserFindText(_ text: String) {
+        googleBrowserFindText = text
+    }
+
     func refreshGoogleAuthStatus() {
         Task {
             do {
@@ -541,6 +572,19 @@ final class CaptureViewModel: ObservableObject {
                 googleDocsStatus = .failed(error.localizedDescription)
                 googleDocsMessage = error.localizedDescription
                 appendLog("Google Docs OAuth failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func refreshGoogleBrowserStatus() {
+        Task {
+            do {
+                let response = try await assistantClient.fetchGoogleBrowserStatus()
+                applyGoogleBrowserResponse(response)
+                appendLog("Google Docs browser helper status loaded.")
+            } catch {
+                googleBrowserMessage = error.localizedDescription
+                appendLog("Google Docs browser helper status failed: \(error.localizedDescription)")
             }
         }
     }
@@ -656,6 +700,143 @@ final class CaptureViewModel: ObservableObject {
                 googleDocsStatus = .failed(error.localizedDescription)
                 googleDocsMessage = error.localizedDescription
                 appendLog("Google Doc direct edit failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func insertGoogleDocsTextUnderHeading() {
+        guard googleDocsIsConnected else {
+            googleDocsMessage = "Connect a Google Doc first."
+            return
+        }
+
+        let heading = googleDocsInsertHeading.trimmingCharacters(in: .whitespacesAndNewlines)
+        let text = googleDocsInsertText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !heading.isEmpty else {
+            googleDocsMessage = "Enter a heading before inserting text."
+            return
+        }
+        guard !text.isEmpty else {
+            googleDocsMessage = "Enter text to insert under the heading."
+            return
+        }
+
+        googleDocsStatus = .starting
+        googleDocsMessage = "Inserting text under heading..."
+        appendLog("Inserting Google Docs text under heading.")
+        let request = GoogleDocInsertUnderHeadingRequest(
+            meetingID: ensureCurrentMeetingID(),
+            heading: heading,
+            text: text
+        )
+
+        Task {
+            do {
+                let response = try await assistantClient.insertGoogleDocTextUnderHeading(request)
+                applyGoogleDocSnapshot(response, fallbackMessage: "Text inserted under heading.")
+                appendLog("Google Doc heading insert applied.")
+            } catch {
+                googleDocsStatus = .failed(error.localizedDescription)
+                googleDocsMessage = error.localizedDescription
+                appendLog("Google Doc heading insert failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func rewriteGoogleDocsParagraph() {
+        guard googleDocsIsConnected else {
+            googleDocsMessage = "Connect a Google Doc first."
+            return
+        }
+
+        let anchor = googleDocsRewriteAnchor.trimmingCharacters(in: .whitespacesAndNewlines)
+        let text = googleDocsRewriteText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !anchor.isEmpty else {
+            googleDocsMessage = "Enter anchor text for the paragraph rewrite."
+            return
+        }
+        guard !text.isEmpty else {
+            googleDocsMessage = "Enter the replacement paragraph."
+            return
+        }
+
+        googleDocsStatus = .starting
+        googleDocsMessage = "Rewriting paragraph..."
+        appendLog("Rewriting Google Docs paragraph containing anchor.")
+        let request = GoogleDocRewriteParagraphRequest(
+            meetingID: ensureCurrentMeetingID(),
+            anchor: anchor,
+            text: text
+        )
+
+        Task {
+            do {
+                let response = try await assistantClient.rewriteGoogleDocParagraph(request)
+                applyGoogleDocSnapshot(response, fallbackMessage: "Paragraph rewritten.")
+                appendLog("Google Doc paragraph rewrite applied.")
+            } catch {
+                googleDocsStatus = .failed(error.localizedDescription)
+                googleDocsMessage = error.localizedDescription
+                appendLog("Google Doc paragraph rewrite failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func openGoogleDocInBrowser() {
+        guard googleDocsIsConnected || !googleDocsURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            googleBrowserMessage = "Connect a Google Doc or paste a URL first."
+            return
+        }
+
+        let request = GoogleBrowserOpenRequest(
+            meetingID: ensureCurrentMeetingID(),
+            url: googleDocsURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        )
+        appendLog("Opening Google Doc in browser helper.")
+        Task {
+            do {
+                let response = try await assistantClient.openGoogleDocInBrowser(request)
+                applyGoogleBrowserResponse(response)
+                appendLog("Google Doc browser open result: \(response.message)")
+            } catch {
+                googleBrowserMessage = error.localizedDescription
+                appendLog("Google Doc browser open failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func scrollGoogleDocBrowserToBottom() {
+        let request = GoogleBrowserMeetingRequest(meetingID: ensureCurrentMeetingID())
+        appendLog("Scrolling Google Doc browser view.")
+        Task {
+            do {
+                let response = try await assistantClient.scrollGoogleDocBrowserToBottom(request)
+                applyGoogleBrowserResponse(response)
+                appendLog("Google Doc browser scroll result: \(response.message)")
+            } catch {
+                googleBrowserMessage = error.localizedDescription
+                appendLog("Google Doc browser scroll failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func findVisibleTextInGoogleDocBrowser() {
+        let query = googleBrowserFindText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else {
+            googleBrowserMessage = "Enter text for browser find."
+            return
+        }
+
+        let request = GoogleBrowserFindRequest(meetingID: ensureCurrentMeetingID(), text: query)
+        appendLog("Finding visible text in Google Doc browser view.")
+        Task {
+            do {
+                let response = try await assistantClient.findVisibleGoogleDocText(request)
+                applyGoogleBrowserResponse(response)
+                appendLog("Google Doc browser find result: \(response.message)")
+            } catch {
+                googleBrowserMessage = error.localizedDescription
+                appendLog("Google Doc browser find failed: \(error.localizedDescription)")
             }
         }
     }
@@ -1038,6 +1219,7 @@ final class CaptureViewModel: ObservableObject {
         googleDocsDocumentID = response.documentId
         googleDocsRevisionID = response.revisionId
         googleDocsPreview = response.preview
+        googleDocsPlainText = response.plainText ?? googleDocsPlainText
         googleDocsBriefing = response.documentBriefing ?? googleDocsBriefing
         googleDocsSnippets = response.snippets ?? googleDocsSnippets
         if let briefingError = response.briefingError, !briefingError.isEmpty {
@@ -1045,6 +1227,13 @@ final class CaptureViewModel: ObservableObject {
         } else {
             googleDocsMessage = response.message ?? fallbackMessage
         }
+    }
+
+    private func applyGoogleBrowserResponse(_ response: GoogleBrowserResponse) {
+        googleBrowserMessage = response.message
+        googleBrowserSeleniumAvailable = response.seleniumAvailable
+        googleBrowserChromeDriverAvailable = response.chromedriverAvailable
+        googleBrowserSessionActive = response.browserSessionActive
     }
 
     private func runGoogleDocSnapshotAction(
