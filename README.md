@@ -134,6 +134,14 @@ source .venv/bin/activate
 python -m pip install -e ".[stt]"
 ```
 
+Optional browser helper for opening, scrolling, and visual find:
+
+```bash
+python -m pip install -e ".[browser]"
+```
+
+The browser helper uses Selenium/ChromeDriver when available and never edits document content. All Google Doc modifications continue to use Google Docs API `batchUpdate`.
+
 7. Start the backend and click `Authorize` in the macOS app Google Docs panel. The local OAuth flow creates:
 
 ```text
@@ -247,7 +255,8 @@ Google Docs demo extension:
 4. Start Meeting and generate transcript/meeting notes.
 5. Click `Append` to append notes/actions to the Google Doc after the meeting.
 6. Switch to `Live notes` and click `Live`, or let the 30 second auto-summary update the `emeet Live Notes` section.
-7. Try direct find/replace with `Replace first` or `Replace all`.
+7. Try direct edits: `Replace first` / `Replace all`, insert text under a heading, or rewrite the paragraph containing an anchor text.
+8. Optional: use the browser helper to open the doc, scroll to the bottom, or run browser find for visible text.
 
 ## Known Limits
 
