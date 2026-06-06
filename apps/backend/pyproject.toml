@@ -23,6 +23,9 @@ faster-whisper = [
 mlx-whisper = [
     "mlx-whisper>=0.4,<1; platform_system == 'Darwin' and platform_machine == 'arm64'"
 ]
+browser = [
+    "selenium>=4,<5"
+]
 stt = [
     "faster-whisper>=1.0,<2",
     "mlx-whisper>=0.4,<1; platform_system == 'Darwin' and platform_machine == 'arm64'"

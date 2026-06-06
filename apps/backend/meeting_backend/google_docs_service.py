@@ -1,7 +1,8 @@
+import json
 import os
 import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 from urllib.parse import parse_qs, urlparse
 
 from meeting_backend.config import Settings
@@ -13,6 +14,15 @@ LIVE_NOTES_TITLE = "emeet Live Notes"
 
 @dataclass(frozen=True)
 class TextIndexMapping:
+    start_offset: int
+    end_offset: int
+    start_index: int
+    end_index: int
+    text: str
+
+
+@dataclass(frozen=True)
+class DocumentParagraph:
     start_offset: int
     end_offset: int
     start_index: int
@@ -69,6 +79,7 @@ class DocumentSnapshot:
     revision_id: str
     plain_text: str
     mappings: List[TextIndexMapping]
+    paragraphs: List[DocumentParagraph] = field(default_factory=list)
     headings: List[DocumentHeading] = field(default_factory=list)
     sections: List[DocumentSection] = field(default_factory=list)
     preview: str = ""
@@ -206,15 +217,12 @@ class GoogleDocsService:
 
     def append_text(self, document_id: str, text: str, *, client: Any = None) -> DocumentSnapshot:
         client = client or self.build_client()
-        snapshot = self.read_document(document_id, client=client)
-        requests = build_append_text_requests(snapshot, text)
-        self.batch_update(
+        snapshot, _metadata = self._apply_snapshot_update(
             document_id,
-            requests,
-            revision_id=snapshot.revision_id,
+            lambda snapshot: (build_append_text_requests(snapshot, text), None),
             client=client,
         )
-        return self.read_document(document_id, client=client)
+        return snapshot
 
     def replace_text(
         self,
@@ -226,18 +234,12 @@ class GoogleDocsService:
         client: Any = None,
     ) -> Tuple[DocumentSnapshot, int]:
         client = client or self.build_client()
-        snapshot = self.read_document(document_id, client=client)
-        requests = build_replace_text_requests(snapshot, find, replace, occurrence=occurrence)
-        changed_count = len(calculate_replacement_ranges(snapshot, find, occurrence=occurrence))
-        if occurrence == "all":
-            changed_count = snapshot.plain_text.count(find)
-        self.batch_update(
+        snapshot, changed_count = self._apply_snapshot_update(
             document_id,
-            requests,
-            revision_id=snapshot.revision_id,
+            lambda snapshot: build_replace_text_update(snapshot, find, replace, occurrence=occurrence),
             client=client,
         )
-        return self.read_document(document_id, client=client), changed_count
+        return snapshot, int(changed_count or 0)
 
     def insert_text_under_heading(
         self,
@@ -248,15 +250,31 @@ class GoogleDocsService:
         client: Any = None,
     ) -> DocumentSnapshot:
         client = client or self.build_client()
-        snapshot = self.read_document(document_id, client=client)
-        requests = build_insert_under_heading_requests(snapshot, heading, text)
-        self.batch_update(
+        snapshot, _metadata = self._apply_snapshot_update(
             document_id,
-            requests,
-            revision_id=snapshot.revision_id,
+            lambda snapshot: (build_insert_under_heading_requests(snapshot, heading, text), None),
             client=client,
         )
-        return self.read_document(document_id, client=client)
+        return snapshot
+
+    def rewrite_paragraph_containing_anchor(
+        self,
+        document_id: str,
+        anchor: str,
+        text: str,
+        *,
+        client: Any = None,
+    ) -> DocumentSnapshot:
+        client = client or self.build_client()
+        snapshot, _metadata = self._apply_snapshot_update(
+            document_id,
+            lambda snapshot: (
+                build_rewrite_paragraph_containing_anchor_requests(snapshot, anchor, text),
+                None,
+            ),
+            client=client,
+        )
+        return snapshot
 
     def update_live_notes(
         self,
@@ -266,15 +284,41 @@ class GoogleDocsService:
         client: Any = None,
     ) -> DocumentSnapshot:
         client = client or self.build_client()
-        snapshot = self.read_document(document_id, client=client)
-        requests = build_update_live_notes_requests(snapshot, live_notes_text)
-        self.batch_update(
+        snapshot, _metadata = self._apply_snapshot_update(
             document_id,
-            requests,
-            revision_id=snapshot.revision_id,
+            lambda snapshot: (build_update_live_notes_requests(snapshot, live_notes_text), None),
             client=client,
         )
-        return self.read_document(document_id, client=client)
+        return snapshot
+
+    def _apply_snapshot_update(
+        self,
+        document_id: str,
+        request_builder: Callable[[DocumentSnapshot], Tuple[List[Dict[str, Any]], Any]],
+        *,
+        client: Any,
+    ) -> Tuple[DocumentSnapshot, Any]:
+        snapshot = self.read_document(document_id, client=client)
+        requests, metadata = request_builder(snapshot)
+        try:
+            self.batch_update(
+                document_id,
+                requests,
+                revision_id=snapshot.revision_id,
+                client=client,
+            )
+        except Exception as error:
+            if not is_revision_conflict_error(error):
+                raise
+            snapshot = self.read_document(document_id, client=client)
+            requests, metadata = request_builder(snapshot)
+            self.batch_update(
+                document_id,
+                requests,
+                revision_id=snapshot.revision_id,
+                client=client,
+            )
+        return self.read_document(document_id, client=client), metadata
 
     def _load_credentials(self, *, allow_missing: bool = False) -> Any:
         if not os.path.exists(self.settings.google_token_path):
@@ -312,6 +356,7 @@ class GoogleDocsService:
 def flatten_document(document_id: str, document: Dict[str, Any]) -> DocumentSnapshot:
     plain_parts: List[str] = []
     mappings: List[TextIndexMapping] = []
+    paragraphs: List[DocumentParagraph] = []
     headings: List[DocumentHeading] = []
     body_content = document.get("body", {}).get("content") or []
     end_index = 1
@@ -347,8 +392,19 @@ def flatten_document(document_id: str, document: Dict[str, Any]) -> DocumentSnap
             )
 
         paragraph_end_offset = sum(len(part) for part in plain_parts)
+        paragraph_text = "".join(plain_parts)[paragraph_start_offset:paragraph_end_offset]
+        if paragraph_text:
+            paragraphs.append(
+                DocumentParagraph(
+                    start_offset=paragraph_start_offset,
+                    end_offset=paragraph_end_offset,
+                    start_index=paragraph_start_index,
+                    end_index=paragraph_end_index,
+                    text=paragraph_text,
+                )
+            )
         heading_level = heading_level_for_paragraph(paragraph)
-        heading_text = "".join(plain_parts)[paragraph_start_offset:paragraph_end_offset].strip()
+        heading_text = paragraph_text.strip()
         if heading_level > 0 and heading_text:
             headings.append(
                 DocumentHeading(
@@ -369,6 +425,7 @@ def flatten_document(document_id: str, document: Dict[str, Any]) -> DocumentSnap
         revision_id=str(document.get("revisionId") or ""),
         plain_text=plain_text,
         mappings=mappings,
+        paragraphs=paragraphs,
         headings=headings,
         sections=sections,
         preview=build_preview(plain_text),
@@ -489,6 +546,19 @@ def build_replace_text_requests(
     ]
 
 
+def build_replace_text_update(
+    snapshot: DocumentSnapshot,
+    find: str,
+    replace: str,
+    *,
+    occurrence: str = "first",
+) -> Tuple[List[Dict[str, Any]], int]:
+    requests = build_replace_text_requests(snapshot, find, replace, occurrence=occurrence)
+    if occurrence == "all":
+        return requests, snapshot.plain_text.count(validate_find_text(find))
+    return requests, len(calculate_replacement_ranges(snapshot, find, occurrence=occurrence))
+
+
 def calculate_replacement_ranges(
     snapshot: DocumentSnapshot,
     find: str,
@@ -556,19 +626,113 @@ def build_insert_under_heading_requests(
     heading_text: str,
     text: str,
 ) -> List[Dict[str, Any]]:
-    heading = find_heading(snapshot, heading_text)
+    heading_text = validate_heading_text(heading_text)
+    body = normalize_insert_text(text)
+    heading = find_heading(snapshot, heading_text) or find_plain_text_heading(snapshot, heading_text)
     if not heading:
-        return build_append_text_requests(snapshot, "{}\n\n{}".format(heading_text.strip(), text.strip()))
+        return build_append_missing_heading_requests(snapshot, heading_text, body)
 
-    insert_text = "\n{}\n".format(text.strip())
+    insert_text = "\n{}\n".format(body)
     return [
         {
             "insertText": {
-                "location": {"index": heading.end_index},
+                "location": {"index": section_end_for_heading(snapshot, heading)},
                 "text": insert_text,
             }
         }
     ]
+
+
+def build_append_missing_heading_requests(
+    snapshot: DocumentSnapshot,
+    heading_text: str,
+    text: str,
+) -> List[Dict[str, Any]]:
+    insert_at = append_index(snapshot)
+    insert_text = normalize_append_text("{}\n\n{}".format(heading_text, text))
+    prefix_units = utf16_code_units(insert_text) - utf16_code_units(insert_text.lstrip("\n"))
+    heading_start = insert_at + prefix_units
+    heading_end = heading_start + utf16_code_units(heading_text)
+    return [
+        {
+            "insertText": {
+                "location": {"index": insert_at},
+                "text": insert_text,
+            }
+        },
+        {
+            "updateParagraphStyle": {
+                "range": {"startIndex": heading_start, "endIndex": heading_end},
+                "paragraphStyle": {"namedStyleType": "HEADING_1"},
+                "fields": "namedStyleType",
+            }
+        },
+    ]
+
+
+def build_rewrite_paragraph_containing_anchor_requests(
+    snapshot: DocumentSnapshot,
+    anchor_text: str,
+    text: str,
+) -> List[Dict[str, Any]]:
+    paragraph = paragraph_containing_anchor(snapshot, anchor_text)
+    if paragraph is None:
+        raise ValueError("Anchor text was not found in a single Google Doc paragraph")
+
+    replacement = normalize_paragraph_rewrite_text(text)
+    return [
+        {
+            "deleteContentRange": {
+                "range": {
+                    "startIndex": paragraph.start_index,
+                    "endIndex": paragraph.end_index,
+                }
+            }
+        },
+        {
+            "insertText": {
+                "location": {"index": paragraph.start_index},
+                "text": replacement,
+            }
+        },
+    ]
+
+
+def paragraph_containing_anchor(
+    snapshot: DocumentSnapshot,
+    anchor_text: str,
+) -> Optional[DocumentParagraph]:
+    anchor = validate_find_text(anchor_text)
+    start_offset = snapshot.plain_text.find(anchor)
+    if start_offset < 0:
+        return None
+    end_offset = start_offset + len(anchor)
+
+    for paragraph in snapshot.paragraphs:
+        if paragraph.start_offset <= start_offset and end_offset <= paragraph.end_offset:
+            return paragraph
+    return None
+
+
+def normalize_insert_text(text: str) -> str:
+    stripped = text.strip()
+    if not stripped:
+        raise ValueError("Insert text is empty")
+    return stripped
+
+
+def normalize_paragraph_rewrite_text(text: str) -> str:
+    stripped = text.strip()
+    if not stripped:
+        raise ValueError("Replacement paragraph is empty")
+    return stripped + "\n"
+
+
+def validate_heading_text(heading_text: str) -> str:
+    heading = heading_text.strip()
+    if not heading:
+        raise ValueError("Heading text is empty")
+    return heading
 
 
 def build_update_live_notes_requests(
@@ -743,3 +907,39 @@ def build_google_docs_client(credentials: Any) -> Any:
     from googleapiclient.discovery import build
 
     return build("docs", "v1", credentials=credentials)
+
+
+def is_revision_conflict_error(error: Exception) -> bool:
+    status = getattr(getattr(error, "resp", None), "status", None)
+    if status in {400, 409, 412}:
+        text = error_text(error).lower()
+        return any(
+            marker in text
+            for marker in (
+                "revision",
+                "writecontrol",
+                "write control",
+                "targetrevisionid",
+                "requiredrevisionid",
+                "conflict",
+                "precondition",
+            )
+        )
+    return False
+
+
+def error_text(error: Exception) -> str:
+    content = getattr(error, "content", b"")
+    if isinstance(content, bytes):
+        content_text = content.decode("utf-8", errors="replace")
+    else:
+        content_text = str(content or "")
+
+    try:
+        parsed = json.loads(content_text)
+        if isinstance(parsed, dict):
+            return json.dumps(parsed, ensure_ascii=False)
+    except Exception:
+        pass
+
+    return "{} {}".format(str(error), content_text)

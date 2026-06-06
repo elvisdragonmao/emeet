@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from meeting_backend.assistant.models import AssistantRequest
 from meeting_backend.assistant.service import generate_assistant_response
+from meeting_backend.browser_controller import BrowserController
 from meeting_backend.config import get_settings
 from meeting_backend.google_docs_context import (
     GOOGLE_DOC_CONNECTIONS,
@@ -44,6 +45,24 @@ class GoogleReplaceTextBody(GoogleMeetingBody):
     find: str
     replace: str
     occurrence: str = "first"
+
+
+class GoogleInsertUnderHeadingBody(GoogleMeetingBody):
+    heading: str
+    text: str
+
+
+class GoogleRewriteParagraphBody(GoogleMeetingBody):
+    anchor: str
+    text: str
+
+
+class GoogleBrowserOpenBody(GoogleMeetingBody):
+    url: str = ""
+
+
+class GoogleBrowserFindBody(GoogleMeetingBody):
+    text: str
 
 
 class GoogleAppendMeetingNotesBody(GoogleMeetingBody):
@@ -173,6 +192,48 @@ async def google_docs_replace_text(body: GoogleReplaceTextBody):
     return write_response(updated, "Replaced {} occurrence(s).".format(changed_count))
 
 
+@router.post("/docs/insert-under-heading")
+async def google_docs_insert_under_heading(body: GoogleInsertUnderHeadingBody):
+    service = GoogleDocsService(get_settings())
+    connection = connection_for_body(body)
+    document_id = body.document_id or connection.snapshot.document_id
+    try:
+        snapshot = await asyncio.to_thread(
+            service.insert_text_under_heading,
+            document_id,
+            body.heading,
+            body.text,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except Exception as error:
+        raise HTTPException(status_code=502, detail=str(error)) from error
+
+    updated = GOOGLE_DOC_CONNECTIONS.update_snapshot(body.meeting_id, snapshot)
+    return write_response(updated, "Inserted text under heading.")
+
+
+@router.post("/docs/rewrite-paragraph")
+async def google_docs_rewrite_paragraph(body: GoogleRewriteParagraphBody):
+    service = GoogleDocsService(get_settings())
+    connection = connection_for_body(body)
+    document_id = body.document_id or connection.snapshot.document_id
+    try:
+        snapshot = await asyncio.to_thread(
+            service.rewrite_paragraph_containing_anchor,
+            document_id,
+            body.anchor,
+            body.text,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except Exception as error:
+        raise HTTPException(status_code=502, detail=str(error)) from error
+
+    updated = GOOGLE_DOC_CONNECTIONS.update_snapshot(body.meeting_id, snapshot)
+    return write_response(updated, "Rewrote paragraph containing anchor text.")
+
+
 @router.post("/docs/append-meeting-notes")
 async def google_docs_append_meeting_notes(body: GoogleAppendMeetingNotesBody):
     settings = get_settings()
@@ -223,6 +284,40 @@ async def google_docs_update_live_notes(body: GoogleUpdateLiveNotesBody):
 
     updated = GOOGLE_DOC_CONNECTIONS.update_snapshot(body.meeting_id, snapshot)
     return write_response(updated, "emeet Live Notes updated.")
+
+
+@router.get("/browser/status")
+async def google_browser_status():
+    return await asyncio.to_thread(BrowserController().status)
+
+
+@router.post("/browser/open")
+async def google_browser_open(body: GoogleBrowserOpenBody):
+    try:
+        url = body.url or google_doc_url_for_body(body)
+        return await asyncio.to_thread(BrowserController().open_url, url)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except Exception as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+
+
+@router.post("/browser/scroll-bottom")
+async def google_browser_scroll_bottom(_body: GoogleMeetingBody):
+    try:
+        return await asyncio.to_thread(BrowserController().scroll_to_bottom)
+    except Exception as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+
+
+@router.post("/browser/find-visible-text")
+async def google_browser_find_visible_text(body: GoogleBrowserFindBody):
+    try:
+        return await asyncio.to_thread(BrowserController().find_visible_text, body.text)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except Exception as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
 
 
 def generate_document_briefing(
@@ -284,6 +379,11 @@ def connection_for_body(body: GoogleMeetingBody) -> GoogleDocMeetingConnection:
     return connection
 
 
+def google_doc_url_for_body(body: GoogleMeetingBody) -> str:
+    connection = connection_for_body(body)
+    return "https://docs.google.com/document/d/{}/edit".format(connection.snapshot.document_id)
+
+
 def meeting_record_from_body_or_storage(
     settings: Any,
     body: GoogleAppendMeetingNotesBody,
@@ -298,7 +398,7 @@ def meeting_record_from_body_or_storage(
 
 
 def snapshot_response(connection: GoogleDocMeetingConnection) -> Dict[str, Any]:
-    payload = connection.snapshot.to_public_dict()
+    payload = connection.snapshot.to_public_dict(include_plain_text=True)
     payload.update(
         {
             "connected": True,
