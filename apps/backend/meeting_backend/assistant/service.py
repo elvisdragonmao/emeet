@@ -55,6 +55,7 @@ def generate_assistant_response(settings: Settings, request: AssistantRequest) -
     raw_text = dispatch_provider(settings, request, provider, model, thinking)
     parsed = parse_assistant_json(raw_text)
     payload = canonical_assistant_payload(parsed, raw_text)
+    document_edit_plan = canonical_document_edit_plan(parsed) if request.action == "document_edit_plan" else None
     latency_ms = int((time.monotonic() - started_at) * 1000)
 
     return AssistantResult(
@@ -66,6 +67,7 @@ def generate_assistant_response(settings: Settings, request: AssistantRequest) -
         notes=payload["notes"],
         actions=payload["actions"],
         raw_text=raw_text,
+        document_edit_plan=document_edit_plan,
     )
 
 
@@ -556,6 +558,26 @@ def parse_assistant_json(text: str) -> Dict[str, Any]:
             return parsed if isinstance(parsed, dict) else {}
         except json.JSONDecodeError:
             return {}
+
+
+def canonical_document_edit_plan(parsed: Dict[str, Any]) -> Dict[str, Any]:
+    intent = str(parsed.get("intent") or "").strip() or "replace_text"
+    valid_intents = {
+        "replace_text",
+        "append_meeting_notes",
+        "rewrite_paragraph_containing_anchor",
+        "insert_under_heading",
+    }
+    if intent not in valid_intents:
+        intent = "replace_text"
+
+    return {
+        "intent": intent,
+        "find": str(parsed.get("find") or ""),
+        "replace": str(parsed.get("replace") or ""),
+        "reason": str(parsed.get("reason") or ""),
+        "requires_user_confirmation": bool(parsed.get("requires_user_confirmation", True)),
+    }
 
 
 def normalize_provider(provider: str) -> str:

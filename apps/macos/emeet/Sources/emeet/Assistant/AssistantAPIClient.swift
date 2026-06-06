@@ -63,6 +63,10 @@ struct AssistantRespondRequest: Encodable {
     let rollingSummary: String
     let previousNotes: [MeetingNoteContextPayload]
     let previousActions: [MeetingActionContextPayload]
+    let documentTitle: String
+    let documentSummary: String
+    let documentSnippets: [String]
+    let documentBriefing: String
 }
 
 struct AssistantRespondResponse: Decodable, Equatable {
@@ -91,6 +95,59 @@ struct MeetingActionResponse: Decodable, Equatable {
     let title: String
     let owner: String
     let state: String
+}
+
+struct GoogleAuthStatusResponse: Decodable, Equatable {
+    let ready: Bool
+    let clientConfigured: Bool
+    let tokenConfigured: Bool
+    let dependenciesAvailable: Bool
+    let scopes: [String]
+}
+
+struct GoogleDocConnectRequest: Encodable {
+    let url: String
+    let meetingID: String
+    let provider: String
+    let model: String
+    let thinking: String
+}
+
+struct GoogleDocMeetingRequest: Encodable {
+    let meetingID: String
+}
+
+struct GoogleDocAppendRequest: Encodable {
+    let meetingID: String
+    let text: String
+}
+
+struct GoogleDocReplaceTextRequest: Encodable {
+    let meetingID: String
+    let find: String
+    let replace: String
+    let occurrence: String
+}
+
+struct GoogleDocMeetingNotesRequest: Encodable {
+    let meetingID: String
+    let notes: [MeetingNoteContextPayload]
+    let actions: [MeetingActionContextPayload]
+    let transcript: [AssistantTranscriptLinePayload]
+}
+
+struct GoogleDocSnapshotResponse: Decodable, Equatable {
+    let connected: Bool?
+    let meetingId: String?
+    let documentId: String
+    let title: String
+    let revisionId: String
+    let preview: String
+    let documentBriefing: String?
+    let briefingError: String?
+    let snippets: [String]?
+    let status: String?
+    let message: String?
 }
 
 final class AssistantAPIClient {
@@ -129,6 +186,60 @@ final class AssistantAPIClient {
         return try decoder.decode(AssistantRespondResponse.self, from: data)
     }
 
+    func fetchGoogleAuthStatus() async throws -> GoogleAuthStatusResponse {
+        let (data, response) = try await session.data(from: url(path: "/v1/google/auth/status"))
+        try validate(response: response, data: data)
+        return try decoder.decode(GoogleAuthStatusResponse.self, from: data)
+    }
+
+    func startGoogleAuth() async throws -> GoogleAuthStatusResponse {
+        let (data, response) = try await post(path: "/v1/google/auth/start", body: EmptyRequest())
+        try validate(response: response, data: data)
+        return try decoder.decode(GoogleAuthStatusResponse.self, from: data)
+    }
+
+    func connectGoogleDoc(_ request: GoogleDocConnectRequest) async throws -> GoogleDocSnapshotResponse {
+        let (data, response) = try await post(path: "/v1/google/docs/connect", body: request)
+        try validate(response: response, data: data)
+        return try decoder.decode(GoogleDocSnapshotResponse.self, from: data)
+    }
+
+    func refreshGoogleDoc(_ request: GoogleDocMeetingRequest) async throws -> GoogleDocSnapshotResponse {
+        let (data, response) = try await post(path: "/v1/google/docs/refresh", body: request)
+        try validate(response: response, data: data)
+        return try decoder.decode(GoogleDocSnapshotResponse.self, from: data)
+    }
+
+    func appendMeetingNotesToGoogleDoc(
+        _ request: GoogleDocMeetingNotesRequest
+    ) async throws -> GoogleDocSnapshotResponse {
+        let (data, response) = try await post(path: "/v1/google/docs/append-meeting-notes", body: request)
+        try validate(response: response, data: data)
+        return try decoder.decode(GoogleDocSnapshotResponse.self, from: data)
+    }
+
+    func updateGoogleDocLiveNotes(
+        _ request: GoogleDocMeetingNotesRequest
+    ) async throws -> GoogleDocSnapshotResponse {
+        let (data, response) = try await post(path: "/v1/google/docs/update-live-notes", body: request)
+        try validate(response: response, data: data)
+        return try decoder.decode(GoogleDocSnapshotResponse.self, from: data)
+    }
+
+    func replaceGoogleDocText(_ request: GoogleDocReplaceTextRequest) async throws -> GoogleDocSnapshotResponse {
+        let (data, response) = try await post(path: "/v1/google/docs/replace-text", body: request)
+        try validate(response: response, data: data)
+        return try decoder.decode(GoogleDocSnapshotResponse.self, from: data)
+    }
+
+    private func post<T: Encodable>(path: String, body: T) async throws -> (Data, URLResponse) {
+        var urlRequest = URLRequest(url: url(path: path))
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.httpBody = try encoder.encode(body)
+        return try await session.data(for: urlRequest)
+    }
+
     private func url(path: String) -> URL {
         var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)
         components?.path = path
@@ -143,3 +254,5 @@ final class AssistantAPIClient {
         }
     }
 }
+
+private struct EmptyRequest: Encodable {}

@@ -168,9 +168,42 @@ struct ContentView: View {
             quickActionsDisabled: viewModel.isAssistantActionRunning,
             whatShouldISayIsLoading: viewModel.isWhatShouldISayLoading,
             followUpIsLoading: viewModel.isFollowUpQuestionsLoading,
+            googleDocsURL: Binding(
+                get: { viewModel.googleDocsURL },
+                set: { viewModel.updateGoogleDocsURL($0) }
+            ),
+            googleDocsMode: Binding(
+                get: { viewModel.googleDocsMode },
+                set: { viewModel.updateGoogleDocsMode($0) }
+            ),
+            googleDocsStatusLabel: viewModel.googleDocsStatusLabel,
+            googleDocsDetailLabel: viewModel.googleDocsDetailLabel,
+            googleDocsMessage: viewModel.googleDocsMessage,
+            googleDocsPreview: viewModel.googleDocsPreview,
+            googleDocsBriefing: viewModel.googleDocsBriefing,
+            googleDocsIsConnected: viewModel.googleDocsIsConnected,
+            googleDocsIsBusy: viewModel.googleDocsIsBusy,
+            googleDocsFindText: Binding(
+                get: { viewModel.googleDocsFindText },
+                set: { viewModel.updateGoogleDocsFindText($0) }
+            ),
+            googleDocsReplaceText: Binding(
+                get: { viewModel.googleDocsReplaceText },
+                set: { viewModel.updateGoogleDocsReplaceText($0) }
+            ),
+            googleDocsReplaceOccurrence: Binding(
+                get: { viewModel.googleDocsReplaceOccurrence },
+                set: { viewModel.updateGoogleDocsReplaceOccurrence($0) }
+            ),
             refreshProvidersAction: viewModel.refreshAssistantProviders,
             whatShouldISayAction: viewModel.prepareWhatShouldISay,
-            followUpAction: viewModel.prepareFollowUpQuestions
+            followUpAction: viewModel.prepareFollowUpQuestions,
+            googleAuthAction: viewModel.startGoogleAuth,
+            googleConnectAction: viewModel.connectGoogleDoc,
+            googleRefreshAction: viewModel.refreshGoogleDocContext,
+            googleAppendNotesAction: viewModel.appendMeetingNotesToGoogleDoc,
+            googleUpdateLiveNotesAction: viewModel.updateGoogleDocLiveNotes,
+            googleApplyReplaceAction: viewModel.applyGoogleDocsReplacement
         )
     }
 

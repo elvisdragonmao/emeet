@@ -35,3 +35,7 @@ apps/backend/data/
 .env
 .env.*
 !.env.example
+apps/backend/secrets/google_oauth_client.json
+apps/backend/secrets/google_token.json
+backend/secrets/google_oauth_client.json
+backend/secrets/google_token.json

@@ -112,6 +112,44 @@ MEETING_BACKEND_DIARIZATION_MAX_SPEAKERS=4 \
 MEETING_BACKEND_DIARIZATION_PROVIDER=source ./scripts/dev.sh
 ```
 
+### Google Docs Integration Setup
+
+The Google Docs MVP uses a single-user local OAuth flow for development. Direct document writes go through the Google Docs API; browser automation is not required for edits.
+
+1. Create a Google Cloud project.
+2. Enable the Google Docs API.
+3. Configure the OAuth consent screen for your test user.
+4. Create an OAuth client with application type `Desktop app`.
+5. Save the downloaded client JSON to:
+
+```text
+apps/backend/secrets/google_oauth_client.json
+```
+
+6. Install backend dependencies:
+
+```bash
+cd apps/backend
+source .venv/bin/activate
+python -m pip install -e ".[stt]"
+```
+
+7. Start the backend and click `Authorize` in the macOS app Google Docs panel. The local OAuth flow creates:
+
+```text
+apps/backend/secrets/google_token.json
+```
+
+Both files are ignored by git. Production TODO: move Google tokens to macOS Keychain or encrypted backend-scoped storage.
+
+Useful overrides:
+
+```bash
+MEETING_BACKEND_GOOGLE_OAUTH_CLIENT_PATH=secrets/google_oauth_client.json \
+MEETING_BACKEND_GOOGLE_TOKEN_PATH=secrets/google_token.json \
+./scripts/dev.sh
+```
+
 Build and open the macOS app:
 
 ```bash
@@ -200,6 +238,16 @@ pnpm build
 10. 展示 Meeting Notes 與 Next Actions。
 11. 匯出 Markdown。
 12. 切換 provider/model，展示模型抽象層。
+
+Google Docs demo extension:
+
+1. Paste a Google Docs URL in the right panel.
+2. Click `Authorize` if OAuth is not ready.
+3. Click `Connect` to read the doc and generate a document briefing.
+4. Start Meeting and generate transcript/meeting notes.
+5. Click `Append` to append notes/actions to the Google Doc after the meeting.
+6. Switch to `Live notes` and click `Live`, or let the 30 second auto-summary update the `emeet Live Notes` section.
+7. Try direct find/replace with `Replace first` or `Replace all`.
 
 ## Known Limits
 

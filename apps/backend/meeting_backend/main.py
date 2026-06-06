@@ -2,10 +2,12 @@ from fastapi import FastAPI, WebSocket
 
 from meeting_backend.assistant.api import router as assistant_router
 from meeting_backend.config import get_settings
+from meeting_backend.google_docs_api import router as google_docs_router
 from meeting_backend.sessions import TranscriptionSession
 
 app = FastAPI(title="emeet Backend", version="0.1.0")
 app.include_router(assistant_router)
+app.include_router(google_docs_router)
 
 
 @app.get("/health")
@@ -28,6 +30,8 @@ async def health():
         "assistant_model": settings.assistant_model,
         "assistant_thinking": settings.assistant_thinking,
         "database_path": settings.database_path,
+        "google_oauth_client_path": settings.google_oauth_client_path,
+        "google_token_path": settings.google_token_path,
     }
 
 

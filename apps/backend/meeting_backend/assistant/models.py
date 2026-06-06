@@ -28,6 +28,10 @@ class AssistantRequest:
     rolling_summary: str = ""
     previous_notes: List[Dict[str, str]] = field(default_factory=list)
     previous_actions: List[Dict[str, str]] = field(default_factory=list)
+    document_title: str = ""
+    document_summary: str = ""
+    document_snippets: List[str] = field(default_factory=list)
+    document_briefing: str = ""
 
 
 @dataclass(frozen=True)
@@ -72,9 +76,10 @@ class AssistantResult:
     notes: List[Dict[str, str]]
     actions: List[Dict[str, str]]
     raw_text: Optional[str] = None
+    document_edit_plan: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        payload = {
             "provider": self.provider,
             "model": self.model,
             "thinking": self.thinking,
@@ -84,3 +89,6 @@ class AssistantResult:
             "actions": self.actions,
             "raw_text": self.raw_text,
         }
+        if self.document_edit_plan is not None:
+            payload["document_edit_plan"] = self.document_edit_plan
+        return payload

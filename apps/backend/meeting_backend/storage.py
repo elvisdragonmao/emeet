@@ -283,6 +283,53 @@ class MeetingStorage:
             )
             return run_id
 
+    def latest_meeting_record(self, meeting_id: str) -> Dict[str, Any]:
+        if not meeting_id:
+            return {"notes": [], "actions": []}
+
+        self.initialize()
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT id
+                FROM assistant_runs
+                WHERE meeting_id = ?
+                  AND action = 'meeting_notes'
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                (meeting_id,),
+            ).fetchone()
+            if row is None:
+                return {"notes": [], "actions": []}
+
+            run_id = int(row[0])
+            notes = [
+                {"title": str(note[0]), "detail": str(note[1])}
+                for note in connection.execute(
+                    """
+                    SELECT title, detail
+                    FROM notes
+                    WHERE run_id = ?
+                    ORDER BY id
+                    """,
+                    (run_id,),
+                ).fetchall()
+            ]
+            actions = [
+                {"title": str(action[0]), "owner": str(action[1]), "state": str(action[2])}
+                for action in connection.execute(
+                    """
+                    SELECT title, owner, state
+                    FROM actions
+                    WHERE run_id = ?
+                    ORDER BY id
+                    """,
+                    (run_id,),
+                ).fetchall()
+            ]
+            return {"notes": notes, "actions": actions}
+
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database_path)
         connection.execute("PRAGMA foreign_keys = ON")

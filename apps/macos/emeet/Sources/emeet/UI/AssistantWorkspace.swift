@@ -18,9 +18,27 @@ struct AssistantWorkspace: View {
     let quickActionsDisabled: Bool
     let whatShouldISayIsLoading: Bool
     let followUpIsLoading: Bool
+    let googleDocsURL: Binding<String>
+    let googleDocsMode: Binding<GoogleDocsSyncMode>
+    let googleDocsStatusLabel: String
+    let googleDocsDetailLabel: String
+    let googleDocsMessage: String
+    let googleDocsPreview: String
+    let googleDocsBriefing: String
+    let googleDocsIsConnected: Bool
+    let googleDocsIsBusy: Bool
+    let googleDocsFindText: Binding<String>
+    let googleDocsReplaceText: Binding<String>
+    let googleDocsReplaceOccurrence: Binding<GoogleDocsReplaceOccurrence>
     let refreshProvidersAction: () -> Void
     let whatShouldISayAction: () -> Void
     let followUpAction: () -> Void
+    let googleAuthAction: () -> Void
+    let googleConnectAction: () -> Void
+    let googleRefreshAction: () -> Void
+    let googleAppendNotesAction: () -> Void
+    let googleUpdateLiveNotesAction: () -> Void
+    let googleApplyReplaceAction: () -> Void
 
     var body: some View {
         ScrollView {
@@ -78,6 +96,27 @@ struct AssistantWorkspace: View {
                     }
                 }
                 .panelStyle()
+
+                GoogleDocsWorkspace(
+                    url: googleDocsURL,
+                    mode: googleDocsMode,
+                    statusLabel: googleDocsStatusLabel,
+                    detailLabel: googleDocsDetailLabel,
+                    message: googleDocsMessage,
+                    preview: googleDocsPreview,
+                    briefing: googleDocsBriefing,
+                    isConnected: googleDocsIsConnected,
+                    isBusy: googleDocsIsBusy,
+                    findText: googleDocsFindText,
+                    replaceText: googleDocsReplaceText,
+                    occurrence: googleDocsReplaceOccurrence,
+                    authAction: googleAuthAction,
+                    connectAction: googleConnectAction,
+                    refreshAction: googleRefreshAction,
+                    appendNotesAction: googleAppendNotesAction,
+                    updateLiveNotesAction: googleUpdateLiveNotesAction,
+                    applyReplaceAction: googleApplyReplaceAction
+                )
 
                 NotesWorkspace(
                     notes: notes,
@@ -243,6 +282,204 @@ private struct AssistantDraftView: View {
             }
         }
         .padding(10)
+        .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+private struct GoogleDocsWorkspace: View {
+    let url: Binding<String>
+    let mode: Binding<GoogleDocsSyncMode>
+    let statusLabel: String
+    let detailLabel: String
+    let message: String
+    let preview: String
+    let briefing: String
+    let isConnected: Bool
+    let isBusy: Bool
+    let findText: Binding<String>
+    let replaceText: Binding<String>
+    let occurrence: Binding<GoogleDocsReplaceOccurrence>
+    let authAction: () -> Void
+    let connectAction: () -> Void
+    let refreshAction: () -> Void
+    let appendNotesAction: () -> Void
+    let updateLiveNotesAction: () -> Void
+    let applyReplaceAction: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Google Docs")
+                        .font(.headline)
+                    Text(detailLabel)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+
+                Spacer()
+
+                if isBusy {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Text(statusLabel)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+
+            HStack(spacing: 8) {
+                TextField("Google Docs URL", text: url)
+                    .textFieldStyle(.roundedBorder)
+
+                Button(action: authAction) {
+                    Image(systemName: "person.badge.key")
+                }
+                .help("Authorize Google Docs")
+                .disabled(isBusy)
+
+                Button(action: connectAction) {
+                    Image(systemName: "link")
+                }
+                .help("Connect Google Doc")
+                .disabled(isBusy)
+            }
+
+            Picker("Mode", selection: mode) {
+                ForEach(GoogleDocsSyncMode.allCases) { item in
+                    Text(item.label)
+                        .tag(item)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+
+            HStack(spacing: 8) {
+                GoogleDocSmallButton(
+                    title: "Refresh",
+                    iconName: "arrow.clockwise",
+                    disabled: !isConnected || isBusy,
+                    action: refreshAction
+                )
+
+                GoogleDocSmallButton(
+                    title: "Append",
+                    iconName: "text.append",
+                    disabled: !isConnected || isBusy,
+                    action: appendNotesAction
+                )
+
+                GoogleDocSmallButton(
+                    title: "Live",
+                    iconName: "square.and.pencil",
+                    disabled: !isConnected || isBusy,
+                    action: updateLiveNotesAction
+                )
+            }
+
+            if !preview.isEmpty || !briefing.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    if !briefing.isEmpty {
+                        Text("Briefing")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        Text(briefing)
+                            .font(.caption)
+                            .foregroundStyle(.primary)
+                            .lineLimit(5)
+                    } else if !preview.isEmpty {
+                        Text("Preview")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        Text(preview)
+                            .font(.caption)
+                            .foregroundStyle(.primary)
+                            .lineLimit(4)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(9)
+                .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+            }
+
+            DirectEditPanel(
+                findText: findText,
+                replaceText: replaceText,
+                occurrence: occurrence,
+                isDisabled: !isConnected || isBusy,
+                applyAction: applyReplaceAction
+            )
+
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .panelStyle()
+    }
+}
+
+private struct GoogleDocSmallButton: View {
+    let title: String
+    let iconName: String
+    let disabled: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label(title, systemImage: iconName)
+                .lineLimit(1)
+                .minimumScaleFactor(0.86)
+        }
+        .buttonStyle(.bordered)
+        .disabled(disabled)
+        .frame(maxWidth: .infinity)
+    }
+}
+
+private struct DirectEditPanel: View {
+    let findText: Binding<String>
+    let replaceText: Binding<String>
+    let occurrence: Binding<GoogleDocsReplaceOccurrence>
+    let isDisabled: Bool
+    let applyAction: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Direct edit")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            TextField("Find text", text: findText)
+                .textFieldStyle(.roundedBorder)
+                .disabled(isDisabled)
+
+            TextField("Replace with", text: replaceText)
+                .textFieldStyle(.roundedBorder)
+                .disabled(isDisabled)
+
+            HStack(spacing: 8) {
+                Picker("Occurrence", selection: occurrence) {
+                    ForEach(GoogleDocsReplaceOccurrence.allCases) { item in
+                        Text(item.label)
+                            .tag(item)
+                    }
+                }
+                .labelsHidden()
+                .frame(maxWidth: .infinity)
+                .disabled(isDisabled)
+
+                Button(action: applyAction) {
+                    Label("Apply", systemImage: "checkmark.circle")
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(isDisabled)
+            }
+        }
+        .padding(9)
         .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
     }
 }

@@ -32,6 +32,22 @@ final class CaptureViewModel: ObservableObject {
     @Published private(set) var autoSummaryRemainingSeconds = 30
     @Published private(set) var autoSummaryStatusLabel = "Start Meeting to begin"
     @Published private(set) var autoSummaryIsGenerating = false
+    @Published private(set) var googleDocsURL = ""
+    @Published private(set) var googleDocsMode: GoogleDocsSyncMode = .afterMeetingAppend
+    @Published private(set) var googleDocsStatus: CaptureStatus = .idle
+    @Published private(set) var googleDocsAuthReady = false
+    @Published private(set) var googleDocsClientConfigured = false
+    @Published private(set) var googleDocsDependenciesAvailable = false
+    @Published private(set) var googleDocsConnectedTitle = ""
+    @Published private(set) var googleDocsDocumentID = ""
+    @Published private(set) var googleDocsRevisionID = ""
+    @Published private(set) var googleDocsPreview = ""
+    @Published private(set) var googleDocsBriefing = ""
+    @Published private(set) var googleDocsSnippets: [String] = []
+    @Published private(set) var googleDocsMessage = "Google Docs not connected."
+    @Published private(set) var googleDocsFindText = ""
+    @Published private(set) var googleDocsReplaceText = ""
+    @Published private(set) var googleDocsReplaceOccurrence: GoogleDocsReplaceOccurrence = .first
     @Published private(set) var eventLog: [String] = [
         "Ready. Start Meeting begins capture, STT, and auto summaries."
     ]
@@ -113,6 +129,7 @@ final class CaptureViewModel: ObservableObject {
         )
 
         refreshAssistantProviders()
+        refreshGoogleAuthStatus()
     }
 
     var isAnyRunning: Bool {
@@ -205,6 +222,40 @@ final class CaptureViewModel: ObservableObject {
 
     var isFollowUpQuestionsLoading: Bool {
         activeAssistantAction == .followUpQuestions
+    }
+
+    var googleDocsStatusLabel: String {
+        switch googleDocsStatus {
+        case .idle:
+            return googleDocsAuthReady ? "Auth ready" : "Not authorized"
+        case .starting:
+            return "Syncing"
+        case .running:
+            return googleDocsConnectedTitle.isEmpty ? "Ready" : "Connected"
+        case .failed(let message):
+            return message
+        }
+    }
+
+    var googleDocsDetailLabel: String {
+        if !googleDocsDependenciesAvailable {
+            return "Install Google Python dependencies"
+        }
+        if !googleDocsClientConfigured {
+            return "Missing OAuth client JSON"
+        }
+        if googleDocsConnectedTitle.isEmpty {
+            return googleDocsAuthReady ? "Paste a Google Docs URL" : "Authorize Google Docs"
+        }
+        return googleDocsConnectedTitle
+    }
+
+    var googleDocsIsConnected: Bool {
+        !googleDocsDocumentID.isEmpty
+    }
+
+    var googleDocsIsBusy: Bool {
+        googleDocsStatus == .starting
     }
 
     var autoSummaryProgress: Double {
@@ -323,7 +374,7 @@ final class CaptureViewModel: ObservableObject {
         }
 
         transcriptionStatus = .starting
-        currentMeetingID = "mtg-\(UUID().uuidString.lowercased())"
+        _ = ensureCurrentMeetingID()
         transcriptLines.removeAll()
         finalTranscriptArchive.removeAll()
         summarizedFinalLineIDs.removeAll()
@@ -434,6 +485,179 @@ final class CaptureViewModel: ObservableObject {
 
     func updateAssistantThinking(_ thinking: String) {
         assistantThinking = thinking
+    }
+
+    func updateGoogleDocsURL(_ url: String) {
+        googleDocsURL = url
+    }
+
+    func updateGoogleDocsMode(_ mode: GoogleDocsSyncMode) {
+        googleDocsMode = mode
+        appendLog("Google Docs mode set to \(mode.label).")
+    }
+
+    func updateGoogleDocsFindText(_ text: String) {
+        googleDocsFindText = text
+    }
+
+    func updateGoogleDocsReplaceText(_ text: String) {
+        googleDocsReplaceText = text
+    }
+
+    func updateGoogleDocsReplaceOccurrence(_ occurrence: GoogleDocsReplaceOccurrence) {
+        googleDocsReplaceOccurrence = occurrence
+    }
+
+    func refreshGoogleAuthStatus() {
+        Task {
+            do {
+                let response = try await assistantClient.fetchGoogleAuthStatus()
+                applyGoogleAuthStatus(response)
+                appendLog("Google Docs auth status loaded.")
+            } catch {
+                googleDocsStatus = .failed(error.localizedDescription)
+                googleDocsMessage = error.localizedDescription
+                appendLog("Google Docs auth status failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func startGoogleAuth() {
+        guard googleDocsStatus != .starting else {
+            return
+        }
+
+        googleDocsStatus = .starting
+        googleDocsMessage = "Opening Google OAuth flow..."
+        appendLog("Starting Google Docs OAuth flow.")
+        Task {
+            do {
+                let response = try await assistantClient.startGoogleAuth()
+                applyGoogleAuthStatus(response)
+                googleDocsStatus = .idle
+                googleDocsMessage = response.ready ? "Google Docs authorization is ready." : "Google Docs authorization is incomplete."
+                appendLog("Google Docs OAuth flow finished.")
+            } catch {
+                googleDocsStatus = .failed(error.localizedDescription)
+                googleDocsMessage = error.localizedDescription
+                appendLog("Google Docs OAuth failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func connectGoogleDoc() {
+        guard googleDocsStatus != .starting else {
+            return
+        }
+
+        let trimmedURL = googleDocsURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedURL.isEmpty else {
+            googleDocsStatus = .failed("Paste a Google Docs URL first.")
+            googleDocsMessage = "Paste a Google Docs URL first."
+            return
+        }
+
+        let meetingID = ensureCurrentMeetingID()
+        googleDocsStatus = .starting
+        googleDocsMessage = "Connecting Google Doc..."
+        appendLog("Connecting Google Doc to \(meetingID).")
+
+        let request = GoogleDocConnectRequest(
+            url: trimmedURL,
+            meetingID: meetingID,
+            provider: assistantProviderID,
+            model: assistantModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? "gpt-5.5"
+                : assistantModel,
+            thinking: assistantThinking
+        )
+
+        Task {
+            do {
+                let response = try await assistantClient.connectGoogleDoc(request)
+                applyGoogleDocSnapshot(response, fallbackMessage: "Google Doc connected.")
+                appendLog("Google Doc connected: \(response.title).")
+            } catch {
+                googleDocsStatus = .failed(error.localizedDescription)
+                googleDocsMessage = error.localizedDescription
+                appendLog("Google Doc connect failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func refreshGoogleDocContext() {
+        guard googleDocsIsConnected else {
+            googleDocsMessage = "Connect a Google Doc first."
+            return
+        }
+        runGoogleDocSnapshotAction(
+            label: "Refreshing Google Doc context...",
+            request: GoogleDocMeetingRequest(meetingID: ensureCurrentMeetingID()),
+            call: assistantClient.refreshGoogleDoc
+        )
+    }
+
+    func appendMeetingNotesToGoogleDoc() {
+        guard googleDocsIsConnected else {
+            googleDocsMessage = "Connect a Google Doc first."
+            return
+        }
+
+        let request = googleDocMeetingNotesRequest()
+        googleDocsStatus = .starting
+        googleDocsMessage = "Appending meeting notes..."
+        appendLog("Appending meeting notes to Google Doc.")
+
+        Task {
+            do {
+                let response = try await assistantClient.appendMeetingNotesToGoogleDoc(request)
+                applyGoogleDocSnapshot(response, fallbackMessage: "Meeting notes appended.")
+                appendLog("Meeting notes appended to Google Doc.")
+            } catch {
+                googleDocsStatus = .failed(error.localizedDescription)
+                googleDocsMessage = error.localizedDescription
+                appendLog("Append to Google Doc failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func updateGoogleDocLiveNotes() {
+        updateGoogleDocLiveNotes(triggeredByAutoSummary: false)
+    }
+
+    func applyGoogleDocsReplacement() {
+        guard googleDocsIsConnected else {
+            googleDocsMessage = "Connect a Google Doc first."
+            return
+        }
+
+        let find = googleDocsFindText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !find.isEmpty else {
+            googleDocsMessage = "Enter find text before applying an edit."
+            return
+        }
+
+        googleDocsStatus = .starting
+        googleDocsMessage = "Applying direct Google Docs edit..."
+        appendLog("Applying Google Docs find/replace edit.")
+        let request = GoogleDocReplaceTextRequest(
+            meetingID: ensureCurrentMeetingID(),
+            find: find,
+            replace: googleDocsReplaceText,
+            occurrence: googleDocsReplaceOccurrence.rawValue
+        )
+
+        Task {
+            do {
+                let response = try await assistantClient.replaceGoogleDocText(request)
+                applyGoogleDocSnapshot(response, fallbackMessage: "Google Doc text replaced.")
+                appendLog("Google Doc direct edit applied.")
+            } catch {
+                googleDocsStatus = .failed(error.localizedDescription)
+                googleDocsMessage = error.localizedDescription
+                appendLog("Google Doc direct edit failed: \(error.localizedDescription)")
+            }
+        }
     }
 
     func openMicrophoneSettings() {
@@ -570,7 +794,11 @@ final class CaptureViewModel: ObservableObject {
             transcript: assistantTranscriptPayload(),
             rollingSummary: "",
             previousNotes: [],
-            previousActions: []
+            previousActions: [],
+            documentTitle: googleDocsConnectedTitle,
+            documentSummary: googleDocsPreview,
+            documentSnippets: googleDocsSnippets,
+            documentBriefing: googleDocsBriefing
         )
 
         Task {
@@ -726,7 +954,11 @@ final class CaptureViewModel: ObservableObject {
             transcript: transcript,
             rollingSummary: rollingSummaryContext(),
             previousNotes: previousNoteContextPayload(),
-            previousActions: previousActionContextPayload()
+            previousActions: previousActionContextPayload(),
+            documentTitle: googleDocsConnectedTitle,
+            documentSummary: googleDocsPreview,
+            documentSnippets: googleDocsSnippets,
+            documentBriefing: googleDocsBriefing
         )
 
         Task { @MainActor [weak self] in
@@ -772,6 +1004,118 @@ final class CaptureViewModel: ObservableObject {
         }
 
         appendLog("Auto summary ready: \(response.provider) \(response.model) \(response.latencyMs)ms.")
+
+        if googleDocsMode == .liveNotes && googleDocsIsConnected {
+            updateGoogleDocLiveNotes(triggeredByAutoSummary: true)
+        }
+    }
+
+    private func applyGoogleAuthStatus(_ response: GoogleAuthStatusResponse) {
+        googleDocsAuthReady = response.ready
+        googleDocsClientConfigured = response.clientConfigured
+        googleDocsDependenciesAvailable = response.dependenciesAvailable
+        if googleDocsStatus != .starting {
+            googleDocsStatus = response.ready ? .idle : .failed("Google Docs authorization required.")
+        }
+        if !response.dependenciesAvailable {
+            googleDocsMessage = "Install Google API Python dependencies in the backend environment."
+        } else if !response.clientConfigured {
+            googleDocsMessage = "Save OAuth client JSON to apps/backend/secrets/google_oauth_client.json."
+        } else if !response.ready {
+            googleDocsMessage = "Click Authorize to create apps/backend/secrets/google_token.json."
+        } else if googleDocsConnectedTitle.isEmpty {
+            googleDocsMessage = "Google Docs authorization is ready."
+        }
+    }
+
+    private func applyGoogleDocSnapshot(
+        _ response: GoogleDocSnapshotResponse,
+        fallbackMessage: String
+    ) {
+        googleDocsStatus = .running
+        googleDocsAuthReady = true
+        googleDocsConnectedTitle = response.title
+        googleDocsDocumentID = response.documentId
+        googleDocsRevisionID = response.revisionId
+        googleDocsPreview = response.preview
+        googleDocsBriefing = response.documentBriefing ?? googleDocsBriefing
+        googleDocsSnippets = response.snippets ?? googleDocsSnippets
+        if let briefingError = response.briefingError, !briefingError.isEmpty {
+            googleDocsMessage = "Connected, but briefing failed: \(briefingError)"
+        } else {
+            googleDocsMessage = response.message ?? fallbackMessage
+        }
+    }
+
+    private func runGoogleDocSnapshotAction(
+        label: String,
+        request: GoogleDocMeetingRequest,
+        call: @escaping (GoogleDocMeetingRequest) async throws -> GoogleDocSnapshotResponse
+    ) {
+        guard googleDocsStatus != .starting else {
+            return
+        }
+
+        googleDocsStatus = .starting
+        googleDocsMessage = label
+        appendLog(label)
+        Task {
+            do {
+                let response = try await call(request)
+                applyGoogleDocSnapshot(response, fallbackMessage: "Google Doc context refreshed.")
+                appendLog("Google Doc context refreshed.")
+            } catch {
+                googleDocsStatus = .failed(error.localizedDescription)
+                googleDocsMessage = error.localizedDescription
+                appendLog("Google Doc refresh failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    private func updateGoogleDocLiveNotes(triggeredByAutoSummary: Bool) {
+        guard googleDocsIsConnected else {
+            googleDocsMessage = "Connect a Google Doc first."
+            return
+        }
+        guard !googleDocsIsBusy else {
+            if !triggeredByAutoSummary {
+                googleDocsMessage = "Google Docs request is already running."
+            }
+            return
+        }
+
+        let request = googleDocMeetingNotesRequest()
+        googleDocsStatus = .starting
+        googleDocsMessage = triggeredByAutoSummary ? "Auto-updating live notes..." : "Updating live notes..."
+        appendLog(triggeredByAutoSummary ? "Auto-updating Google Doc live notes." : "Updating Google Doc live notes.")
+
+        Task {
+            do {
+                let response = try await assistantClient.updateGoogleDocLiveNotes(request)
+                applyGoogleDocSnapshot(response, fallbackMessage: "Live notes updated.")
+                appendLog("Google Doc live notes updated.")
+            } catch {
+                googleDocsStatus = .failed(error.localizedDescription)
+                googleDocsMessage = error.localizedDescription
+                appendLog("Google Doc live notes failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    private func googleDocMeetingNotesRequest() -> GoogleDocMeetingNotesRequest {
+        GoogleDocMeetingNotesRequest(
+            meetingID: ensureCurrentMeetingID(),
+            notes: previousNoteContextPayload(),
+            actions: previousActionContextPayload(),
+            transcript: assistantTranscriptPayload(finalOnly: true)
+        )
+    }
+
+    private func ensureCurrentMeetingID() -> String {
+        if currentMeetingID.isEmpty {
+            currentMeetingID = "mtg-\(UUID().uuidString.lowercased())"
+        }
+        return currentMeetingID
     }
 
     private func resetAutoSummaryCountdown(status: String) {

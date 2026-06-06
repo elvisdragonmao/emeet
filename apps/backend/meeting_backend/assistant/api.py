@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from meeting_backend.assistant.models import AssistantRequest, AssistantTranscriptLine
 from meeting_backend.assistant.service import generate_assistant_response, list_provider_descriptors
 from meeting_backend.config import get_settings
+from meeting_backend.google_docs_context import GOOGLE_DOC_CONNECTIONS
 from meeting_backend.storage import MeetingStorage
 
 router = APIRouter(prefix="/v1/assistant", tags=["assistant"])
@@ -45,6 +46,10 @@ class AssistantRespondBody(BaseModel):
     rolling_summary: str = ""
     previous_notes: List[MeetingNoteBody] = Field(default_factory=list)
     previous_actions: List[MeetingActionBody] = Field(default_factory=list)
+    document_title: str = ""
+    document_summary: str = ""
+    document_snippets: List[str] = Field(default_factory=list)
+    document_briefing: str = ""
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
 
@@ -58,6 +63,18 @@ async def providers():
 @router.post("/respond")
 async def respond(body: AssistantRespondBody):
     settings = get_settings()
+    document_title = body.document_title
+    document_summary = body.document_summary
+    document_snippets = body.document_snippets
+    document_briefing = body.document_briefing
+    if body.meeting_id and not (document_title or document_summary or document_snippets or document_briefing):
+        connection = GOOGLE_DOC_CONNECTIONS.get(body.meeting_id)
+        if connection:
+            document_title = connection.snapshot.title
+            document_summary = connection.snapshot.preview
+            document_snippets = connection.snapshot.relevant_snippets()
+            document_briefing = connection.document_briefing
+
     request = AssistantRequest(
         action=body.action,
         meeting_id=body.meeting_id,
@@ -96,6 +113,10 @@ async def respond(body: AssistantRespondBody):
             }
             for item in body.previous_actions
         ],
+        document_title=document_title,
+        document_summary=document_summary,
+        document_snippets=document_snippets,
+        document_briefing=document_briefing,
     )
     try:
         result = await asyncio.to_thread(generate_assistant_response, settings, request)
