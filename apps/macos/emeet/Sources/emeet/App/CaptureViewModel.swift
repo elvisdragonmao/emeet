@@ -44,11 +44,15 @@ final class CaptureViewModel: ObservableObject {
     private let assistantClient: AssistantAPIClient
     private let maxHistoryCount = 96
     private let maxTranscriptLineCount = 24
+    private let maxFinalTranscriptArchiveCount = 3_000
     private let autoSummaryIntervalSeconds = 30
     private var autoSummaryTask: Task<Void, Never>?
     private var autoSummaryRequestGeneration = 0
     private var assistantRequestGeneration = 0
     private var didRequestScreenRecordingPermission = false
+    private var currentMeetingID = ""
+    private var finalTranscriptArchive: [TranscriptLine] = []
+    private var summarizedFinalLineIDs = Set<String>()
 
     init(transcriptionBackend: TranscriptionBackendConfig = .fromEnvironment()) {
         self.transcriptionBackend = transcriptionBackend
@@ -319,12 +323,15 @@ final class CaptureViewModel: ObservableObject {
         }
 
         transcriptionStatus = .starting
+        currentMeetingID = "mtg-\(UUID().uuidString.lowercased())"
         transcriptLines.removeAll()
+        finalTranscriptArchive.removeAll()
+        summarizedFinalLineIDs.removeAll()
         resetLatencyReadings()
         resetMeetingDrafts()
         appendLog("Connecting transcription backend at \(transcriptionBackend.displayAddress)...")
-        microphoneTranscriptionClient.connect()
-        systemTranscriptionClient.connect()
+        microphoneTranscriptionClient.connect(meetingID: currentMeetingID)
+        systemTranscriptionClient.connect(meetingID: currentMeetingID)
         startAutoSummaryCountdown()
 
         if microphoneStatus != .running && microphoneStatus != .starting {
@@ -349,6 +356,8 @@ final class CaptureViewModel: ObservableObject {
         autoSummaryRequestGeneration += 1
         autoSummaryIsGenerating = false
         transcriptLines.removeAll()
+        finalTranscriptArchive.removeAll()
+        summarizedFinalLineIDs.removeAll()
         resetLatencyReadings()
         resetMeetingDrafts()
         resetAssistantDrafts()
@@ -474,6 +483,8 @@ final class CaptureViewModel: ObservableObject {
             id: event.segmentId ?? UUID().uuidString,
             source: event.source ?? "microphone",
             speakerHint: event.speakerHint ?? "self",
+            speakerID: event.speakerId ?? event.speakerHint ?? "unknown",
+            speakerLabel: event.speakerLabel ?? "",
             startMs: event.startMs ?? 0,
             endMs: event.endMs ?? 0,
             provider: event.provider ?? "backend",
@@ -489,6 +500,19 @@ final class CaptureViewModel: ObservableObject {
             transcriptLines = Array(transcriptLines.suffix(maxTranscriptLineCount))
         }
 
+        if line.isFinal {
+            upsertFinalTranscriptArchive(line)
+        }
+
+    }
+
+    private func upsertFinalTranscriptArchive(_ line: TranscriptLine) {
+        if let index = finalTranscriptArchive.firstIndex(where: { $0.id == line.id }) {
+            finalTranscriptArchive[index] = line
+        } else {
+            finalTranscriptArchive.append(line)
+            finalTranscriptArchive = Array(finalTranscriptArchive.suffix(maxFinalTranscriptArchiveCount))
+        }
     }
 
     private func configureTranscriptionClient(
@@ -537,12 +561,16 @@ final class CaptureViewModel: ObservableObject {
 
         let request = AssistantRespondRequest(
             action: quickAction.requestAction,
+            meetingID: currentMeetingID,
             provider: assistantProviderID,
             model: assistantModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 ? "gpt-5.5"
                 : assistantModel,
             thinking: assistantThinking,
-            transcript: assistantTranscriptPayload()
+            transcript: assistantTranscriptPayload(),
+            rollingSummary: "",
+            previousNotes: [],
+            previousActions: []
         )
 
         Task {
@@ -585,12 +613,30 @@ final class CaptureViewModel: ObservableObject {
     }
 
     private func assistantTranscriptPayload(finalOnly: Bool = false) -> [AssistantTranscriptLinePayload] {
-        let sourceLines = finalOnly ? transcriptLines.filter(\.isFinal) : transcriptLines
+        let sourceLines = finalOnly ? finalTranscriptArchive : transcriptLines
         return sourceLines.suffix(16).map {
             AssistantTranscriptLinePayload(
                 source: $0.source,
                 sourceLabel: $0.sourceLabel,
                 speakerHint: $0.speakerHint,
+                speakerID: $0.speakerID,
+                speakerLabel: $0.speakerLabel,
+                startMs: $0.startMs,
+                endMs: $0.endMs,
+                text: $0.text,
+                isFinal: $0.isFinal
+            )
+        }
+    }
+
+    private func assistantTranscriptPayload(lines: [TranscriptLine]) -> [AssistantTranscriptLinePayload] {
+        lines.map {
+            AssistantTranscriptLinePayload(
+                source: $0.source,
+                sourceLabel: $0.sourceLabel,
+                speakerHint: $0.speakerHint,
+                speakerID: $0.speakerID,
+                speakerLabel: $0.speakerLabel,
                 startMs: $0.startMs,
                 endMs: $0.endMs,
                 text: $0.text,
@@ -655,11 +701,13 @@ final class CaptureViewModel: ObservableObject {
             return
         }
 
-        let transcript = assistantTranscriptPayload(finalOnly: true)
+        let newFinalLines = finalTranscriptArchive.filter { !summarizedFinalLineIDs.contains($0.id) }
+        let transcript = assistantTranscriptPayload(lines: newFinalLines)
         guard !transcript.isEmpty else {
             resetAutoSummaryCountdown(status: "Waiting for final transcript")
             return
         }
+        let lineIDsToMark = Set(newFinalLines.map(\.id))
 
         autoSummaryIsGenerating = true
         autoSummaryStatusLabel = "Summarizing now"
@@ -669,12 +717,16 @@ final class CaptureViewModel: ObservableObject {
 
         let request = AssistantRespondRequest(
             action: "meeting_notes",
+            meetingID: currentMeetingID,
             provider: assistantProviderID,
             model: assistantModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 ? "gpt-5.5"
                 : assistantModel,
             thinking: assistantThinking,
-            transcript: transcript
+            transcript: transcript,
+            rollingSummary: rollingSummaryContext(),
+            previousNotes: previousNoteContextPayload(),
+            previousActions: previousActionContextPayload()
         )
 
         Task { @MainActor [weak self] in
@@ -691,6 +743,7 @@ final class CaptureViewModel: ObservableObject {
                     return
                 }
                 self.applyAutomaticSummaryResponse(response)
+                self.summarizedFinalLineIDs.formUnion(lineIDsToMark)
                 self.resetAutoSummaryCountdown(status: "Updated \(self.shortTimeLabel())")
             } catch {
                 guard self.autoSummaryRequestGeneration == requestGeneration else {
@@ -754,6 +807,35 @@ final class CaptureViewModel: ObservableObject {
     private func resetMeetingDrafts() {
         noteDrafts = []
         actionDrafts = []
+    }
+
+    private func rollingSummaryContext() -> String {
+        var lines: [String] = []
+        if !noteDrafts.isEmpty {
+            lines.append("Current notes:")
+            for note in noteDrafts {
+                lines.append("- \(note.title): \(note.detail)")
+            }
+        }
+
+        if !actionDrafts.isEmpty {
+            lines.append("Current actions:")
+            for action in actionDrafts {
+                lines.append("- \(action.title) / owner=\(action.owner) / state=\(action.state)")
+            }
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
+    private func previousNoteContextPayload() -> [MeetingNoteContextPayload] {
+        noteDrafts.map { MeetingNoteContextPayload(title: $0.title, detail: $0.detail) }
+    }
+
+    private func previousActionContextPayload() -> [MeetingActionContextPayload] {
+        actionDrafts.map {
+            MeetingActionContextPayload(title: $0.title, owner: $0.owner, state: $0.state)
+        }
     }
 
     private func resetAssistantDrafts() {
@@ -826,10 +908,11 @@ final class CaptureViewModel: ObservableObject {
 
         lines.append("## Transcript")
         lines.append("")
-        if transcriptLines.isEmpty {
+        let exportTranscript = finalTranscriptArchive.isEmpty ? transcriptLines : finalTranscriptArchive
+        if exportTranscript.isEmpty {
             lines.append("_No transcript yet._")
         } else {
-            for line in transcriptLines {
+            for line in exportTranscript {
                 let status = line.isFinal ? "Final" : "Partial"
                 lines.append("- `\(line.timeRangeLabel)` **\(line.sourceLabel)** (\(status), \(line.provider)): \(line.text)")
             }

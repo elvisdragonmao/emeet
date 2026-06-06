@@ -34,18 +34,35 @@ struct AssistantTranscriptLinePayload: Encodable {
     let source: String
     let sourceLabel: String
     let speakerHint: String
+    let speakerID: String
+    let speakerLabel: String
     let startMs: Int
     let endMs: Int
     let text: String
     let isFinal: Bool
 }
 
+struct MeetingNoteContextPayload: Encodable {
+    let title: String
+    let detail: String
+}
+
+struct MeetingActionContextPayload: Encodable {
+    let title: String
+    let owner: String
+    let state: String
+}
+
 struct AssistantRespondRequest: Encodable {
     let action: String
+    let meetingID: String
     let provider: String
     let model: String
     let thinking: String
     let transcript: [AssistantTranscriptLinePayload]
+    let rollingSummary: String
+    let previousNotes: [MeetingNoteContextPayload]
+    let previousActions: [MeetingActionContextPayload]
 }
 
 struct AssistantRespondResponse: Decodable, Equatable {

@@ -4,6 +4,8 @@ struct TranscriptLine: Identifiable, Equatable {
     let id: String
     let source: String
     let speakerHint: String
+    let speakerID: String
+    let speakerLabel: String
     let startMs: Int
     let endMs: Int
     let provider: String
@@ -12,6 +14,10 @@ struct TranscriptLine: Identifiable, Equatable {
     let text: String
 
     var sourceLabel: String {
+        if !speakerLabel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return speakerLabel
+        }
+
         switch speakerHint {
         case "self":
             return "Self"

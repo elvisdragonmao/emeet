@@ -9,6 +9,8 @@ struct TranscriptEvent: Decodable, Equatable {
     let segmentId: String?
     let source: String?
     let speakerHint: String?
+    let speakerId: String?
+    let speakerLabel: String?
     let startMs: Int?
     let endMs: Int?
     let text: String?
@@ -49,14 +51,18 @@ final class TranscriptionWebSocketClient {
         self.session = session
     }
 
-    func connect() {
+    func connect(meetingID: String? = nil) {
         queue.async { [weak self] in
             guard let self, self.task == nil else {
                 return
             }
 
             let task = self.session.webSocketTask(with: self.url)
-            self.sessionID = "macos-\(self.source)-\(UUID().uuidString.lowercased())"
+            if let meetingID, !meetingID.isEmpty {
+                self.sessionID = "\(meetingID)-\(self.source)"
+            } else {
+                self.sessionID = "macos-\(self.source)-\(UUID().uuidString.lowercased())"
+            }
             self.bufferedAudio.removeAll(keepingCapacity: true)
             self.pendingPings.removeAll(keepingCapacity: true)
             self.audioTimelineStartNanoseconds = nil

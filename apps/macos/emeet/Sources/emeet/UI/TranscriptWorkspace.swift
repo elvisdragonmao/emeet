@@ -23,7 +23,7 @@ struct TranscriptWorkspace: View {
                 LatencyReadout(title: "Backend", value: backendLatencyLabel)
                 LatencyReadout(title: "STT", value: transcriptionLatencyLabel)
                 SourceLegend(label: "Self", color: .blue)
-                SourceLegend(label: "Other", color: .green)
+                SourceLegend(label: "Speakers", color: .green)
             }
 
             Divider()
@@ -111,9 +111,24 @@ private struct TranscriptLineView: View {
     }
 
     private var sourceColor: Color {
-        switch line.speakerHint {
-        case "self":
+        if line.speakerHint == "self" {
             return .blue
+        }
+
+        switch line.speakerID {
+        case "speaker_1":
+            return .green
+        case "speaker_2":
+            return .orange
+        case "speaker_3":
+            return .purple
+        case "speaker_4":
+            return .pink
+        default:
+            break
+        }
+
+        switch line.speakerHint {
         case "other":
             return .green
         default:
