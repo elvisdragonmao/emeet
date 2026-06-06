@@ -88,7 +88,7 @@ layout: section
 2. 打開 macOS App。
 3. 按下 `Start Meeting`。
 4. 觀察麥克風與系統音訊音量。
-5. 看到 `Self` / `Other` 逐字稿。
+5. 看到 `Self` / `Speaker 1` 逐字稿。
 6. 點 `What should I say?`。
 7. 點 `Follow-up questions`。
 8. 等待 30 秒自動整理 Meeting Notes。
@@ -272,7 +272,7 @@ Research: `docs/research/translated/02-音訊擷取技術研究.md`
 - `AVAudioEngine` for microphone
 - `ScreenCaptureKit` for system audio
 - 兩條 source 分開送 backend
-- UI 顯示 `Self` / `Other`
+- UI 顯示 `Self` / `Speaker 1` / `Speaker 2`
 
 </div>
 
@@ -282,7 +282,8 @@ Research: `docs/research/translated/02-音訊擷取技術研究.md`
 
 - 對 macOS prototype 最務實
 - 不需 driver installation
-- source-based speaker hint 足夠 MVP
+- source-based speaker hint 作為穩定 fallback
+- 本機 segment-level speaker numbering 可 demo
 - 完整 diarization 延後
 
 </div>
@@ -291,7 +292,7 @@ Research: `docs/research/translated/02-音訊擷取技術研究.md`
 
 
 <!--
-可以說明：這不是完整 speaker diarization，但對第一版 demo 已足夠。
+可以說明：這不是完整 speaker diarization，而是本機 segment-level speaker numbering，但對第一版 demo 已足夠。
 自己聲音和系統聲音分開，比把全部混成一軌後再猜誰講話更穩。
 -->
 
@@ -452,7 +453,7 @@ Realtime 在這個專題裡分成很多層，每層預算不同。
 | Audio transport | 小而穩定的封包 | 約 100 ms PCM16 |
 | STT final | 停頓後產生 final segment | speech window |
 | Suggestion | 使用者按鈕後可用 | `/v1/assistant/respond` |
-| Notes | 低頻穩定更新 | 30 秒 final transcript |
+| Notes | 低頻穩定更新 | 30 秒新增 final transcript + rolling notes |
 
 <div class="callout">
 逐字稿可以快；筆記和建議要穩。不要讓不穩定 partial transcript 污染會議紀錄。
@@ -590,10 +591,11 @@ layout: section
 
 # Meeting Notes Strategy
 
-- final transcript 來了先更新 local draft。
+- final transcript 來了先進入本場會議 archive。
 - `Start Meeting` 後啟動 30 秒倒數。
 - 倒數到 0 時呼叫 `meeting_notes` action。
-- 回傳 `notes` / `actions` 後替換 UI draft。
+- 只送新增 final transcript，加上上一輪 notes/actions。
+- 回傳 `notes` / `actions` 後替換 UI rolling draft。
 
 <!--
 這裡要說明為什麼不是每句話都摘要：筆記是要保守和可信，不是最即時。
@@ -624,7 +626,7 @@ Export 是 demo 的收尾。它證明這個系統不只是會中看一下，也�
 
 1. 加上 meeting-level API、查詢、FTS 與 export API。
 2. 升級 VAD：Silero/WebRTC，加上語意邊界。
-3. 加入 rolling summary state，避免長會議 context 變慢。
+3. 將 app 端 rolling summary state 持久化，避免長會議 context 變慢。
 4. 將 assistant schema 版本化，加入 evidence segment ids。
 5. 補完整會議聊天框。
 6. 量測 latency：capture-to-final、RTT、button-to-suggestion、notes refresh。

@@ -121,8 +121,9 @@ Rationale:
 
 * Official macOS APIs and no driver install for the demo target.
 * More controllable than mixing local and remote audio into one track.
-* Source-based `Self` / `Other` labels are enough for MVP.
-* Full speaker diarization is deferred.
+* Source-based `Self` / `Other` hints remain the stable fallback.
+* Local segment-level speaker numbering can label system audio as `Speaker 1`, `Speaker 2`, etc.
+* Full DER-optimized speaker diarization is deferred.
 
 Deferred:
 
@@ -146,6 +147,7 @@ Chosen MVP line:
 * Backend segments speech windows, then runs `faster-whisper` or `mlx-whisper`.
 * Apple Silicon demo preference: `mlx-whisper` with `large-v3-turbo`.
 * `faster-whisper` remains the CPU-compatible route.
+* System-audio speaker labels can be assigned locally with `MEETING_BACKEND_DIARIZATION_PROVIDER=local-clustering`.
 
 ### Realtime Chunking
 
@@ -171,6 +173,7 @@ Research conclusion:
 * Notes should use final transcript, not unstable partial transcript.
 * `What should I say?` and `Follow-up questions` are user-triggered.
 * Meeting notes update every 30 seconds.
+* Auto notes should merge newly finalized transcript lines into existing rolling notes/actions instead of re-sending the whole meeting transcript.
 
 ### Assistant / Model Provider
 
@@ -228,7 +231,7 @@ Current MVP behavior:
 
 * Local draft notes update when final transcript arrives.
 * Automatic `meeting_notes` action runs every 30 seconds after `Start Meeting`.
-* Auto summary uses only final transcript lines.
+* Auto summary uses newly finalized transcript lines plus previous rolling notes/actions.
 * Export writes Markdown with notes, actions, suggestions, and transcript.
 
 Preferred future structure:
@@ -346,7 +349,7 @@ Use this order for the graduation project live demo:
 
 * Real STT providers currently emit final speech-window segments, not true token streaming partials.
 * RMS VAD is a simple MVP gate. It should be upgraded for noisy environments.
-* `speaker_hint` is source-based, not full diarization.
+* `speaker_hint` is source-based; `speaker_label` is local segment-level speaker numbering, not full diarization.
 * The chat box is not yet a full meeting Q&A route in the UI.
 * SQLite does not yet have meeting-level query/export APIs or FTS.
 * No automatic external actions should be added without explicit user confirmation.
@@ -355,7 +358,7 @@ Use this order for the graduation project live demo:
 
 * Add full meeting-level persistence and export API.
 * Add evidence segment IDs to assistant outputs.
-* Add rolling summary state to avoid long-context degradation.
+* Persist rolling summary state to avoid long-context degradation across app restarts.
 * Add meeting chat UI grounded in transcript and notes.
 * Benchmark Zoom, Google Meet, Teams system audio capture.
 * Evaluate WER/CER, source attribution accuracy, button-to-suggestion latency, notes faithfulness, and user acceptance rate.
