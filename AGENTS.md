@@ -287,9 +287,8 @@ Backend faster-whisper:
 
 ```bash
 cd apps/backend
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -e ".[stt]"
+uv python install 3.12
+uv sync --extra faster-whisper
 MEETING_BACKEND_PROVIDER=faster-whisper ./scripts/dev.sh
 ```
 
@@ -297,8 +296,8 @@ Backend MLX Whisper:
 
 ```bash
 cd apps/backend
-source .venv/bin/activate
-python -m pip install -e ".[mlx-whisper]"
+uv python install 3.12
+uv sync --extra mlx-whisper
 MEETING_BACKEND_PROVIDER=mlx-whisper \
 MEETING_BACKEND_MODEL=large-v3-turbo \
 ./scripts/dev.sh
@@ -324,8 +323,7 @@ Tests:
 
 ```bash
 cd apps/backend
-source .venv/bin/activate
-python -m pytest
+uv run pytest
 ```
 
 ## Demo Script

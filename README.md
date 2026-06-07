@@ -66,9 +66,8 @@ Backend with `faster-whisper`:
 
 ```bash
 cd apps/backend
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -e ".[stt]"
+uv python install 3.12
+uv sync --extra faster-whisper
 MEETING_BACKEND_PROVIDER=faster-whisper ./scripts/dev.sh
 ```
 
@@ -76,8 +75,8 @@ Backend with MLX Whisper on Apple Silicon:
 
 ```bash
 cd apps/backend
-source .venv/bin/activate
-python -m pip install -e ".[mlx-whisper]"
+uv python install 3.12
+uv sync --extra mlx-whisper
 MEETING_BACKEND_PROVIDER=mlx-whisper \
 MEETING_BACKEND_MODEL=large-v3-turbo \
 ./scripts/dev.sh
@@ -130,14 +129,14 @@ apps/backend/secrets/google_oauth_client.json
 
 ```bash
 cd apps/backend
-source .venv/bin/activate
-python -m pip install -e ".[stt]"
+uv sync --extra stt
 ```
 
 Optional browser helper for opening, scrolling, and visual find:
 
 ```bash
-python -m pip install -e ".[browser]"
+uv sync --extra stt --extra browser
+MEETING_BACKEND_UV_EXTRA=browser ./scripts/dev.sh
 ```
 
 The browser helper uses Selenium/ChromeDriver when available and never edits document content. All Google Doc modifications continue to use Google Docs API `batchUpdate`.
@@ -212,8 +211,7 @@ Backend tests:
 
 ```bash
 cd apps/backend
-source .venv/bin/activate
-python -m pytest
+uv run pytest
 ```
 
 macOS build:

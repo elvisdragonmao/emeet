@@ -24,7 +24,7 @@ class FasterWhisperStreamingTranscriber(SegmentedStreamingTranscriber):
             from faster_whisper import WhisperModel
         except ImportError as error:
             raise RuntimeError(
-                "faster-whisper provider requires `python -m pip install -e \".[stt]\"`"
+                "faster-whisper provider requires `uv sync --extra faster-whisper`"
             ) from error
 
         super().__init__(

@@ -34,7 +34,7 @@ class MlxWhisperStreamingTranscriber(SegmentedStreamingTranscriber):
             import mlx_whisper
         except ImportError as error:
             raise RuntimeError(
-                "mlx-whisper provider requires `python -m pip install -e \".[mlx-whisper]\"`"
+                "mlx-whisper provider requires `uv sync --extra mlx-whisper`"
             ) from error
 
         super().__init__(
