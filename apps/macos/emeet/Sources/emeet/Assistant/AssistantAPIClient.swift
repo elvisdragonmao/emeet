@@ -66,6 +66,12 @@ final class AssistantAPIClient {
         return try decoder.decode(GoogleDocSnapshotResponse.self, from: data)
     }
 
+    func appendGoogleDocText(_ request: GoogleDocAppendRequest) async throws -> GoogleDocSnapshotResponse {
+        let (data, response) = try await post(path: "/v1/google/docs/append", body: request)
+        try validate(response: response, data: data)
+        return try decoder.decode(GoogleDocSnapshotResponse.self, from: data)
+    }
+
     func appendMeetingNotesToGoogleDoc(
         _ request: GoogleDocMeetingNotesRequest
     ) async throws -> GoogleDocSnapshotResponse {

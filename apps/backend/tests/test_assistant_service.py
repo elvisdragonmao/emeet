@@ -178,6 +178,18 @@ class AssistantServiceTest(unittest.TestCase):
         self.assertEqual(plan["occurrence"], "all")
         self.assertFalse(plan["requires_user_confirmation"])
 
+        append_plan = canonical_document_edit_plan(
+            {
+                "intent": "append_text",
+                "text": "在文件最後新增一個短笑話。",
+                "requires_user_confirmation": False,
+            }
+        )
+
+        self.assertEqual(append_plan["intent"], "append_text")
+        self.assertEqual(append_plan["text"], "在文件最後新增一個短笑話。")
+        self.assertFalse(append_plan["requires_user_confirmation"])
+
     def test_codex_exec_command_skips_unsupported_approval_flag(self) -> None:
         help_text = """
         Options:

@@ -167,7 +167,7 @@ async def google_docs_append(body: GoogleAppendBody):
         raise HTTPException(status_code=502, detail=str(error)) from error
 
     updated = GOOGLE_DOC_CONNECTIONS.update_snapshot(body.meeting_id, snapshot)
-    return write_response(updated, "Text appended to Google Doc.")
+    return write_response(updated, "文字已附加到 Google Doc。")
 
 
 @router.post("/docs/replace-text")

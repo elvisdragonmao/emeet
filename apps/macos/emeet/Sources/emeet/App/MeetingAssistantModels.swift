@@ -41,12 +41,14 @@ struct TranscriptLine: Identifiable, Equatable {
 }
 
 struct TranscriptMarker: Identifiable, Equatable {
-    let id = UUID()
+    let id: String
     let title: String
     let detail: String
     let iconName: String
     let style: TranscriptMarkerStyle
     let createdAtMs: Int
+    let anchorLineID: String?
+    let anchorMs: Int
 
     var timeLabel: String {
         let date = Date(timeIntervalSince1970: TimeInterval(createdAtMs) / 1_000)

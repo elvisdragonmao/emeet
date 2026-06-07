@@ -35,12 +35,15 @@ struct TranscriptWorkspace: View {
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 10) {
-                        ForEach(markers) { marker in
-                            TranscriptMarkerView(marker: marker)
-                        }
-
                         ForEach(lines) { line in
                             TranscriptLineView(line: line)
+                            ForEach(markersAnchored(to: line)) { marker in
+                                TranscriptMarkerView(marker: marker)
+                            }
+                        }
+
+                        ForEach(unplacedMarkers) { marker in
+                            TranscriptMarkerView(marker: marker)
                         }
                     }
                     .padding(.vertical, 2)
@@ -48,6 +51,24 @@ struct TranscriptWorkspace: View {
             }
         }
         .panelStyle()
+    }
+
+    private func markersAnchored(to line: TranscriptLine) -> [TranscriptMarker] {
+        markers
+            .filter { $0.anchorLineID == line.id }
+            .sorted { $0.anchorMs < $1.anchorMs }
+    }
+
+    private var unplacedMarkers: [TranscriptMarker] {
+        let visibleLineIDs = Set(lines.map(\.id))
+        return markers
+            .filter { marker in
+                guard let anchorLineID = marker.anchorLineID else {
+                    return true
+                }
+                return !visibleLineIDs.contains(anchorLineID)
+            }
+            .sorted { $0.anchorMs < $1.anchorMs }
     }
 }
 

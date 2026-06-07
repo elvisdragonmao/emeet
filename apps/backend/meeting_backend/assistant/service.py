@@ -565,6 +565,7 @@ def canonical_document_edit_plan(parsed: Dict[str, Any]) -> Dict[str, Any]:
     valid_intents = {
         "none",
         "replace_text",
+        "append_text",
         "append_meeting_notes",
         "rewrite_paragraph_containing_anchor",
         "insert_under_heading",

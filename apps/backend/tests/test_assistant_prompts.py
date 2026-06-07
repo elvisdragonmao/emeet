@@ -112,6 +112,9 @@ class AssistantPromptsTest(unittest.TestCase):
         content = build_messages(request)[1]["content"]
 
         self.assertIn("intent, find, replace, heading, text, anchor, occurrence", content)
+        self.assertIn("append_text", content)
+        self.assertIn("請你幫我在最後面寫一個笑話", content)
+        self.assertIn("never use append_meeting_notes for ordinary requested document text", content)
         self.assertIn("AI 請幫我", content)
         self.assertIn("請你幫我", content)
         self.assertIn("requires_user_confirmation to false", content)

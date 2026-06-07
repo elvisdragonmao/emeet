@@ -124,15 +124,19 @@ extension CaptureViewModel {
             thinking: assistantThinking
         )
 
-        Task {
+        Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
             do {
-                let response = try await assistantClient.connectGoogleDoc(request)
-                applyGoogleDocSnapshot(response, fallbackMessage: "Google Doc 已連接。")
-                appendLog("Google Doc 已連接：\(response.title)。")
+                let response = try await self.assistantClient.connectGoogleDoc(request)
+                self.applyGoogleDocSnapshot(response, fallbackMessage: "Google Doc 已連接。")
+                self.appendLog("Google Doc 已連接：\(response.title)。")
+                await self.prepareMeetingFromDocumentSnapshotIfNeeded(response, meetingID: meetingID)
             } catch {
-                googleDocsStatus = .failed(error.localizedDescription)
-                googleDocsMessage = error.localizedDescription
-                appendLog("Google Doc 連接失敗：\(error.localizedDescription)")
+                self.googleDocsStatus = .failed(error.localizedDescription)
+                self.googleDocsMessage = error.localizedDescription
+                self.appendLog("Google Doc 連接失敗：\(error.localizedDescription)")
             }
         }
     }
@@ -155,22 +159,9 @@ extension CaptureViewModel {
         }
 
         let meetingID = ensureCurrentMeetingID()
-        guard !documentPreparedMeetingIDs.contains(meetingID) else {
+        guard beginDocumentBriefingPreparation(meetingID: meetingID) else {
             return
         }
-
-        guard noteDrafts.isEmpty && actionDrafts.isEmpty else {
-            appendLog("已略過 Google Doc 會議準備，因為已有會議紀錄或行動項目。")
-            return
-        }
-
-        documentPreparedMeetingIDs.insert(meetingID)
-        googleDocsStatus = .starting
-        googleDocsMessage = "正在根據 Google Doc 準備會議..."
-        assistantStatus = .starting
-        assistantModeLabel = "文件準備 · \(assistantProviderID)"
-        autoSummaryStatusLabel = "正在根據文件準備"
-        appendLog("正在根據已連接的 Google Doc 準備初始會議紀錄。")
 
         Task { @MainActor [weak self] in
             guard let self else {
@@ -186,48 +177,98 @@ extension CaptureViewModel {
                 }
 
                 self.applyGoogleDocSnapshot(snapshot, fallbackMessage: "Google Doc 內容已重新整理。")
-                let fullDocumentText = (snapshot.plainText ?? self.googleDocsPlainText)
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                let documentSummary = fullDocumentText.isEmpty ? snapshot.preview : fullDocumentText
-
-                let request = AssistantRespondRequest(
-                    action: "document_briefing",
-                    meetingID: meetingID,
-                    provider: self.assistantProviderID,
-                    model: self.assistantModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                        ? "gpt-5.5"
-                        : self.assistantModel,
-                    thinking: self.assistantThinking,
-                    transcript: [],
-                    rollingSummary: "",
-                    previousNotes: [],
-                    previousActions: [],
-                    documentTitle: snapshot.title,
-                    documentSummary: documentSummary,
-                    documentSnippets: snapshot.snippets ?? self.googleDocsSnippets,
-                    documentBriefing: ""
-                )
-
-                let response = try await self.assistantClient.respond(request)
-                guard self.currentMeetingID == meetingID else {
-                    return
-                }
-
-                self.applyInitialDocumentBriefingResponse(response)
+                try await self.prepareMeetingFromDocumentSnapshot(snapshot, meetingID: meetingID)
             } catch {
-                guard self.currentMeetingID == meetingID else {
-                    return
-                }
-
-                self.documentPreparedMeetingIDs.remove(meetingID)
-                self.googleDocsStatus = .failed(error.localizedDescription)
-                self.googleDocsMessage = error.localizedDescription
-                self.assistantStatus = .failed(error.localizedDescription)
-                self.assistantModeLabel = "文件準備失敗"
-                self.autoSummaryStatusLabel = "文件準備失敗"
-                self.appendLog("Google Doc 會議準備失敗：\(error.localizedDescription)")
+                self.handleDocumentBriefingFailure(error, meetingID: meetingID)
             }
         }
+    }
+
+    func prepareMeetingFromDocumentSnapshotIfNeeded(
+        _ snapshot: GoogleDocSnapshotResponse,
+        meetingID: String
+    ) async {
+        guard beginDocumentBriefingPreparation(meetingID: meetingID) else {
+            return
+        }
+
+        do {
+            try await prepareMeetingFromDocumentSnapshot(snapshot, meetingID: meetingID)
+        } catch {
+            handleDocumentBriefingFailure(error, meetingID: meetingID)
+        }
+    }
+
+    func beginDocumentBriefingPreparation(meetingID: String) -> Bool {
+        guard !documentPreparedMeetingIDs.contains(meetingID) else {
+            return false
+        }
+
+        guard noteDrafts.isEmpty && actionDrafts.isEmpty else {
+            appendLog("已略過 Google Doc 會議準備，因為已有會議紀錄或行動項目。")
+            return false
+        }
+
+        documentPreparedMeetingIDs.insert(meetingID)
+        googleDocsStatus = .starting
+        googleDocsMessage = "正在根據 Google Doc 準備會議..."
+        assistantStatus = .starting
+        assistantModeLabel = "文件準備 · \(assistantProviderID)"
+        autoSummaryStatusLabel = "正在根據文件準備"
+        appendLog("正在根據已連接的 Google Doc 準備初始會議紀錄。")
+        return true
+    }
+
+    func prepareMeetingFromDocumentSnapshot(
+        _ snapshot: GoogleDocSnapshotResponse,
+        meetingID: String
+    ) async throws {
+        guard currentMeetingID == meetingID else {
+            return
+        }
+
+        let fullDocumentText = (snapshot.plainText ?? googleDocsPlainText)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let documentSummary = fullDocumentText.isEmpty ? snapshot.preview : fullDocumentText
+
+        let request = AssistantRespondRequest(
+            action: "document_briefing",
+            meetingID: meetingID,
+            provider: assistantProviderID,
+            model: assistantModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? "gpt-5.5"
+                : assistantModel,
+            thinking: assistantThinking,
+            transcript: [],
+            rollingSummary: "",
+            previousNotes: [],
+            previousActions: [],
+            documentTitle: snapshot.title,
+            documentSummary: documentSummary,
+            documentSnippets: snapshot.snippets ?? googleDocsSnippets,
+            documentBriefing: ""
+        )
+
+        let response = try await assistantClient.respond(request)
+        guard currentMeetingID == meetingID else {
+            return
+        }
+
+        applyInitialDocumentBriefingResponse(response)
+    }
+
+    func handleDocumentBriefingFailure(_ error: Error, meetingID: String) {
+        guard currentMeetingID == meetingID else {
+            return
+        }
+
+        documentPreparedMeetingIDs.remove(meetingID)
+        googleDocsStatus = .failed(error.localizedDescription)
+        googleDocsMessage = error.localizedDescription
+        assistantStatus = .failed(error.localizedDescription)
+        assistantModeLabel = "文件準備失敗"
+        autoSummaryStatusLabel = "文件準備失敗"
+        appendLog("Google Doc 會議準備失敗：\(error.localizedDescription)")
     }
 
     func appendMeetingNotesToGoogleDoc() {
@@ -327,14 +368,14 @@ extension CaptureViewModel {
 
         documentEditTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: UInt64(self?.documentEditIntervalSeconds ?? 10) * 1_000_000_000)
-                guard !Task.isCancelled else {
-                    break
-                }
                 guard let self else {
                     break
                 }
                 self.tickDocumentEditWatcher()
+                try? await Task.sleep(nanoseconds: UInt64(self.documentEditIntervalSeconds) * 1_000_000_000)
+                guard !Task.isCancelled else {
+                    break
+                }
             }
         }
     }
@@ -342,8 +383,28 @@ extension CaptureViewModel {
     func stopDocumentEditWatcher() {
         documentEditTask?.cancel()
         documentEditTask = nil
+        documentEditDebounceTask?.cancel()
+        documentEditDebounceTask = nil
         documentEditRequestGeneration += 1
         documentEditIsPlanning = false
+    }
+
+    func scheduleDocumentEditWatcherTick() {
+        guard googleDocsIsConnected else {
+            return
+        }
+
+        documentEditDebounceTask?.cancel()
+        documentEditDebounceTask = Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+            try? await Task.sleep(nanoseconds: UInt64(self.documentEditDebounceMilliseconds) * 1_000_000)
+            guard !Task.isCancelled else {
+                return
+            }
+            self.tickDocumentEditWatcher()
+        }
     }
 
     func tickDocumentEditWatcher() {
@@ -368,13 +429,20 @@ extension CaptureViewModel {
         documentEditRequestGeneration += 1
         let requestGeneration = documentEditRequestGeneration
         let lineIDsToMark = Set(newFinalLines.map(\.id))
+        let anchorLine = newFinalLines.last
+        let markerID = documentEditMarkerID(for: newFinalLines)
+        let markerAnchorLineID = anchorLine?.id
+        let markerAnchorMs = anchorLine?.endMs ?? anchorLine?.startMs
 
         if commandHint != nil {
             recordTranscriptMarker(
+                id: markerID,
                 title: "正在判斷文件修改指令",
                 detail: documentEditTranscriptPreview(newFinalLines),
                 iconName: "wand.and.stars",
-                style: .progress
+                style: .progress,
+                anchorLineID: markerAnchorLineID,
+                anchorMs: markerAnchorMs
             )
         }
 
@@ -426,10 +494,13 @@ extension CaptureViewModel {
                             detail = "聽到疑似文件修改內容。請用「AI 幫我...」或「請你幫我...」開頭，並說清楚位置與內容。"
                         }
                         self.recordTranscriptMarker(
+                            id: markerID,
                             title: "沒有套用文件修改",
                             detail: detail,
                             iconName: "exclamationmark.bubble",
-                            style: .warning
+                            style: .warning,
+                            anchorLineID: markerAnchorLineID,
+                            anchorMs: markerAnchorMs
                         )
                     }
                     self.googleDocsMessage = "正在聆聽 AI 文件修改指令。"
@@ -442,10 +513,28 @@ extension CaptureViewModel {
                         ? "AI 文件修改指令需要更多資訊。"
                         : "AI 文件修改指令需要更多資訊：\(plan.reason)"
                     self.recordTranscriptMarker(
+                        id: markerID,
                         title: "文件修改指令需要更多資訊",
                         detail: plan.reason.isEmpty ? "請補充要修改的位置與內容。" : plan.reason,
                         iconName: "questionmark.bubble",
-                        style: .warning
+                        style: .warning,
+                        anchorLineID: markerAnchorLineID,
+                        anchorMs: markerAnchorMs
+                    )
+                    return
+                }
+
+                guard plan.intent != "append_meeting_notes" || self.documentEditRequestsMeetingNotes(newFinalLines) else {
+                    self.documentEditCheckedFinalLineIDs.formUnion(lineIDsToMark)
+                    self.googleDocsMessage = "已避免錯誤附加會議紀錄。"
+                    self.recordTranscriptMarker(
+                        id: markerID,
+                        title: "沒有套用文件修改",
+                        detail: "AI 回傳的是附加會議紀錄，但這段指令不是要求附加會議紀錄。請再說一次要寫到文件最後的文字。",
+                        iconName: "exclamationmark.bubble",
+                        style: .warning,
+                        anchorLineID: markerAnchorLineID,
+                        anchorMs: markerAnchorMs
                     )
                     return
                 }
@@ -455,10 +544,13 @@ extension CaptureViewModel {
                     self.documentEditCheckedFinalLineIDs.formUnion(lineIDsToMark)
                     self.googleDocsMessage = "這個 AI 文件修改指令已套用過。"
                     self.recordTranscriptMarker(
+                        id: markerID,
                         title: "已略過重複文件修改",
-                        detail: self.documentEditLabel(plan.intent),
+                        detail: self.documentEditPlanSummary(plan),
                         iconName: "checkmark.seal",
-                        style: .info
+                        style: .info,
+                        anchorLineID: markerAnchorLineID,
+                        anchorMs: markerAnchorMs
                     )
                     return
                 }
@@ -466,10 +558,13 @@ extension CaptureViewModel {
                 self.googleDocsStatus = .starting
                 self.googleDocsMessage = "正在套用 AI 語音文件修改..."
                 self.recordTranscriptMarker(
+                    id: markerID,
                     title: "正在套用文件修改",
-                    detail: self.documentEditLabel(plan.intent),
+                    detail: self.documentEditPlanSummary(plan),
                     iconName: "doc.text.magnifyingglass",
-                    style: .progress
+                    style: .progress,
+                    anchorLineID: markerAnchorLineID,
+                    anchorMs: markerAnchorMs
                 )
                 let snapshot = try await self.applyDocumentEditPlan(plan)
                 guard self.documentEditRequestGeneration == requestGeneration else {
@@ -480,10 +575,13 @@ extension CaptureViewModel {
                 self.documentEditCheckedFinalLineIDs.formUnion(lineIDsToMark)
                 self.applyGoogleDocSnapshot(snapshot, fallbackMessage: "AI 語音文件修改已套用。")
                 self.recordTranscriptMarker(
+                    id: markerID,
                     title: "已套用文件修改",
-                    detail: self.documentEditLabel(plan.intent),
+                    detail: self.documentEditPlanSummary(plan),
                     iconName: "checkmark.circle",
-                    style: .success
+                    style: .success,
+                    anchorLineID: markerAnchorLineID,
+                    anchorMs: markerAnchorMs
                 )
                 self.appendLog("AI 語音文件修改已套用：\(self.documentEditLabel(plan.intent))。")
             } catch {
@@ -495,10 +593,13 @@ extension CaptureViewModel {
                 self.googleDocsStatus = .failed(error.localizedDescription)
                 self.googleDocsMessage = error.localizedDescription
                 self.recordTranscriptMarker(
+                    id: markerID,
                     title: "文件修改失敗",
                     detail: error.localizedDescription,
                     iconName: "xmark.octagon",
-                    style: .failure
+                    style: .failure,
+                    anchorLineID: markerAnchorLineID,
+                    anchorMs: markerAnchorMs
                 )
                 self.appendLog("AI 語音文件修改失敗：\(error.localizedDescription)")
             }
@@ -569,6 +670,10 @@ extension CaptureViewModel {
         }
 
         googleDocsBriefing = documentBriefingText(notes: response.notes, actions: response.actions)
+        googleDocsStatus = .running
+        googleDocsMessage = notes.isEmpty && actions.isEmpty
+            ? "Google Doc 已連接，文件內容已載入。"
+            : "Google Doc 已連接，會議紀錄已準備。"
         assistantStatus = .running
         assistantModeLabel = "文件準備 · \(response.provider) · \(response.model) · \(response.latencyMs) ms"
         autoSummaryStatusLabel = notes.isEmpty && actions.isEmpty
@@ -656,6 +761,18 @@ extension CaptureViewModel {
                 )
             )
 
+        case "append_text":
+            let text = plan.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty else {
+                throw VoiceEditError("AI 修改計畫缺少要附加到文件最後的文字。")
+            }
+            return try await assistantClient.appendGoogleDocText(
+                GoogleDocAppendRequest(
+                    meetingID: ensureCurrentMeetingID(),
+                    text: text
+                )
+            )
+
         case "insert_under_heading":
             let heading = plan.heading.trimmingCharacters(in: .whitespacesAndNewlines)
             let text = plan.text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -725,6 +842,8 @@ extension CaptureViewModel {
         switch intent {
         case "replace_text":
             return "替換文字"
+        case "append_text":
+            return "在文件最後新增文字"
         case "insert_under_heading":
             return "在標題下新增內容"
         case "rewrite_paragraph_containing_anchor":
@@ -734,6 +853,52 @@ extension CaptureViewModel {
         default:
             return "文件修改"
         }
+    }
+
+    func documentEditMarkerID(for lines: [TranscriptLine]) -> String {
+        let lineKey = lines.map(\.id).joined(separator: "-")
+        if lineKey.isEmpty {
+            return "document-edit-\(documentEditRequestGeneration)"
+        }
+        return "document-edit-\(lineKey)"
+    }
+
+    func documentEditPlanSummary(_ plan: DocumentEditPlanResponse) -> String {
+        switch plan.intent {
+        case "replace_text":
+            let find = plan.find.trimmingCharacters(in: .whitespacesAndNewlines)
+            let replace = plan.replace.trimmingCharacters(in: .whitespacesAndNewlines)
+            let occurrence = plan.occurrence == "all" ? "全部" : "第一處"
+            return "把\(occurrence)「\(shortDocumentEditText(find))」替換成「\(shortDocumentEditText(replace))」。"
+
+        case "append_text":
+            let text = plan.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            return "在文件最後新增：「\(shortDocumentEditText(text))」。"
+
+        case "insert_under_heading":
+            let heading = plan.heading.trimmingCharacters(in: .whitespacesAndNewlines)
+            let text = plan.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            return "在「\(shortDocumentEditText(heading))」下面新增：「\(shortDocumentEditText(text))」。"
+
+        case "rewrite_paragraph_containing_anchor":
+            let anchor = plan.anchor.trimmingCharacters(in: .whitespacesAndNewlines)
+            let text = plan.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            return "重寫包含「\(shortDocumentEditText(anchor))」的段落為：「\(shortDocumentEditText(text))」。"
+
+        case "append_meeting_notes":
+            return "把目前會議紀錄與下一步行動附加到文件。"
+
+        default:
+            return documentEditLabel(plan.intent)
+        }
+    }
+
+    func shortDocumentEditText(_ text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count > 80 else {
+            return trimmed
+        }
+        return "\(trimmed.prefix(80))..."
     }
 
     func documentEditCommandHint(in lines: [TranscriptLine]) -> DocumentEditCommandHint? {
@@ -761,6 +926,26 @@ extension CaptureViewModel {
         }
 
         return nil
+    }
+
+    func documentEditRequestsMeetingNotes(_ lines: [TranscriptLine]) -> Bool {
+        let text = lines
+            .map(\.text)
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        let noteTerms = [
+            "會議紀錄",
+            "會議記錄",
+            "meeting notes",
+            "meeting record",
+            "next actions",
+            "下一步",
+            "行動項目",
+            "待辦",
+            "todo",
+        ]
+        return noteTerms.contains { text.contains($0) }
     }
 
     func documentEditTranscriptPreview(_ lines: [TranscriptLine]) -> String {

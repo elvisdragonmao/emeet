@@ -15,7 +15,8 @@ OUTPUT_CONTRACT = (
 DOCUMENT_EDIT_PLAN_OUTPUT_CONTRACT = (
     "Return compact JSON only. The JSON object must contain keys intent, find, replace, heading, "
     "text, anchor, occurrence, reason, and requires_user_confirmation. Valid intent values are "
-    "none, replace_text, append_meeting_notes, rewrite_paragraph_containing_anchor, and insert_under_heading."
+    "none, replace_text, append_text, append_meeting_notes, rewrite_paragraph_containing_anchor, "
+    "and insert_under_heading."
 )
 
 
@@ -104,8 +105,14 @@ PROMPT_TEMPLATES: Dict[str, PromptTemplate] = {
             "If the command is explicit and contains enough information to execute safely, set "
             "requires_user_confirmation to false. If the command is ambiguous, set intent to none and explain "
             "what is missing in reason. For replace_text, fill find, replace, and occurrence as first or all. "
-            "For insert_under_heading, fill heading and text. For rewrite_paragraph_containing_anchor, fill "
-            "anchor and text. For append_meeting_notes, no find/replace text is required."
+            "For append_text, use it when the user asks to write, add, append, or insert content at the end of "
+            "the document, such as '請你幫我在最後面寫一個笑話'; fill text with the exact requested text or a "
+            "short generated non-factual item when the user explicitly asks AI to write one. Example: if the command "
+            "is '請你幫我在最後面寫一個笑話', intent must be append_text and text should be a short Traditional "
+            "Chinese joke, not meeting notes. For insert_under_heading, "
+            "fill heading and text. For rewrite_paragraph_containing_anchor, fill anchor and text. Use "
+            "append_meeting_notes only when the user explicitly asks to append the current meeting notes, meeting "
+            "record, or next actions; never use append_meeting_notes for ordinary requested document text."
         ),
     ),
     "chat": PromptTemplate(

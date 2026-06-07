@@ -46,13 +46,17 @@ extension CaptureViewModel {
             documentEditCheckedFinalLineIDs = Set(finalTranscriptArchive.map(\.id))
             appliedDocumentEditKeys.removeAll()
         } else {
+            let shouldKeepDocumentBriefing = documentPreparedMeetingIDs.contains(currentMeetingID)
+                && (!noteDrafts.isEmpty || !actionDrafts.isEmpty)
             transcriptLines.removeAll()
             transcriptMarkers.removeAll()
             finalTranscriptArchive.removeAll()
             summarizedFinalLineIDs.removeAll()
             documentEditCheckedFinalLineIDs.removeAll()
             appliedDocumentEditKeys.removeAll()
-            resetMeetingDrafts()
+            if !shouldKeepDocumentBriefing {
+                resetMeetingDrafts()
+            }
             resetAssistantDrafts()
         }
         resetLatencyReadings()
@@ -140,6 +144,7 @@ extension CaptureViewModel {
 
         if line.isFinal {
             upsertFinalTranscriptArchive(line)
+            scheduleDocumentEditWatcherTick()
         }
 
     }
@@ -210,19 +215,29 @@ extension CaptureViewModel {
     }
 
     func recordTranscriptMarker(
+        id: String = UUID().uuidString,
         title: String,
         detail: String,
         iconName: String,
-        style: TranscriptMarkerStyle
+        style: TranscriptMarkerStyle,
+        anchorLineID: String? = nil,
+        anchorMs: Int? = nil
     ) {
         let marker = TranscriptMarker(
+            id: id,
             title: title,
             detail: detail,
             iconName: iconName,
             style: style,
-            createdAtMs: Int(Date().timeIntervalSince1970 * 1_000)
+            createdAtMs: Int(Date().timeIntervalSince1970 * 1_000),
+            anchorLineID: anchorLineID,
+            anchorMs: anchorMs ?? Int(Date().timeIntervalSince1970 * 1_000)
         )
-        transcriptMarkers.append(marker)
+        if let index = transcriptMarkers.firstIndex(where: { $0.id == id }) {
+            transcriptMarkers[index] = marker
+        } else {
+            transcriptMarkers.append(marker)
+        }
         transcriptMarkers = Array(transcriptMarkers.suffix(maxTranscriptMarkerCount))
     }
 

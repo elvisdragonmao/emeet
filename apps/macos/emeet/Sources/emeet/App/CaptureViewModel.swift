@@ -81,8 +81,10 @@ final class CaptureViewModel: ObservableObject {
     let maxFinalTranscriptArchiveCount = 3_000
     let autoSummaryIntervalSeconds = 30
     let documentEditIntervalSeconds = 10
+    let documentEditDebounceMilliseconds = 1_200
     var autoSummaryTask: Task<Void, Never>?
     var documentEditTask: Task<Void, Never>?
+    var documentEditDebounceTask: Task<Void, Never>?
     var autoSummaryRequestGeneration = 0
     var documentEditRequestGeneration = 0
     var assistantRequestGeneration = 0

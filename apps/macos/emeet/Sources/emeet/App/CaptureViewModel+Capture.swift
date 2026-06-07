@@ -124,6 +124,8 @@ extension CaptureViewModel {
 
         autoSummaryRequestGeneration += 1
         documentEditRequestGeneration += 1
+        documentEditDebounceTask?.cancel()
+        documentEditDebounceTask = nil
         autoSummaryIsGenerating = false
         documentEditIsPlanning = false
         currentMeetingID = ""
