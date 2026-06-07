@@ -108,19 +108,3 @@ enum AssistantQuickAction: String, Equatable {
         }
     }
 }
-
-enum GoogleDocsSyncMode: String, CaseIterable, Identifiable {
-    case afterMeetingAppend
-    case liveNotes
-
-    var id: String { rawValue }
-
-    var label: String {
-        switch self {
-        case .afterMeetingAppend:
-            return "After meeting append"
-        case .liveNotes:
-            return "Live notes"
-        }
-    }
-}

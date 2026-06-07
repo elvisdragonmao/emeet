@@ -33,7 +33,6 @@ final class CaptureViewModel: ObservableObject {
     @Published private(set) var autoSummaryStatusLabel = "Start Meeting to begin"
     @Published private(set) var autoSummaryIsGenerating = false
     @Published private(set) var googleDocsURL = ""
-    @Published private(set) var googleDocsMode: GoogleDocsSyncMode = .afterMeetingAppend
     @Published private(set) var googleDocsStatus: CaptureStatus = .idle
     @Published private(set) var googleDocsAuthReady = false
     @Published private(set) var googleDocsClientConfigured = false
@@ -147,7 +146,6 @@ final class CaptureViewModel: ObservableObject {
 
         refreshAssistantProviders()
         refreshGoogleAuthStatus()
-        refreshGoogleBrowserStatus()
     }
 
     var isAnyRunning: Bool {
@@ -618,11 +616,6 @@ final class CaptureViewModel: ObservableObject {
         googleDocsURL = url
     }
 
-    func updateGoogleDocsMode(_ mode: GoogleDocsSyncMode) {
-        googleDocsMode = mode
-        appendLog("Google Docs mode set to \(mode.label).")
-    }
-
     func updateGoogleBrowserFindText(_ text: String) {
         googleBrowserFindText = text
     }
@@ -760,6 +753,7 @@ final class CaptureViewModel: ObservableObject {
     func openGoogleDocInBrowser() {
         guard googleDocsIsConnected || !googleDocsURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             googleBrowserMessage = "Connect a Google Doc or paste a URL first."
+            googleDocsMessage = googleBrowserMessage
             return
         }
 
@@ -767,6 +761,7 @@ final class CaptureViewModel: ObservableObject {
             meetingID: ensureCurrentMeetingID(),
             url: googleDocsURL.trimmingCharacters(in: .whitespacesAndNewlines)
         )
+        googleDocsMessage = "Opening Google Doc..."
         appendLog("Opening Google Doc in browser helper.")
         Task {
             do {
@@ -775,6 +770,7 @@ final class CaptureViewModel: ObservableObject {
                 appendLog("Google Doc browser open result: \(response.message)")
             } catch {
                 googleBrowserMessage = error.localizedDescription
+                googleDocsMessage = error.localizedDescription
                 appendLog("Google Doc browser open failed: \(error.localizedDescription)")
             }
         }
@@ -1289,7 +1285,7 @@ final class CaptureViewModel: ObservableObject {
 
         appendLog("Auto summary ready: \(response.provider) \(response.model) \(response.latencyMs)ms.")
 
-        if googleDocsMode == .liveNotes && googleDocsIsConnected {
+        if googleDocsIsConnected {
             updateGoogleDocLiveNotes(triggeredByAutoSummary: true)
         }
     }
@@ -1334,6 +1330,7 @@ final class CaptureViewModel: ObservableObject {
 
     private func applyGoogleBrowserResponse(_ response: GoogleBrowserResponse) {
         googleBrowserMessage = response.message
+        googleDocsMessage = response.message
         googleBrowserSeleniumAvailable = response.seleniumAvailable
         googleBrowserChromeDriverAvailable = response.chromedriverAvailable
         googleBrowserSessionActive = response.browserSessionActive

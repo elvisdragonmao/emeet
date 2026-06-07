@@ -132,14 +132,14 @@ cd apps/backend
 uv sync --extra stt
 ```
 
-Optional browser helper for opening, scrolling, and visual find:
+Optional Selenium-backed `Open` button:
 
 ```bash
 uv sync --extra stt --extra browser
 MEETING_BACKEND_UV_EXTRA=browser ./scripts/dev.sh
 ```
 
-The browser helper uses Selenium/ChromeDriver when available and never edits document content. All Google Doc modifications continue to use Google Docs API `batchUpdate`.
+`Open` uses Selenium/ChromeDriver when available and falls back to macOS `open`. If the backend process cannot find ChromeDriver, set `CHROMEDRIVER_PATH=/opt/homebrew/bin/chromedriver` or your local path. All Google Doc modifications continue to use Google Docs API `batchUpdate`.
 
 7. Start the backend and click `Authorize` in the macOS app Google Docs panel. The local OAuth flow creates:
 
@@ -249,12 +249,11 @@ Google Docs demo extension:
 
 1. Paste a Google Docs URL in the right panel.
 2. Click `Authorize` if OAuth is not ready.
-3. Click `Connect` to read the doc and generate a document briefing.
-4. Start Meeting and generate transcript/meeting notes.
-5. Click `Append` to append notes/actions to the Google Doc after the meeting.
-6. Switch to `Live notes` and click `Live`, or let the 30 second auto-summary update the `emeet Live Notes` section.
-7. Try direct edits: `Replace first` / `Replace all`, insert text under a heading, or rewrite the paragraph containing an anchor text.
-8. Optional: use the browser helper to open the doc, scroll to the bottom, or run browser find for visible text.
+3. Click `Connect` to read the doc context.
+4. Click `Open` if you want the document visible in Chrome.
+5. Start Meeting and generate transcript/meeting notes.
+6. Let the 30 second auto-summary update the `emeet Live Notes` section.
+7. Say an explicit edit command such as `AI 請幫我把第二段改成...` and let the 10 second voice-edit loop apply it.
 
 ## Known Limits
 

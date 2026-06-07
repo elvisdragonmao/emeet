@@ -1,6 +1,7 @@
 import unittest
+from unittest.mock import patch
 
-from meeting_backend.browser_controller import validate_url
+from meeting_backend.browser_controller import resolve_chromedriver_path, validate_url
 from meeting_backend.google_docs_api import snapshot_response
 from meeting_backend.google_docs_context import GoogleDocMeetingConnection
 from meeting_backend.google_docs_service import (
@@ -207,6 +208,42 @@ class GoogleDocsServiceTest(unittest.TestCase):
         self.assertEqual(validate_url(url), url)
         with self.assertRaises(ValueError):
             validate_url("https://example.com/document/d/abc/edit")
+
+    def test_resolves_chromedriver_from_env(self) -> None:
+        with patch.dict("os.environ", {"CHROMEDRIVER_PATH": "/tmp/chromedriver"}), patch(
+            "meeting_backend.browser_controller.os.path.isfile",
+            return_value=True,
+        ), patch(
+            "meeting_backend.browser_controller.os.access",
+            return_value=True,
+        ), patch(
+            "meeting_backend.browser_controller.shutil.which",
+            return_value=None,
+        ):
+            self.assertEqual(resolve_chromedriver_path(), "/tmp/chromedriver")
+
+    def test_resolves_chromedriver_from_path(self) -> None:
+        with patch.dict("os.environ", {"CHROMEDRIVER_PATH": ""}), patch(
+            "meeting_backend.browser_controller.shutil.which",
+            return_value="/bin/chromedriver",
+        ):
+            self.assertEqual(resolve_chromedriver_path(), "/bin/chromedriver")
+
+    def test_resolves_chromedriver_from_homebrew_path(self) -> None:
+        def isfile(path: str) -> bool:
+            return path == "/opt/homebrew/bin/chromedriver"
+
+        with patch.dict("os.environ", {"CHROMEDRIVER_PATH": ""}), patch(
+            "meeting_backend.browser_controller.shutil.which",
+            return_value=None,
+        ), patch(
+            "meeting_backend.browser_controller.os.path.isfile",
+            side_effect=isfile,
+        ), patch(
+            "meeting_backend.browser_controller.os.access",
+            return_value=True,
+        ):
+            self.assertEqual(resolve_chromedriver_path(), "/opt/homebrew/bin/chromedriver")
 
 
 def sample_document():

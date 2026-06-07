@@ -19,30 +19,16 @@ struct AssistantWorkspace: View {
     let whatShouldISayIsLoading: Bool
     let followUpIsLoading: Bool
     let googleDocsURL: Binding<String>
-    let googleDocsMode: Binding<GoogleDocsSyncMode>
     let googleDocsStatusLabel: String
     let googleDocsDetailLabel: String
     let googleDocsMessage: String
-    let googleDocsPreview: String
-    let googleDocsBriefing: String
-    let googleDocsIsConnected: Bool
     let googleDocsIsBusy: Bool
-    let googleBrowserMessage: String
-    let googleBrowserSeleniumAvailable: Bool
-    let googleBrowserSessionActive: Bool
-    let googleBrowserFindText: Binding<String>
     let refreshProvidersAction: () -> Void
     let whatShouldISayAction: () -> Void
     let followUpAction: () -> Void
     let googleAuthAction: () -> Void
     let googleConnectAction: () -> Void
-    let googleRefreshAction: () -> Void
-    let googleAppendNotesAction: () -> Void
-    let googleUpdateLiveNotesAction: () -> Void
-    let googleBrowserRefreshAction: () -> Void
     let googleBrowserOpenAction: () -> Void
-    let googleBrowserScrollAction: () -> Void
-    let googleBrowserFindAction: () -> Void
 
     var body: some View {
         ScrollView {
@@ -103,27 +89,13 @@ struct AssistantWorkspace: View {
 
                 GoogleDocsWorkspace(
                     url: googleDocsURL,
-                    mode: googleDocsMode,
                     statusLabel: googleDocsStatusLabel,
                     detailLabel: googleDocsDetailLabel,
                     message: googleDocsMessage,
-                    preview: googleDocsPreview,
-                    briefing: googleDocsBriefing,
-                    isConnected: googleDocsIsConnected,
                     isBusy: googleDocsIsBusy,
-                    browserMessage: googleBrowserMessage,
-                    browserSeleniumAvailable: googleBrowserSeleniumAvailable,
-                    browserSessionActive: googleBrowserSessionActive,
-                    browserFindText: googleBrowserFindText,
                     authAction: googleAuthAction,
                     connectAction: googleConnectAction,
-                    refreshAction: googleRefreshAction,
-                    appendNotesAction: googleAppendNotesAction,
-                    updateLiveNotesAction: googleUpdateLiveNotesAction,
-                    browserRefreshAction: googleBrowserRefreshAction,
-                    browserOpenAction: googleBrowserOpenAction,
-                    browserScrollAction: googleBrowserScrollAction,
-                    browserFindAction: googleBrowserFindAction
+                    browserOpenAction: googleBrowserOpenAction
                 )
 
                 NotesWorkspace(
@@ -296,27 +268,13 @@ private struct AssistantDraftView: View {
 
 private struct GoogleDocsWorkspace: View {
     let url: Binding<String>
-    let mode: Binding<GoogleDocsSyncMode>
     let statusLabel: String
     let detailLabel: String
     let message: String
-    let preview: String
-    let briefing: String
-    let isConnected: Bool
     let isBusy: Bool
-    let browserMessage: String
-    let browserSeleniumAvailable: Bool
-    let browserSessionActive: Bool
-    let browserFindText: Binding<String>
     let authAction: () -> Void
     let connectAction: () -> Void
-    let refreshAction: () -> Void
-    let appendNotesAction: () -> Void
-    let updateLiveNotesAction: () -> Void
-    let browserRefreshAction: () -> Void
     let browserOpenAction: () -> Void
-    let browserScrollAction: () -> Void
-    let browserFindAction: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -358,77 +316,14 @@ private struct GoogleDocsWorkspace: View {
                 }
                 .help("Connect Google Doc")
                 .disabled(isBusy)
-            }
-
-            Picker("Mode", selection: mode) {
-                ForEach(GoogleDocsSyncMode.allCases) { item in
-                    Text(item.label)
-                        .tag(item)
-                }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-
-            HStack(spacing: 8) {
-                GoogleDocSmallButton(
-                    title: "Refresh",
-                    iconName: "arrow.clockwise",
-                    disabled: !isConnected || isBusy,
-                    action: refreshAction
-                )
 
                 GoogleDocSmallButton(
-                    title: "Append",
-                    iconName: "text.append",
-                    disabled: !isConnected || isBusy,
-                    action: appendNotesAction
-                )
-
-                GoogleDocSmallButton(
-                    title: "Live",
-                    iconName: "square.and.pencil",
-                    disabled: !isConnected || isBusy,
-                    action: updateLiveNotesAction
+                    title: "Open",
+                    iconName: "safari",
+                    disabled: isBusy,
+                    action: browserOpenAction
                 )
             }
-
-            if !preview.isEmpty || !briefing.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
-                    if !briefing.isEmpty {
-                        Text("Briefing")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                        Text(briefing)
-                            .font(.caption)
-                            .foregroundStyle(.primary)
-                            .lineLimit(5)
-                    } else if !preview.isEmpty {
-                        Text("Preview")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                        Text(preview)
-                            .font(.caption)
-                            .foregroundStyle(.primary)
-                            .lineLimit(4)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(9)
-                .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
-            }
-
-            BrowserHelperPanel(
-                message: browserMessage,
-                seleniumAvailable: browserSeleniumAvailable,
-                browserSessionActive: browserSessionActive,
-                findText: browserFindText,
-                isConnected: isConnected,
-                isBusy: isBusy,
-                refreshAction: browserRefreshAction,
-                openAction: browserOpenAction,
-                scrollAction: browserScrollAction,
-                findAction: browserFindAction
-            )
 
             Text(message)
                 .font(.caption)
@@ -436,77 +331,6 @@ private struct GoogleDocsWorkspace: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .panelStyle()
-    }
-}
-
-private struct BrowserHelperPanel: View {
-    let message: String
-    let seleniumAvailable: Bool
-    let browserSessionActive: Bool
-    let findText: Binding<String>
-    let isConnected: Bool
-    let isBusy: Bool
-    let refreshAction: () -> Void
-    let openAction: () -> Void
-    let scrollAction: () -> Void
-    let findAction: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Browser helper")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Button(action: refreshAction) {
-                    Image(systemName: "arrow.clockwise")
-                }
-                .buttonStyle(.borderless)
-                .help("Refresh browser helper status")
-            }
-
-            HStack(spacing: 8) {
-                GoogleDocSmallButton(
-                    title: "Open",
-                    iconName: "safari",
-                    disabled: isBusy,
-                    action: openAction
-                )
-
-                GoogleDocSmallButton(
-                    title: "Bottom",
-                    iconName: "arrow.down.to.line",
-                    disabled: isBusy || !seleniumAvailable || !browserSessionActive,
-                    action: scrollAction
-                )
-            }
-
-            HStack(spacing: 8) {
-                TextField("Find visible text", text: findText)
-                    .textFieldStyle(.roundedBorder)
-                    .disabled(isBusy || !seleniumAvailable || !browserSessionActive)
-
-                Button(action: findAction) {
-                    Image(systemName: "magnifyingglass")
-                }
-                .disabled(isBusy || !seleniumAvailable || !browserSessionActive)
-                .help("Find visible text in browser")
-            }
-
-            Text(statusLine)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(9)
-        .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
-    }
-
-    private var statusLine: String {
-        if !isConnected {
-            return "Connect a doc first. \(message)"
-        }
-        return message
     }
 }
 
@@ -524,7 +348,7 @@ private struct GoogleDocSmallButton: View {
         }
         .buttonStyle(.bordered)
         .disabled(disabled)
-        .frame(maxWidth: .infinity)
+        .frame(minWidth: 76)
     }
 }
 

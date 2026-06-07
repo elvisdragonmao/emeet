@@ -200,36 +200,16 @@ struct ContentView: View {
                 get: { viewModel.googleDocsURL },
                 set: { viewModel.updateGoogleDocsURL($0) }
             ),
-            googleDocsMode: Binding(
-                get: { viewModel.googleDocsMode },
-                set: { viewModel.updateGoogleDocsMode($0) }
-            ),
             googleDocsStatusLabel: viewModel.googleDocsStatusLabel,
             googleDocsDetailLabel: viewModel.googleDocsDetailLabel,
             googleDocsMessage: viewModel.googleDocsMessage,
-            googleDocsPreview: viewModel.googleDocsPreview,
-            googleDocsBriefing: viewModel.googleDocsBriefing,
-            googleDocsIsConnected: viewModel.googleDocsIsConnected,
             googleDocsIsBusy: viewModel.googleDocsIsBusy,
-            googleBrowserMessage: viewModel.googleBrowserMessage,
-            googleBrowserSeleniumAvailable: viewModel.googleBrowserSeleniumAvailable,
-            googleBrowserSessionActive: viewModel.googleBrowserSessionActive,
-            googleBrowserFindText: Binding(
-                get: { viewModel.googleBrowserFindText },
-                set: { viewModel.updateGoogleBrowserFindText($0) }
-            ),
             refreshProvidersAction: viewModel.refreshAssistantProviders,
             whatShouldISayAction: viewModel.prepareWhatShouldISay,
             followUpAction: viewModel.prepareFollowUpQuestions,
             googleAuthAction: viewModel.startGoogleAuth,
             googleConnectAction: viewModel.connectGoogleDoc,
-            googleRefreshAction: viewModel.refreshGoogleDocContext,
-            googleAppendNotesAction: viewModel.appendMeetingNotesToGoogleDoc,
-            googleUpdateLiveNotesAction: viewModel.updateGoogleDocLiveNotes,
-            googleBrowserRefreshAction: viewModel.refreshGoogleBrowserStatus,
-            googleBrowserOpenAction: viewModel.openGoogleDocInBrowser,
-            googleBrowserScrollAction: viewModel.scrollGoogleDocBrowserToBottom,
-            googleBrowserFindAction: viewModel.findVisibleTextInGoogleDocBrowser
+            googleBrowserOpenAction: viewModel.openGoogleDocInBrowser
         )
     }
 

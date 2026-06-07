@@ -6,6 +6,10 @@ from typing import Any, Dict, Optional
 
 
 _DRIVER: Optional[Any] = None
+COMMON_CHROMEDRIVER_PATHS = (
+    "/opt/homebrew/bin/chromedriver",
+    "/usr/local/bin/chromedriver",
+)
 
 
 @dataclass(frozen=True)
@@ -52,10 +56,7 @@ class BrowserController:
             if open_with_system_browser(clean_url):
                 return BrowserResult(
                     ok=True,
-                    message=(
-                        "Opened Google Doc with the system browser. "
-                        "Install Selenium and ChromeDriver to enable scroll/find."
-                    ),
+                    message="Opened Google Doc with the system browser.",
                     selenium_available=selenium_available(),
                     chromedriver_available=chromedriver_available(),
                     browser_session_active=False,
@@ -107,7 +108,12 @@ class BrowserController:
         webdriver = selenium_webdriver()
         options = webdriver.ChromeOptions()
         options.add_argument("--start-maximized")
-        _DRIVER = webdriver.Chrome(options=options)
+        driver_path = resolve_chromedriver_path()
+        if driver_path:
+            service = selenium_chrome_service()(executable_path=driver_path)
+            _DRIVER = webdriver.Chrome(service=service, options=options)
+        else:
+            _DRIVER = webdriver.Chrome(options=options)
         return _DRIVER
 
 
@@ -134,9 +140,11 @@ def open_with_system_browser(url: str) -> bool:
 
 
 def browser_status_message() -> str:
-    if selenium_available():
-        return "Selenium is available. ChromeDriver or Selenium Manager may launch Chrome."
-    return "Selenium is not installed. Browser open can use macOS open, but scroll/find are unavailable."
+    if not selenium_available():
+        return "Selenium is not installed. Browser open can use macOS open."
+    if chromedriver_available():
+        return "Selenium and ChromeDriver are available."
+    return "Selenium is available. ChromeDriver was not found; set CHROMEDRIVER_PATH if Chrome does not launch."
 
 
 def selenium_available() -> bool:
@@ -150,13 +158,38 @@ def selenium_available() -> bool:
 
 
 def chromedriver_available() -> bool:
-    return shutil.which("chromedriver") is not None
+    return resolve_chromedriver_path() is not None
+
+
+def resolve_chromedriver_path() -> Optional[str]:
+    env_path = os.environ.get("CHROMEDRIVER_PATH", "").strip()
+    if is_executable_file(env_path):
+        return env_path
+
+    path_match = shutil.which("chromedriver")
+    if path_match:
+        return path_match
+
+    for candidate in COMMON_CHROMEDRIVER_PATHS:
+        if is_executable_file(candidate):
+            return candidate
+    return None
+
+
+def is_executable_file(path: str) -> bool:
+    return bool(path) and os.path.isfile(path) and os.access(path, os.X_OK)
 
 
 def selenium_webdriver() -> Any:
     from selenium import webdriver
 
     return webdriver
+
+
+def selenium_chrome_service() -> Any:
+    from selenium.webdriver.chrome.service import Service
+
+    return Service
 
 
 def selenium_by() -> Any:
