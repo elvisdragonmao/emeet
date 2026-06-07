@@ -8,187 +8,178 @@
   </head>
   <body>
     <main class="poster" aria-label="emeet A2 report poster">
-      <section class="title-bar">
-        <div class="title-copy">
-          <p class="kicker">macOS Native Meeting Copilot</p>
+      <header class="poster-header">
+        <div class="headline">
+          <p class="kicker">Realtime · Local-first · Collaborative Meeting Copilot</p>
           <h1>emeet</h1>
-          <h2>即時會議副駕與文件共編原型</h2>
-          <p class="thesis">
-            把目前通話逐字稿轉成下一句可說的話、可追問的問題、會議筆記與下一步行動。
+          <h2>即時會議副駕，把會議對話轉成可說出口的回覆與可同步的文件更新</h2>
+          <p>
+            macOS 原生工具在會議中擷取麥克風與系統音訊，生成逐字稿，並以文件脈絡輔助使用者回應、追問、整理 notes/actions，以及導覽共同編輯中的 Google Docs。
           </p>
         </div>
 
-        <aside class="mission-card" aria-label="project positioning">
-          <p class="plate-label">Product Goal</p>
-          <p>
-            一個私密、macOS 原生、低摩擦、模型可選的即時會議副駕。
-          </p>
-          <dl class="meta-grid">
-            <div>
-              <dt>MVP Loop</dt>
-              <dd>Start Meeting -> Transcript -> Suggest -> Notes -> Export</dd>
-            </div>
-            <div>
-              <dt>Primary UI</dt>
-              <dd>What should I say? / Follow-up questions</dd>
-            </div>
-          </dl>
+        <div class="focus-grid" aria-label="product focus">
+          <article>
+            <span>Realtime</span>
+            <strong>會中即時輔助</strong>
+            <p>不是只等會後摘要，而是在對話還在進行時提供下一句回覆與追問。</p>
+          </article>
+          <article>
+            <span>Local</span>
+            <strong>本地音訊與模型彈性</strong>
+            <p>macOS 音訊擷取搭配本機 STT、Ollama 或 OpenAI-compatible endpoint。</p>
+          </article>
+          <article>
+            <span>Collaborate</span>
+            <strong>文件共編脈絡</strong>
+            <p>讀取 Google Docs 內容，並把會議 live notes 同步寫回文件。</p>
+          </article>
+          <article>
+            <span>Prompt</span>
+            <strong>對話提示</strong>
+            <p>使用 What should I say? 與 Follow-up questions 推進討論。</p>
+          </article>
+        </div>
+      </header>
+
+      <section class="product-demo" aria-labelledby="demo-title">
+        <div class="demo-title">
+          <p class="section-label">Product Interface</p>
+          <h2 id="demo-title">正在會議中：逐字稿、AI 提示與 Google Docs 共編同時發生</h2>
+        </div>
+
+        <div class="visual-stage">
+          <figure class="app-window">
+            <img src="../screenshot.png" alt="emeet app showing realtime transcript, assistant suggestions, Google Docs connection, and meeting notes">
+            <figcaption>macOS app: live transcript, conversation prompts, notes/actions</figcaption>
+            <span class="pin pin-audio">1</span>
+            <span class="pin pin-transcript">2</span>
+            <span class="pin pin-prompt">3</span>
+            <span class="pin pin-notes">4</span>
+            <span class="pin pin-provider">5</span>
+          </figure>
+
+          <figure class="docs-window">
+            <img src="../docs.png" alt="Google Docs document connected with emeet during a meeting">
+            <figcaption>Google Docs: shared artifact, browser navigation, live notes target</figcaption>
+            <span class="pin pin-docs">6</span>
+          </figure>
+
+          <div class="sync-beam" aria-hidden="true"></div>
+        </div>
+
+        <aside class="annotation-rail" aria-label="feature annotations">
+          <article>
+            <span class="tag">1</span>
+            <h3>雙路音訊來源</h3>
+            <p>麥克風用 AVAudioEngine，系統音訊用 ScreenCaptureKit；來源分流讓 Self / Other 標籤更穩定。</p>
+          </article>
+          <article>
+            <span class="tag">2</span>
+            <h3>即時逐字稿</h3>
+            <p>100 ms PCM16 frame 傳到 FastAPI backend，speech-window segmentation 產生可用的 final transcript。</p>
+          </article>
+          <article>
+            <span class="tag">3</span>
+            <h3>對話提示</h3>
+            <p>What should I say? 產生可直接說出口的回覆；Follow-up questions 產生釐清需求、限制、風險與下一步的追問。</p>
+          </article>
+          <article>
+            <span class="tag">4</span>
+            <h3>即時會議紀錄</h3>
+            <p>Meeting Notes 與 Next Actions 使用新增 final transcript 滾動更新，並可匯出 Markdown 紀錄。</p>
+          </article>
+          <article>
+            <span class="tag">5</span>
+            <h3>本地與可替換模型</h3>
+            <p>STT 可切換 faster-whisper / mlx-whisper；助理模型可切換 Ollama、OpenAI-compatible、Codex CLI 與 Copilot CLI。</p>
+          </article>
+          <article>
+            <span class="tag">6</span>
+            <h3>共編與瀏覽導覽</h3>
+            <p>連接 Google Docs 後讀取文件脈絡、更新 live notes，並可透過 Chrome 開啟、捲動或搜尋到指定段落。</p>
+          </article>
         </aside>
       </section>
 
-      <section class="system-strip" aria-label="core system layers">
-        <article>
-          <span class="step-no">01</span>
-          <h3>Audio Capture</h3>
-          <p>AVAudioEngine 擷取麥克風，ScreenCaptureKit 擷取系統音訊。</p>
-        </article>
-        <article>
-          <span class="step-no">02</span>
-          <h3>Realtime STT</h3>
-          <p>16 kHz mono PCM16 以 100 ms frame 經 WebSocket 送到 backend。</p>
-        </article>
-        <article>
-          <span class="step-no">03</span>
-          <h3>Meeting Copilot</h3>
-          <p>使用 final transcript 產生回覆、追問、notes 與 actions。</p>
-        </article>
-        <article>
-          <span class="step-no">04</span>
-          <h3>Model Choice</h3>
-          <p>可切換 Ollama、OpenAI-compatible、Codex CLI 與 Copilot CLI。</p>
-        </article>
-      </section>
-
-      <section class="screenshot-panel" aria-labelledby="screenshot-title">
-        <div class="section-heading">
-          <p class="plate-label">Demo Interface</p>
-          <h2 id="screenshot-title">App 截圖功能標註</h2>
-          <p>會議當下只保留必要控制：看逐字稿、按建議、整理筆記、同步文件。</p>
-        </div>
-
-        <div class="screen-frame">
-          <img class="app-shot" src="../screenshot.png" alt="emeet macOS app screenshot with transcript, assistant suggestions, Google Docs, meeting notes, and audio panels">
-
-          <span class="hotspot hotspot-audio" aria-hidden="true"></span>
-          <span class="hotspot hotspot-transcript" aria-hidden="true"></span>
-          <span class="hotspot hotspot-assistant" aria-hidden="true"></span>
-          <span class="hotspot hotspot-docs" aria-hidden="true"></span>
-          <span class="hotspot hotspot-notes" aria-hidden="true"></span>
-          <span class="hotspot hotspot-controls" aria-hidden="true"></span>
-
-          <article class="callout callout-audio">
-            <span>01</span>
-            <h3>雙路音訊擷取</h3>
-            <p>麥克風與系統音訊分流，保留 Self / Other 來源線索。</p>
-          </article>
-          <article class="callout callout-transcript">
-            <span>02</span>
-            <h3>即時逐字稿</h3>
-            <p>後端以 speech window 產生 final segments，避免 unstable partial 進筆記。</p>
-          </article>
-          <article class="callout callout-assistant">
-            <span>03</span>
-            <h3>會中 AI 助理</h3>
-            <p>回覆建議與追問由使用者按鈕觸發，輸出保守且可直接說出口。</p>
-          </article>
-          <article class="callout callout-docs">
-            <span>04</span>
-            <h3>文件脈絡</h3>
-            <p>連接 Google Docs，將會議重點同步到 live notes 區塊。</p>
-          </article>
-          <article class="callout callout-notes">
-            <span>05</span>
-            <h3>Meeting Notes</h3>
-            <p>每 30 秒根據新增 final transcript 更新 notes 與 next actions。</p>
-          </article>
-          <article class="callout callout-controls">
-            <span>06</span>
-            <h3>低摩擦控制</h3>
-            <p>Start/Stop、provider/model、Delete Records、Export 都在同一個工作台。</p>
-          </article>
-        </div>
-      </section>
-
-      <section class="content-grid" aria-label="poster report sections">
-        <article class="panel panel-motivation">
-          <p class="plate-label">Motivation</p>
-          <h2>會議當下的問題，不只是在會後摘要</h2>
+      <section class="research-grid" aria-label="research poster sections">
+        <article class="paper-panel motivation">
+          <p class="section-label">Motivation</p>
+          <h2>會議中的關鍵壓力發生在「當下」</h2>
           <p>
-            線上會議中，使用者要同時聽懂內容、整理回應、避免過度承諾，還要記住決策與下一步。
-            現有 AI 會議工具多聚焦錄音、轉錄與會後整理；emeet 聚焦正在會議中「下一句該怎麼說」與「接下來該問什麼」。
+            線上會議不只需要會後摘要。當對方提出需求、質疑時程、要求文件修改或追問風險時，使用者需要即時理解、回應、追問，並讓共同文件跟上討論。
           </p>
-          <ul class="signal-list">
-            <li>即時理解目前對話。</li>
-            <li>產生自然、保守、可說出口的回覆。</li>
-            <li>把 final transcript 滾動整理成 notes/actions。</li>
+          <p>
+            現有 AI notetaker 多半擅長錄音、轉錄與會後整理；emeet 聚焦把正在發生的對話轉換成可採用的會中行動。
+          </p>
+          <ul>
+            <li>把遠端與自己的發言轉成可讀逐字稿。</li>
+            <li>把逐字稿轉成下一句話與下一個問題。</li>
+            <li>把會議重點同步到正在共編的文件。</li>
           </ul>
+          <div class="takeaway">
+            <h3>Core Claim</h3>
+            <p>即時會議輔助的價值來自三件事同步：目前對話、共享文件、下一個可採取的回應。</p>
+          </div>
         </article>
 
-        <article class="panel panel-design">
-          <p class="plate-label">Design Consideration</p>
-          <h2>AI 是副駕，不是自動代理人</h2>
-          <ul class="signal-list">
-            <li>手動 Start/Stop，讓錄音狀態清楚可見。</li>
-            <li>LLM 呼叫低頻且語意化，避免每 100 ms 跟音訊同頻推理。</li>
-            <li>只用 final transcript 更新筆記，降低誤寫尚未定稿內容的風險。</li>
-            <li>prompt 明確禁止編造 owner、date、budget、approval 或 commitment。</li>
-            <li>UI 消費 drafts / notes / actions，不解析任意模型 prose。</li>
-          </ul>
+        <article class="paper-panel design">
+          <p class="section-label">Design Considerations</p>
+          <h2>降低干擾，同時保留使用者控制</h2>
+          <dl class="design-list">
+            <div>
+              <dt>D1 · Separate audio sources</dt>
+              <dd>麥克風與系統音訊分流，比先混音再分離更適合即時 demo 與來源標註。</dd>
+            </div>
+            <div>
+              <dt>D2 · Match cadence to task</dt>
+              <dd>音訊可高頻傳輸；LLM 只在按鈕、筆記週期或文件指令時低頻推理。</dd>
+            </div>
+            <div>
+              <dt>D3 · Ground in shared documents</dt>
+              <dd>會議經常圍繞文件討論，因此建議與筆記要能參考 Google Docs 脈絡。</dd>
+            </div>
+            <div>
+              <dt>D4 · Keep edits bounded</dt>
+              <dd>文件修改限定在明確語音指令、可定位段落與單一步驟 batchUpdate。</dd>
+            </div>
+            <div>
+              <dt>D5 · Support browser navigation</dt>
+              <dd>除了改文件，也要能把 Chrome 導到指定位置，讓使用者與協作者看同一段內容。</dd>
+            </div>
+          </dl>
+          <div class="takeaway">
+            <h3>Design Outcome</h3>
+            <p>使用者不需要離開會議視窗，就能取得回覆提示、追問方向、文件位置與滾動式紀錄。</p>
+          </div>
         </article>
 
-        <article class="panel panel-architecture">
-          <p class="plate-label">Approach / System Architecture</p>
-          <h2>高頻音訊傳輸，低頻語意推理</h2>
-          <div class="architecture-flow" aria-label="system architecture flow">
-            <div class="node source">Mic<br><small>AVAudioEngine</small></div>
-            <div class="node source">System<br><small>ScreenCaptureKit</small></div>
-            <div class="node">PCM16<br><small>16 kHz mono</small></div>
-            <div class="node">WS<br><small>100 ms frames</small></div>
-            <div class="node">FastAPI<br><small>segmenter</small></div>
-            <div class="node">STT<br><small>mlx / faster-whisper</small></div>
-            <div class="node">Assistant<br><small>provider layer</small></div>
-            <div class="node store">SQLite<br><small>records/export</small></div>
+        <article class="paper-panel approach">
+          <p class="section-label">Approach / System Architecture</p>
+          <h2>高頻音訊管線 + 低頻語意協作管線</h2>
+          <div class="architecture" aria-label="system architecture diagram">
+            <div class="arch-node input">Mic<br><small>AVAudioEngine</small></div>
+            <div class="arch-node input">System<br><small>ScreenCaptureKit</small></div>
+            <div class="arch-node">PCM16<br><small>16 kHz mono</small></div>
+            <div class="arch-node">WebSocket<br><small>100 ms frames</small></div>
+            <div class="arch-node backend">FastAPI<br><small>segmenter</small></div>
+            <div class="arch-node backend">STT<br><small>mlx / faster-whisper</small></div>
+            <div class="arch-node assistant">Assistant<br><small>provider layer</small></div>
+            <div class="arch-node assistant">JSON<br><small>drafts / notes / actions</small></div>
+            <div class="arch-node doc">Google Docs<br><small>context + live notes</small></div>
+            <div class="arch-node doc">Chrome<br><small>open / scroll / find</small></div>
+            <div class="arch-node store">SQLite<br><small>records + export</small></div>
           </div>
           <p>
-            macOS app 負責擷取與 UI 狀態；backend 負責 speech-window segmentation、STT、assistant provider dispatch 與 SQLite 儲存。
+            macOS app 負責擷取、狀態與工作台；backend 負責分段、STT、LLM provider dispatch、Google Docs API 與資料儲存。UI 只接收結構化輸出，避免直接解析模型自由文字。
           </p>
-        </article>
-
-        <article class="panel panel-implementation">
-          <p class="plate-label">Implementation</p>
-          <h2>目前已完成的 MVP loop</h2>
-          <ul class="compact-list">
-            <li>雙路音訊擷取與音量 meter。</li>
-            <li>PCM16 converter 與 WebSocket STT session。</li>
-            <li>Self / Other 與本機 segment-level speaker numbering。</li>
-            <li>What should I say? 與 Follow-up questions。</li>
-            <li>30 秒 Meeting Notes / Next Actions 自動整理。</li>
-            <li>SQLite append-first storage 與 Markdown export。</li>
-          </ul>
-        </article>
-
-        <article class="panel panel-demo">
-          <p class="plate-label">Demo Flow</p>
-          <h2>可展示的端到端流程</h2>
-          <ol class="demo-steps">
-            <li>Start Meeting。</li>
-            <li>顯示麥克風與系統音訊 meter。</li>
-            <li>產生 Self / Other transcript。</li>
-            <li>按 What should I say? 取得回覆。</li>
-            <li>按 Follow-up questions 取得追問。</li>
-            <li>整理 notes/actions 並匯出 Markdown。</li>
-          </ol>
-        </article>
-
-        <article class="panel panel-limits">
-          <p class="plate-label">Known Limits / Future Work</p>
-          <h2>從可 demo 原型走向穩定產品</h2>
-          <ul class="compact-list">
-            <li>STT 目前是 final speech-window segments，尚非 token streaming partials。</li>
-            <li>RMS VAD 需升級以面對噪音環境。</li>
-            <li>speaker label 是來源與本機分群，不是完整 diarization。</li>
-            <li>下一版應加入 evidence_segment_ids、rolling summary state 與更完整 privacy mode。</li>
-          </ul>
+          <div class="timing-grid" aria-label="processing cadence">
+            <div><span>Audio</span><strong>100 ms</strong><p>小封包穩定傳輸</p></div>
+            <div><span>STT</span><strong>speech window</strong><p>停頓後定稿逐字稿</p></div>
+            <div><span>Prompt</span><strong>on demand</strong><p>按鈕觸發回覆/追問</p></div>
+            <div><span>Notes</span><strong>30 sec</strong><p>根據 final transcript 更新</p></div>
+            <div><span>Docs</span><strong>commanded</strong><p>明確指令才改文件或導覽</p></div>
+          </div>
         </article>
       </section>
     </main>
