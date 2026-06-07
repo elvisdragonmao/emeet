@@ -12,6 +12,7 @@ class AssistantPromptsTest(unittest.TestCase):
         self.assertIn("討論主題與內容", prompt_template_for_action("meeting_notes").instruction)
         self.assertIn("meeting-context question", prompt_template_for_action("chat").instruction)
         self.assertIn("explicit spoken command addressed to AI", prompt_template_for_action("document_edit_plan").instruction)
+        self.assertIn("saved-meeting title", prompt_template_for_action("meeting_title").instruction)
 
     def test_build_messages_includes_transcript_and_output_contract(self) -> None:
         request = AssistantRequest(

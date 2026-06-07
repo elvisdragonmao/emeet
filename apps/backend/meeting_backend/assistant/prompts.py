@@ -65,6 +65,16 @@ PROMPT_TEMPLATES: Dict[str, PromptTemplate] = {
             "Do not guess owners, due dates, conclusions, or commitments that were not stated."
         ),
     ),
+    "meeting_title": PromptTemplate(
+        action="meeting_title",
+        system=BASE_SYSTEM_PROMPT,
+        instruction=(
+            "Generate one concise saved-meeting title from the meeting transcript and rolling notes. "
+            "Use the drafts array with exactly one item. Put the title in drafts[0].title, use an empty "
+            "detail, badge AI, and icon_name text.quote. The title should be 4-10 words in the meeting's "
+            "main language, without quotes, Markdown, dates, owners, or commitments that were not stated."
+        ),
+    ),
     "document_briefing": PromptTemplate(
         action="document_briefing",
         system=(

@@ -185,6 +185,7 @@ class StorageTest(unittest.TestCase):
             meetings = storage.list_meetings()
             self.assertEqual(len(meetings), 1)
             self.assertEqual(meetings[0]["meeting_id"], "mtg-demo")
+            self.assertFalse(meetings[0]["title_is_manual"])
             self.assertEqual(meetings[0]["transcript_count"], 1)
             self.assertEqual(meetings[0]["assistant_response_count"], 1)
             self.assertEqual(meetings[0]["notes_count"], 1)
@@ -199,6 +200,70 @@ class StorageTest(unittest.TestCase):
             self.assertNotIn("raw_text", record["assistant_responses"][0])
             self.assertEqual(record["notes"][0]["title"], "討論主題與內容")
             self.assertEqual(record["actions"][0]["title"], "Confirm demo checklist")
+            markdown = storage.meeting_markdown("mtg-demo")
+            self.assertIsNotNone(markdown)
+            assert markdown is not None
+            self.assertIn("## Meeting Notes", markdown)
+            self.assertIn("Confirm demo checklist", markdown)
+            self.assertIn("We need to confirm the demo checklist.", markdown)
+
+    def test_renames_meeting_and_preserves_manual_title(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = os.path.join(directory, "meeting.sqlite3")
+            storage = MeetingStorage(database_path)
+            session = SessionStart(
+                session_id="mtg-title-microphone",
+                source="microphone",
+                sample_rate=16000,
+                channels=1,
+                sample_width=2,
+            )
+
+            storage.record_session_start(session, provider="mlx-whisper", model="large-v3-turbo")
+            storage.record_transcript_event(
+                transcript_event(
+                    event_type="transcript.final",
+                    session=session,
+                    segment_index=1,
+                    start_ms=0,
+                    end_ms=1200,
+                    text="Discuss the graduation demo timeline.",
+                    revision=1,
+                    is_final=True,
+                    provider="mlx-whisper",
+                )
+            )
+
+            renamed = storage.rename_meeting("mtg-title", "Graduation Demo Review")
+            self.assertIsNotNone(renamed)
+            assert renamed is not None
+            self.assertEqual(renamed["title"], "Graduation Demo Review")
+            self.assertTrue(renamed["title_is_manual"])
+
+            generated = storage.update_generated_meeting_title("mtg-title", "AI Generated Title")
+            self.assertIsNotNone(generated)
+            assert generated is not None
+            self.assertEqual(generated["title"], "Graduation Demo Review")
+            self.assertTrue(generated["title_is_manual"])
+
+    def test_updates_generated_meeting_title_when_not_manual(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = os.path.join(directory, "meeting.sqlite3")
+            storage = MeetingStorage(database_path)
+            session = SessionStart(
+                session_id="mtg-ai-title-microphone",
+                source="microphone",
+                sample_rate=16000,
+                channels=1,
+                sample_width=2,
+            )
+
+            storage.record_session_start(session, provider="mlx-whisper", model="large-v3-turbo")
+            generated = storage.update_generated_meeting_title("mtg-ai-title", "Demo Risk Review")
+            self.assertIsNotNone(generated)
+            assert generated is not None
+            self.assertEqual(generated["title"], "Demo Risk Review")
+            self.assertFalse(generated["title_is_manual"])
 
     def test_adds_new_columns_to_existing_database(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -243,9 +308,11 @@ class StorageTest(unittest.TestCase):
             with sqlite3.connect(database_path) as connection:
                 transcript_columns = table_columns(connection, "transcript_segments")
                 assistant_run_columns = table_columns(connection, "assistant_runs")
+                meeting_columns = table_columns(connection, "meetings")
                 self.assertIn("speaker_id", transcript_columns)
                 self.assertIn("speaker_label", transcript_columns)
                 self.assertIn("meeting_id", assistant_run_columns)
+                self.assertIn("title_is_manual", meeting_columns)
 
 
 def count_rows(connection: sqlite3.Connection, table: str) -> int:

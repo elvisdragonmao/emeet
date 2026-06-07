@@ -8,6 +8,9 @@ struct MeetingHistoryView: View {
     let message: String
     let refreshAction: () -> Void
     let selectAction: (MeetingHistorySummary) -> Void
+    let renameAction: (String) -> Void
+    let exportAction: (MeetingHistoryRecordResponse) -> Void
+    let continueAction: (MeetingHistoryRecordResponse) -> Void
     let closeAction: () -> Void
 
     var body: some View {
@@ -59,7 +62,13 @@ struct MeetingHistoryView: View {
             meetingList
                 .frame(width: 300)
             Divider()
-            MeetingHistoryDetail(record: record, isLoading: isLoading)
+            MeetingHistoryDetail(
+                record: record,
+                isLoading: isLoading,
+                renameAction: renameAction,
+                exportAction: exportAction,
+                continueAction: continueAction
+            )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
@@ -149,12 +158,16 @@ private struct MeetingHistoryRow: View {
 private struct MeetingHistoryDetail: View {
     let record: MeetingHistoryRecordResponse?
     let isLoading: Bool
+    let renameAction: (String) -> Void
+    let exportAction: (MeetingHistoryRecordResponse) -> Void
+    let continueAction: (MeetingHistoryRecordResponse) -> Void
     @State private var selectedTab: MeetingHistoryTab = .transcript
+    @State private var titleDraft = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             if let record {
-                summary(record.meeting)
+                summary(record)
                 Picker("History section", selection: $selectedTab) {
                     ForEach(MeetingHistoryTab.allCases) { tab in
                         Text(tab.label).tag(tab)
@@ -186,10 +199,20 @@ private struct MeetingHistoryDetail: View {
             }
         }
         .padding(18)
+        .onAppear {
+            titleDraft = record?.meeting.title ?? ""
+        }
+        .onChange(of: record?.meeting.meetingId) { _, _ in
+            titleDraft = record?.meeting.title ?? ""
+        }
+        .onChange(of: record?.meeting.title) { _, _ in
+            titleDraft = record?.meeting.title ?? ""
+        }
     }
 
-    private func summary(_ meeting: MeetingHistorySummary) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+    private func summary(_ record: MeetingHistoryRecordResponse) -> some View {
+        let meeting = record.meeting
+        return VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(meeting.title)
                     .font(.title3.weight(.semibold))
@@ -210,6 +233,36 @@ private struct MeetingHistoryDetail: View {
             .font(.caption)
             .foregroundStyle(.secondary)
             .lineLimit(1)
+
+            HStack(spacing: 8) {
+                TextField("Meeting name", text: $titleDraft)
+                    .textFieldStyle(.roundedBorder)
+
+                Button {
+                    renameAction(titleDraft)
+                } label: {
+                    Label("Rename", systemImage: "pencil")
+                }
+                .disabled(titleDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                Button {
+                    exportAction(record)
+                } label: {
+                    Label("Export", systemImage: "square.and.arrow.down")
+                }
+
+                Button {
+                    continueAction(record)
+                } label: {
+                    Label("Continue", systemImage: "arrowshape.turn.up.right")
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            .controlSize(.regular)
+
+            Label(meeting.titleIsManual ? "Manual name" : "AI/generated name", systemImage: meeting.titleIsManual ? "person.fill" : "sparkles")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
         }
     }
 

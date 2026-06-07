@@ -32,6 +32,9 @@ struct ContentView: View {
                 message: viewModel.meetingHistoryMessage,
                 refreshAction: viewModel.refreshMeetingHistory,
                 selectAction: viewModel.selectMeetingHistory,
+                renameAction: viewModel.renameSelectedMeeting,
+                exportAction: viewModel.exportSelectedMeetingRecord,
+                continueAction: viewModel.continueMeetingFromHistory,
                 closeAction: viewModel.closeMeetingHistory
             )
         }
@@ -94,9 +97,9 @@ struct ContentView: View {
             .buttonStyle(.borderedProminent)
 
             Button {
-                viewModel.clearCurrentRecords()
+                viewModel.startNewMeeting()
             } label: {
-                Label("Clear View", systemImage: "xmark.circle")
+                Label("New Meeting", systemImage: "plus.circle")
             }
             .buttonStyle(.bordered)
 

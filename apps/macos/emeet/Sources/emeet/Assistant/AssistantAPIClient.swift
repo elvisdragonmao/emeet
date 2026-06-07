@@ -205,6 +205,7 @@ struct MeetingHistoryListResponse: Decodable, Equatable {
 struct MeetingHistorySummary: Decodable, Identifiable, Equatable {
     let meetingId: String
     let title: String
+    let titleIsManual: Bool
     let startedAtMs: Int
     let endedAtMs: Int?
     let durationMs: Int
@@ -292,6 +293,25 @@ struct MeetingHistorySuggestion: Decodable, Identifiable, Equatable {
     let detail: String
     let badge: String
     let iconName: String
+}
+
+struct MeetingRenameRequest: Encodable {
+    let title: String
+}
+
+struct MeetingGenerateTitleRequest: Encodable {
+    let provider: String
+    let model: String
+    let thinking: String
+}
+
+struct MeetingMutationResponse: Decodable, Equatable {
+    let meeting: MeetingHistorySummary
+}
+
+struct MeetingGenerateTitleResponse: Decodable, Equatable {
+    let meeting: MeetingHistorySummary
+    let generated: Bool
 }
 
 final class AssistantAPIClient {
@@ -432,9 +452,41 @@ final class AssistantAPIClient {
         return try decoder.decode(MeetingHistoryRecordResponse.self, from: data)
     }
 
+    func renameMeeting(meetingID: String, title: String) async throws -> MeetingMutationResponse {
+        let (data, response) = try await patch(
+            path: "/v1/meetings/\(meetingID)",
+            body: MeetingRenameRequest(title: title)
+        )
+        try validate(response: response, data: data)
+        return try decoder.decode(MeetingMutationResponse.self, from: data)
+    }
+
+    func generateMeetingTitle(
+        meetingID: String,
+        request: MeetingGenerateTitleRequest
+    ) async throws -> MeetingGenerateTitleResponse {
+        let (data, response) = try await post(path: "/v1/meetings/\(meetingID)/generate-title", body: request)
+        try validate(response: response, data: data)
+        return try decoder.decode(MeetingGenerateTitleResponse.self, from: data)
+    }
+
+    func exportMeetingMarkdown(meetingID: String) async throws -> String {
+        let (data, response) = try await session.data(from: url(path: "/v1/meetings/\(meetingID)/export"))
+        try validate(response: response, data: data)
+        return String(data: data, encoding: .utf8) ?? ""
+    }
+
     private func post<T: Encodable>(path: String, body: T) async throws -> (Data, URLResponse) {
         var urlRequest = URLRequest(url: url(path: path))
         urlRequest.httpMethod = "POST"
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.httpBody = try encoder.encode(body)
+        return try await session.data(for: urlRequest)
+    }
+
+    private func patch<T: Encodable>(path: String, body: T) async throws -> (Data, URLResponse) {
+        var urlRequest = URLRequest(url: url(path: path))
+        urlRequest.httpMethod = "PATCH"
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         urlRequest.httpBody = try encoder.encode(body)
         return try await session.data(for: urlRequest)

@@ -80,6 +80,7 @@ final class CaptureViewModel: ObservableObject {
     private var didRequestScreenRecordingPermission = false
     private var currentMeetingID = ""
     private var shouldCreateNewMeetingOnNextStart = false
+    private var shouldPreserveLoadedMeetingOnNextStart = false
     private var finalTranscriptArchive: [TranscriptLine] = []
     private var summarizedFinalLineIDs = Set<String>()
     private var documentEditCheckedFinalLineIDs = Set<String>()
@@ -398,15 +399,24 @@ final class CaptureViewModel: ObservableObject {
             currentMeetingID = ""
             shouldCreateNewMeetingOnNextStart = false
         }
+        let preserveLoadedMeeting = shouldPreserveLoadedMeetingOnNextStart
+        shouldPreserveLoadedMeetingOnNextStart = false
         _ = ensureCurrentMeetingID()
-        transcriptLines.removeAll()
-        finalTranscriptArchive.removeAll()
-        summarizedFinalLineIDs.removeAll()
-        documentEditCheckedFinalLineIDs.removeAll()
-        appliedDocumentEditKeys.removeAll()
+        if preserveLoadedMeeting {
+            summarizedFinalLineIDs = Set(finalTranscriptArchive.map(\.id))
+            documentEditCheckedFinalLineIDs = Set(finalTranscriptArchive.map(\.id))
+            appliedDocumentEditKeys.removeAll()
+        } else {
+            transcriptLines.removeAll()
+            finalTranscriptArchive.removeAll()
+            summarizedFinalLineIDs.removeAll()
+            documentEditCheckedFinalLineIDs.removeAll()
+            appliedDocumentEditKeys.removeAll()
+            resetMeetingDrafts()
+            resetAssistantDrafts()
+        }
         resetLatencyReadings()
-        resetMeetingDrafts()
-        appendLog("Connecting transcription backend at \(transcriptionBackend.displayAddress)...")
+        appendLog("Connecting transcription backend at \(transcriptionBackend.displayAddress) for \(currentMeetingID)...")
         microphoneTranscriptionClient.connect(meetingID: currentMeetingID)
         systemTranscriptionClient.connect(meetingID: currentMeetingID)
         startAutoSummaryCountdown()
@@ -422,6 +432,7 @@ final class CaptureViewModel: ObservableObject {
     }
 
     func disconnectTranscription() {
+        let endedMeetingID = currentMeetingID
         microphoneTranscriptionClient.disconnect()
         systemTranscriptionClient.disconnect()
         transcriptionStatus = .idle
@@ -430,13 +441,21 @@ final class CaptureViewModel: ObservableObject {
         stopDocumentEditWatcher()
         shouldCreateNewMeetingOnNextStart = !currentMeetingID.isEmpty
         appendLog("Transcription backend disconnected.")
+        requestGeneratedMeetingTitle(meetingID: endedMeetingID)
     }
 
-    func clearCurrentRecords() {
+    func startNewMeeting() {
+        if isMeetingActive {
+            stopAll()
+        }
+
         autoSummaryRequestGeneration += 1
         documentEditRequestGeneration += 1
         autoSummaryIsGenerating = false
         documentEditIsPlanning = false
+        currentMeetingID = ""
+        shouldCreateNewMeetingOnNextStart = false
+        shouldPreserveLoadedMeetingOnNextStart = false
         transcriptLines.removeAll()
         finalTranscriptArchive.removeAll()
         summarizedFinalLineIDs.removeAll()
@@ -453,7 +472,7 @@ final class CaptureViewModel: ObservableObject {
             autoSummaryStatusLabel = "Start Meeting to begin"
         }
 
-        appendLog("Current meeting records cleared.")
+        appendLog("New meeting ready.")
     }
 
     func exportMeetingRecords() {
@@ -535,6 +554,109 @@ final class CaptureViewModel: ObservableObject {
         loadMeetingRecord(meetingID: meeting.meetingId)
     }
 
+    func continueMeetingFromHistory(_ record: MeetingHistoryRecordResponse) {
+        let wasActive = isMeetingActive
+        if isMeetingActive {
+            stopAll()
+        }
+
+        currentMeetingID = record.meeting.meetingId
+        shouldCreateNewMeetingOnNextStart = false
+        shouldPreserveLoadedMeetingOnNextStart = true
+        let loadedLines = record.transcript.map(Self.transcriptLine(from:))
+        finalTranscriptArchive = loadedLines
+        transcriptLines = Array(loadedLines.suffix(maxTranscriptLineCount))
+        summarizedFinalLineIDs = Set(loadedLines.map(\.id))
+        documentEditCheckedFinalLineIDs = Set(loadedLines.map(\.id))
+        appliedDocumentEditKeys.removeAll()
+        noteDrafts = record.notes.map { MeetingNoteDraft(title: $0.title, detail: $0.detail) }
+        actionDrafts = record.actions.map {
+            MeetingActionDraft(title: $0.title, owner: $0.owner, state: $0.state)
+        }
+        assistantDrafts = record.assistantResponses.first?.suggestions.map {
+            AssistantDraft(title: $0.title, detail: $0.detail, badge: $0.badge, iconName: $0.iconName)
+        } ?? []
+        resetLatencyReadings()
+        meetingHistoryIsPresented = false
+        autoSummaryStatusLabel = "Continuing saved meeting"
+        appendLog("Continuing meeting: \(record.meeting.title).")
+        if wasActive {
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: 350_000_000)
+                self?.connectTranscription()
+            }
+        } else {
+            connectTranscription()
+        }
+    }
+
+    func renameSelectedMeeting(to title: String) {
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !selectedMeetingHistoryID.isEmpty else {
+            meetingHistoryMessage = "Select a meeting first."
+            return
+        }
+        guard !trimmedTitle.isEmpty else {
+            meetingHistoryMessage = "Meeting title cannot be empty."
+            return
+        }
+
+        let meetingID = selectedMeetingHistoryID
+        meetingHistoryStatus = .starting
+        meetingHistoryMessage = "Renaming meeting..."
+
+        Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+
+            do {
+                let response = try await self.assistantClient.renameMeeting(meetingID: meetingID, title: trimmedTitle)
+                self.applyUpdatedMeetingSummary(response.meeting)
+                self.meetingHistoryStatus = .running
+                self.meetingHistoryMessage = "Meeting renamed"
+                self.appendLog("Meeting renamed: \(response.meeting.title).")
+            } catch {
+                self.meetingHistoryStatus = .failed(error.localizedDescription)
+                self.meetingHistoryMessage = error.localizedDescription
+                self.appendLog("Meeting rename failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func exportSelectedMeetingRecord(_ record: MeetingHistoryRecordResponse) {
+        let panel = NSSavePanel()
+        panel.title = "Export Saved Meeting"
+        panel.nameFieldStringValue = "\(safeFilename(record.meeting.title))-\(fileTimestamp()).md"
+        panel.allowedContentTypes = [UTType(filenameExtension: "md") ?? .plainText]
+        panel.canCreateDirectories = true
+
+        guard panel.runModal() == .OK, let url = panel.url else {
+            return
+        }
+
+        meetingHistoryStatus = .starting
+        meetingHistoryMessage = "Exporting saved meeting..."
+
+        Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+
+            do {
+                let markdown = try await self.assistantClient.exportMeetingMarkdown(meetingID: record.meeting.meetingId)
+                try markdown.write(to: url, atomically: true, encoding: .utf8)
+                self.meetingHistoryStatus = .running
+                self.meetingHistoryMessage = "Meeting exported"
+                self.appendLog("Saved meeting exported: \(url.lastPathComponent)")
+            } catch {
+                self.meetingHistoryStatus = .failed(error.localizedDescription)
+                self.meetingHistoryMessage = error.localizedDescription
+                self.appendLog("Saved meeting export failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
     private func loadMeetingRecord(meetingID: String) {
         meetingHistoryRequestGeneration += 1
         let requestGeneration = meetingHistoryRequestGeneration
@@ -564,6 +686,57 @@ final class CaptureViewModel: ObservableObject {
                 self.meetingHistoryStatus = .failed(error.localizedDescription)
                 self.meetingHistoryMessage = error.localizedDescription
             }
+        }
+    }
+
+    private func requestGeneratedMeetingTitle(meetingID: String) {
+        guard !meetingID.isEmpty else {
+            return
+        }
+
+        let request = MeetingGenerateTitleRequest(
+            provider: assistantProviderID,
+            model: assistantModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? "gpt-5.5"
+                : assistantModel,
+            thinking: assistantThinking
+        )
+
+        Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+
+            try? await Task.sleep(nanoseconds: 700_000_000)
+
+            do {
+                let response = try await self.assistantClient.generateMeetingTitle(
+                    meetingID: meetingID,
+                    request: request
+                )
+                self.applyUpdatedMeetingSummary(response.meeting)
+                if response.generated {
+                    self.appendLog("AI generated meeting title: \(response.meeting.title).")
+                }
+            } catch {
+                self.appendLog("AI meeting title generation failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    private func applyUpdatedMeetingSummary(_ meeting: MeetingHistorySummary) {
+        if let index = meetingHistory.firstIndex(where: { $0.meetingId == meeting.meetingId }) {
+            meetingHistory[index] = meeting
+        }
+
+        if let record = selectedMeetingRecord, record.meeting.meetingId == meeting.meetingId {
+            selectedMeetingRecord = MeetingHistoryRecordResponse(
+                meeting: meeting,
+                transcript: record.transcript,
+                assistantResponses: record.assistantResponses,
+                notes: record.notes,
+                actions: record.actions
+            )
         }
     }
 
@@ -1579,6 +1752,22 @@ final class CaptureViewModel: ObservableObject {
         return trimmed.count > 24 ? "\(trimmed.prefix(24))..." : trimmed
     }
 
+    private static func transcriptLine(from historyLine: MeetingHistoryTranscriptLine) -> TranscriptLine {
+        TranscriptLine(
+            id: historyLine.segmentId,
+            source: historyLine.source,
+            speakerHint: historyLine.speakerHint,
+            speakerID: historyLine.speakerId,
+            speakerLabel: historyLine.speakerLabel,
+            startMs: historyLine.startMs,
+            endMs: historyLine.endMs,
+            provider: historyLine.provider,
+            revision: historyLine.revision,
+            isFinal: historyLine.isFinal,
+            text: historyLine.text
+        )
+    }
+
     private func exportMarkdown() -> String {
         var lines: [String] = []
         lines.append("# Meeting Record")
@@ -1658,6 +1847,16 @@ final class CaptureViewModel: ObservableObject {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyyMMdd-HHmmss"
         return formatter.string(from: Date())
+    }
+
+    private func safeFilename(_ title: String) -> String {
+        let invalidCharacters = CharacterSet(charactersIn: "/\\?%*|\"<>:")
+            .union(.newlines)
+            .union(.controlCharacters)
+        let parts = title.components(separatedBy: invalidCharacters)
+        let normalized = parts.joined(separator: "-")
+            .trimmingCharacters(in: CharacterSet(charactersIn: "-. "))
+        return normalized.isEmpty ? "meeting-record" : String(normalized.prefix(64))
     }
 
     private func appendLog(_ message: String) {

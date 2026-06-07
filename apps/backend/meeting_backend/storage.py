@@ -11,6 +11,7 @@ SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS meetings (
     meeting_id TEXT PRIMARY KEY,
     title TEXT NOT NULL DEFAULT '',
+    title_is_manual INTEGER NOT NULL DEFAULT 0,
     started_at_ms INTEGER NOT NULL,
     ended_at_ms INTEGER,
     stt_provider TEXT NOT NULL DEFAULT '',
@@ -123,6 +124,12 @@ class MeetingStorage:
                 table="assistant_runs",
                 column="meeting_id",
                 definition="TEXT NOT NULL DEFAULT ''",
+            )
+            ensure_column(
+                connection,
+                table="meetings",
+                column="title_is_manual",
+                definition="INTEGER NOT NULL DEFAULT 0",
             )
 
     def record_session_start(self, session: SessionStart, *, provider: str, model: str) -> None:
@@ -349,7 +356,7 @@ class MeetingStorage:
             rows = connection.execute(
                 """
                 SELECT
-                    meeting_id, title, started_at_ms, ended_at_ms,
+                    meeting_id, title, title_is_manual, started_at_ms, ended_at_ms,
                     stt_provider, stt_model, assistant_provider, assistant_model,
                     created_at_ms, updated_at_ms
                 FROM meetings
@@ -370,7 +377,7 @@ class MeetingStorage:
             row = connection.execute(
                 """
                 SELECT
-                    meeting_id, title, started_at_ms, ended_at_ms,
+                    meeting_id, title, title_is_manual, started_at_ms, ended_at_ms,
                     stt_provider, stt_model, assistant_provider, assistant_model,
                     created_at_ms, updated_at_ms
                 FROM meetings
@@ -395,6 +402,82 @@ class MeetingStorage:
         self.initialize()
         with self._connect() as connection:
             return self._latest_meeting_record(connection, meeting_id)
+
+    def rename_meeting(self, meeting_id: str, title: str) -> Optional[Dict[str, Any]]:
+        normalized_title = normalize_meeting_title(title)
+        if not meeting_id or not normalized_title:
+            return None
+
+        self.initialize()
+        now = current_time_ms()
+        with self._connect() as connection:
+            self._backfill_meetings(connection)
+            row = connection.execute(
+                "SELECT meeting_id FROM meetings WHERE meeting_id = ?",
+                (meeting_id,),
+            ).fetchone()
+            if row is None:
+                return None
+
+            connection.execute(
+                """
+                UPDATE meetings
+                SET title = ?, title_is_manual = 1, updated_at_ms = ?
+                WHERE meeting_id = ?
+                """,
+                (normalized_title, now, meeting_id),
+            )
+            return self.meeting_summary(connection, meeting_id)
+
+    def update_generated_meeting_title(self, meeting_id: str, title: str) -> Optional[Dict[str, Any]]:
+        normalized_title = normalize_meeting_title(title)
+        if not meeting_id or not normalized_title:
+            return None
+
+        self.initialize()
+        now = current_time_ms()
+        with self._connect() as connection:
+            self._backfill_meetings(connection)
+            row = connection.execute(
+                "SELECT title_is_manual FROM meetings WHERE meeting_id = ?",
+                (meeting_id,),
+            ).fetchone()
+            if row is None:
+                return None
+            if bool(row[0]):
+                return self.meeting_summary(connection, meeting_id)
+
+            connection.execute(
+                """
+                UPDATE meetings
+                SET title = ?, title_is_manual = 0, updated_at_ms = ?
+                WHERE meeting_id = ?
+                """,
+                (normalized_title, now, meeting_id),
+            )
+            return self.meeting_summary(connection, meeting_id)
+
+    def meeting_summary(self, connection: sqlite3.Connection, meeting_id: str) -> Optional[Dict[str, Any]]:
+        row = connection.execute(
+            """
+            SELECT
+                meeting_id, title, title_is_manual, started_at_ms, ended_at_ms,
+                stt_provider, stt_model, assistant_provider, assistant_model,
+                created_at_ms, updated_at_ms
+            FROM meetings
+            WHERE meeting_id = ?
+            """,
+            (meeting_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        return self._meeting_summary(connection, row)
+
+    def meeting_markdown(self, meeting_id: str) -> Optional[str]:
+        record = self.meeting_record(meeting_id)
+        if record is None:
+            return None
+        return meeting_record_markdown(record)
 
     def _backfill_meetings(self, connection: sqlite3.Connection) -> None:
         for row in connection.execute(
@@ -432,9 +515,10 @@ class MeetingStorage:
 
     def _meeting_summary(self, connection: sqlite3.Connection, row: sqlite3.Row) -> Dict[str, Any]:
         meeting_id = str(row[0])
-        started_at_ms = int(row[2])
-        ended_at_ms = None if row[3] is None else int(row[3])
-        updated_at_ms = int(row[9])
+        title_is_manual = bool(row[2])
+        started_at_ms = int(row[3])
+        ended_at_ms = None if row[4] is None else int(row[4])
+        updated_at_ms = int(row[10])
         effective_end_ms = ended_at_ms if ended_at_ms is not None else updated_at_ms
         notes_actions = self._latest_meeting_record(connection, meeting_id)
         title = str(row[1] or "") or first_transcript_title(connection, meeting_id) or "Untitled meeting"
@@ -442,18 +526,19 @@ class MeetingStorage:
         return {
             "meeting_id": meeting_id,
             "title": title,
+            "title_is_manual": title_is_manual,
             "started_at_ms": started_at_ms,
             "ended_at_ms": ended_at_ms,
             "duration_ms": max(0, effective_end_ms - started_at_ms),
-            "stt_provider": str(row[4] or ""),
-            "stt_model": str(row[5] or ""),
-            "assistant_provider": str(row[6] or ""),
-            "assistant_model": str(row[7] or ""),
+            "stt_provider": str(row[5] or ""),
+            "stt_model": str(row[6] or ""),
+            "assistant_provider": str(row[7] or ""),
+            "assistant_model": str(row[8] or ""),
             "transcript_count": transcript_count(connection, meeting_id),
             "assistant_response_count": assistant_response_count(connection, meeting_id),
             "notes_count": len(notes_actions["notes"]),
             "actions_count": len(notes_actions["actions"]),
-            "created_at_ms": int(row[8]),
+            "created_at_ms": int(row[9]),
             "updated_at_ms": updated_at_ms,
         }
 
@@ -624,7 +709,7 @@ def upsert_meeting(
     existing = connection.execute(
         """
         SELECT
-            title, started_at_ms, ended_at_ms, stt_provider, stt_model,
+            title, title_is_manual, started_at_ms, ended_at_ms, stt_provider, stt_model,
             assistant_provider, assistant_model, created_at_ms, updated_at_ms
         FROM meetings
         WHERE meeting_id = ?
@@ -635,11 +720,11 @@ def upsert_meeting(
         connection.execute(
             """
             INSERT INTO meetings (
-                meeting_id, title, started_at_ms, ended_at_ms,
+                meeting_id, title, title_is_manual, started_at_ms, ended_at_ms,
                 stt_provider, stt_model, assistant_provider, assistant_model,
                 created_at_ms, updated_at_ms
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 meeting_id,
@@ -656,7 +741,7 @@ def upsert_meeting(
         )
         return
 
-    existing_ended_at_ms = None if existing[2] is None else int(existing[2])
+    existing_ended_at_ms = None if existing[3] is None else int(existing[3])
     next_ended_at_ms: Optional[int]
     if clear_ended:
         next_ended_at_ms = None
@@ -683,13 +768,13 @@ def upsert_meeting(
         """,
         (
             str(existing[0] or "") or title,
-            min(int(existing[1]), started_at_ms),
+            min(int(existing[2]), started_at_ms),
             next_ended_at_ms,
-            stt_provider or str(existing[3] or ""),
-            stt_model or str(existing[4] or ""),
-            assistant_provider or str(existing[5] or ""),
-            assistant_model or str(existing[6] or ""),
-            max(int(existing[8]), now),
+            stt_provider or str(existing[4] or ""),
+            stt_model or str(existing[5] or ""),
+            assistant_provider or str(existing[6] or ""),
+            assistant_model or str(existing[7] or ""),
+            max(int(existing[9]), now),
             meeting_id,
         ),
     )
@@ -713,6 +798,7 @@ def update_meeting_title_from_transcript(
             title = CASE WHEN title = '' THEN ? ELSE title END,
             updated_at_ms = ?
         WHERE meeting_id = ?
+          AND title_is_manual = 0
         """,
         (title, now, meeting_id),
     )
@@ -813,6 +899,15 @@ def first_transcript_title(connection: sqlite3.Connection, meeting_id: str) -> s
     return title_from_transcript(str(row[0]))
 
 
+def normalize_meeting_title(title: str) -> str:
+    normalized = " ".join(title.replace("#", " ").split()).strip(" \"'`")
+    if not normalized:
+        return ""
+    if len(normalized) <= 80:
+        return normalized
+    return normalized[:77].rstrip() + "..."
+
+
 def title_from_transcript(text: str) -> str:
     normalized = " ".join(text.split())
     if not normalized:
@@ -820,3 +915,84 @@ def title_from_transcript(text: str) -> str:
     if len(normalized) <= 64:
         return normalized
     return normalized[:61].rstrip() + "..."
+
+
+def meeting_record_markdown(record: Dict[str, Any]) -> str:
+    meeting = record.get("meeting") or {}
+    lines: List[str] = ["# {}".format(meeting.get("title") or "Meeting Record"), ""]
+    if meeting.get("started_at_ms"):
+        lines.append("- Started: {}".format(display_time_ms(int(meeting["started_at_ms"]))))
+    if meeting.get("ended_at_ms"):
+        lines.append("- Ended: {}".format(display_time_ms(int(meeting["ended_at_ms"]))))
+    if meeting.get("stt_provider") or meeting.get("stt_model"):
+        lines.append("- STT: {} / {}".format(meeting.get("stt_provider") or "", meeting.get("stt_model") or ""))
+    if meeting.get("assistant_provider") or meeting.get("assistant_model"):
+        lines.append(
+            "- Assistant: {} / {}".format(
+                meeting.get("assistant_provider") or "",
+                meeting.get("assistant_model") or "",
+            )
+        )
+    lines.append("")
+
+    lines.extend(["## Meeting Notes", ""])
+    notes = record.get("notes") or []
+    if not notes:
+        lines.append("_No meeting notes yet._")
+    else:
+        for note in notes:
+            lines.append("### {}".format(note.get("title") or "Note"))
+            lines.append(str(note.get("detail") or ""))
+            lines.append("")
+
+    lines.extend(["", "## Next Actions", ""])
+    actions = record.get("actions") or []
+    if not actions:
+        lines.append("_No next actions yet._")
+    else:
+        for action in actions:
+            lines.append("- [ ] {}  ".format(action.get("title") or "Next action"))
+            lines.append("  Owner: {}  ".format(action.get("owner") or "Unassigned"))
+            lines.append("  State: {}".format(action.get("state") or "Draft"))
+
+    lines.extend(["", "## AI Suggestions", ""])
+    assistant_responses = record.get("assistant_responses") or []
+    if not assistant_responses:
+        lines.append("_No assistant suggestions yet._")
+    else:
+        for response in assistant_responses:
+            lines.append("### {}".format(str(response.get("action") or "").replace("_", " ").title()))
+            lines.append("- Provider: {} / {}".format(response.get("provider") or "", response.get("model") or ""))
+            for suggestion in response.get("suggestions") or []:
+                lines.append("- **{}**: {}".format(suggestion.get("title") or "Suggestion", suggestion.get("detail") or ""))
+            lines.append("")
+
+    lines.extend(["## Transcript", ""])
+    transcript = record.get("transcript") or []
+    if not transcript:
+        lines.append("_No transcript yet._")
+    else:
+        for line in transcript:
+            speaker = line.get("speaker_label") or line.get("speaker_hint") or line.get("source") or "Unknown"
+            lines.append(
+                "- `{} - {}` **{}**: {}".format(
+                    display_duration_ms(int(line.get("start_ms") or 0)),
+                    display_duration_ms(int(line.get("end_ms") or 0)),
+                    speaker,
+                    line.get("text") or "",
+                )
+            )
+
+    lines.append("")
+    return "\n".join(lines)
+
+
+def display_time_ms(milliseconds: int) -> str:
+    return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(milliseconds / 1000))
+
+
+def display_duration_ms(milliseconds: int) -> str:
+    total_seconds = max(0, milliseconds // 1000)
+    minutes = total_seconds // 60
+    seconds = total_seconds % 60
+    return "{:02d}:{:02d}".format(minutes, seconds)
