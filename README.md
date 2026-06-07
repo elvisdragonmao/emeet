@@ -78,7 +78,7 @@ cd apps/backend
 uv python install 3.12
 uv sync --extra mlx-whisper
 MEETING_BACKEND_PROVIDER=mlx-whisper \
-MEETING_BACKEND_MODEL=breeze-asr-25 \
+MEETING_BACKEND_MODEL=schsu/breeze-asr-25-mlx \
 MEETING_BACKEND_WHISPER_LANGUAGE=zh \
 ./scripts/dev.sh
 ```
