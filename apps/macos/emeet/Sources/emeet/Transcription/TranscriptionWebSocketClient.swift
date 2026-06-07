@@ -44,6 +44,9 @@ final class TranscriptionWebSocketClient {
     private var bufferedAudio = Data()
     private var audioTimelineStartNanoseconds: UInt64?
     private var sessionID = "macos-local"
+    private var sttProvider = ""
+    private var sttModel = ""
+    private var sttLanguage = "auto"
 
     init(url: URL, source: String = "microphone", session: URLSession = .shared) {
         self.url = url
@@ -51,7 +54,12 @@ final class TranscriptionWebSocketClient {
         self.session = session
     }
 
-    func connect(meetingID: String? = nil) {
+    func connect(
+        meetingID: String? = nil,
+        sttProvider: String = "",
+        sttModel: String = "",
+        sttLanguage: String = "auto"
+    ) {
         queue.async { [weak self] in
             guard let self, self.task == nil else {
                 return
@@ -63,6 +71,9 @@ final class TranscriptionWebSocketClient {
             } else {
                 self.sessionID = "macos-\(self.source)-\(UUID().uuidString.lowercased())"
             }
+            self.sttProvider = sttProvider
+            self.sttModel = sttModel
+            self.sttLanguage = sttLanguage
             self.bufferedAudio.removeAll(keepingCapacity: true)
             self.pendingPings.removeAll(keepingCapacity: true)
             self.audioTimelineStartNanoseconds = nil
@@ -157,7 +168,10 @@ final class TranscriptionWebSocketClient {
             "source": source,
             "sample_rate": PCM16AudioConverter.outputSampleRate,
             "channels": Int(PCM16AudioConverter.outputChannels),
-            "sample_width": PCM16AudioConverter.sampleWidth
+            "sample_width": PCM16AudioConverter.sampleWidth,
+            "stt_provider": sttProvider,
+            "stt_model": sttModel,
+            "stt_language": sttLanguage
         ]
 
         sendJSON(payload, on: task)

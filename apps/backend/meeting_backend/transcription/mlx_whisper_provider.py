@@ -7,6 +7,8 @@ from meeting_backend.transcription.segmented import SegmentedStreamingTranscribe
 from meeting_backend.transcription.segmenter import SpeechSegmenterConfig
 
 MLX_MODEL_ALIASES = {
+    "breeze-asr-25": "schsu/breeze-asr-25-mlx",
+    "breeze-asr-25-mlx": "schsu/breeze-asr-25-mlx",
     "tiny": "mlx-community/whisper-tiny",
     "base": "mlx-community/whisper-base-mlx-fp32",
     "small": "mlx-community/whisper-small-mlx-fp32",

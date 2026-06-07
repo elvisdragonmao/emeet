@@ -4,7 +4,7 @@ from typing import Any, Optional
 from fastapi import WebSocket
 from starlette.websockets import WebSocketDisconnect
 
-from meeting_backend.config import Settings
+from meeting_backend.config import Settings, with_transcription_overrides
 from meeting_backend.protocol import error_event, parse_session_start, pong_event
 from meeting_backend.storage import MeetingStorage
 from meeting_backend.transcription import create_transcriber
@@ -26,11 +26,17 @@ class TranscriptionSession:
             first_message = await self.websocket.receive_text()
             session = parse_session_start(json.loads(first_message))
             self.session_id = session.session_id
-            self.transcriber = create_transcriber(self.settings)
+            session_settings = with_transcription_overrides(
+                self.settings,
+                provider=session.stt_provider,
+                model=session.stt_model,
+                language=session.stt_language,
+            )
+            self.transcriber = create_transcriber(session_settings)
             self.storage.record_session_start(
                 session,
-                provider=self.settings.provider,
-                model=self.settings.whisper_model,
+                provider=session_settings.provider,
+                model=session_settings.whisper_model,
             )
             await self._send_many(self.transcriber.start(session))
 

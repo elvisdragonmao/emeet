@@ -5,6 +5,7 @@ from meeting_backend.transcription.mlx_whisper_provider import resolve_mlx_model
 
 class MlxWhisperProviderTest(unittest.TestCase):
     def test_resolves_standard_whisper_aliases_to_mlx_repos(self) -> None:
+        self.assertEqual(resolve_mlx_model_name("breeze-asr-25"), "schsu/breeze-asr-25-mlx")
         self.assertEqual(resolve_mlx_model_name("large-v3"), "mlx-community/whisper-large-v3-mlx")
         self.assertEqual(
             resolve_mlx_model_name("large-v3-turbo"),

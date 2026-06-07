@@ -2,7 +2,7 @@ import unittest
 from contextlib import contextmanager
 import os
 
-from meeting_backend.config import get_settings
+from meeting_backend.config import get_settings, with_transcription_overrides
 
 
 class ConfigTest(unittest.TestCase):
@@ -75,6 +75,18 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(settings.diarization_provider, "source")
         self.assertEqual(settings.diarization_max_speakers, 2)
         self.assertEqual(settings.diarization_cluster_threshold, 0.5)
+
+    def test_transcription_overrides_update_provider_model_and_language(self) -> None:
+        settings = with_transcription_overrides(
+            get_settings(),
+            provider="mlx-whisper",
+            model="breeze-asr-25",
+            language="zh",
+        )
+
+        self.assertEqual(settings.provider, "mlx-whisper")
+        self.assertEqual(settings.whisper_model, "breeze-asr-25")
+        self.assertEqual(settings.whisper_language, "zh")
 
 
 @contextmanager

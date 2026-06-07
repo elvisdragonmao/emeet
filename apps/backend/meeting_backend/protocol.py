@@ -10,6 +10,9 @@ class SessionStart:
     sample_rate: int
     channels: int
     sample_width: int
+    stt_provider: str = ""
+    stt_model: str = ""
+    stt_language: str = ""
 
 
 def parse_session_start(payload: Dict[str, Any]) -> SessionStart:
@@ -21,6 +24,9 @@ def parse_session_start(payload: Dict[str, Any]) -> SessionStart:
     sample_rate = int(payload.get("sample_rate") or 16_000)
     channels = int(payload.get("channels") or 1)
     sample_width = int(payload.get("sample_width") or 2)
+    stt_provider = str(payload.get("stt_provider") or "")
+    stt_model = str(payload.get("stt_model") or "")
+    stt_language = str(payload.get("stt_language") or "")
 
     if sample_rate <= 0:
         raise ValueError("sample_rate must be positive")
@@ -35,6 +41,9 @@ def parse_session_start(payload: Dict[str, Any]) -> SessionStart:
         sample_rate=sample_rate,
         channels=channels,
         sample_width=sample_width,
+        stt_provider=stt_provider,
+        stt_model=stt_model,
+        stt_language=stt_language,
     )
 
 

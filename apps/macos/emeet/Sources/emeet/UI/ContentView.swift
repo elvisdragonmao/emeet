@@ -38,6 +38,40 @@ struct ContentView: View {
                 closeAction: viewModel.closeMeetingHistory
             )
         }
+        .sheet(
+            isPresented: Binding(
+                get: { viewModel.transcriptionSettingsIsPresented },
+                set: { presented in
+                    if !presented {
+                        viewModel.closeTranscriptionSettings()
+                    }
+                }
+            )
+        ) {
+            TranscriptionSettingsView(
+                hardwareLabel: viewModel.transcriptionHardwareLabel,
+                message: viewModel.transcriptionOptionsMessage,
+                isLoading: viewModel.transcriptionOptionsStatus == .starting,
+                isMeetingActive: viewModel.isMeetingActive,
+                providers: viewModel.transcriptionProviderOptions,
+                selectedProviderID: Binding(
+                    get: { viewModel.transcriptionProviderID },
+                    set: { viewModel.selectTranscriptionProvider($0) }
+                ),
+                models: viewModel.transcriptionModelOptions,
+                selectedModelID: Binding(
+                    get: { viewModel.transcriptionModel },
+                    set: { viewModel.updateTranscriptionModel($0) }
+                ),
+                languages: viewModel.transcriptionLanguageOptions,
+                selectedLanguageID: Binding(
+                    get: { viewModel.transcriptionLanguage },
+                    set: { viewModel.updateTranscriptionLanguage($0) }
+                ),
+                refreshAction: viewModel.refreshTranscriptionOptions,
+                closeAction: viewModel.closeTranscriptionSettings
+            )
+        }
     }
 
     private var header: some View {
@@ -69,6 +103,10 @@ struct ContentView: View {
             Text(viewModel.transcriptionEndpointLabel)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            Text(viewModel.transcriptionSettingsSummary)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
         }
     }
 
@@ -107,6 +145,13 @@ struct ContentView: View {
                 viewModel.openMeetingHistory()
             } label: {
                 Label("History", systemImage: "clock.arrow.circlepath")
+            }
+            .buttonStyle(.bordered)
+
+            Button {
+                viewModel.openTranscriptionSettings()
+            } label: {
+                Label("Settings", systemImage: "gearshape")
             }
             .buttonStyle(.bordered)
 

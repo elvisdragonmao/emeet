@@ -78,7 +78,8 @@ cd apps/backend
 uv python install 3.12
 uv sync --extra mlx-whisper
 MEETING_BACKEND_PROVIDER=mlx-whisper \
-MEETING_BACKEND_MODEL=large-v3-turbo \
+MEETING_BACKEND_MODEL=breeze-asr-25 \
+MEETING_BACKEND_WHISPER_LANGUAGE=zh \
 ./scripts/dev.sh
 ```
 
@@ -232,7 +233,7 @@ pnpm build
 
 建議畢業專題 live demo 順序：
 
-1. 啟動 backend，Apple Silicon demo 優先使用 `MEETING_BACKEND_PROVIDER=mlx-whisper`。
+1. 啟動 backend，Apple Silicon demo 優先使用 `MEETING_BACKEND_PROVIDER=mlx-whisper` 與 `MEETING_BACKEND_MODEL=breeze-asr-25`。
 2. 開啟 `emeet.app`。
 3. 按 `Start Meeting`。
 4. 展示麥克風與系統音訊 level meters。

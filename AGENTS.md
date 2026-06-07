@@ -145,8 +145,9 @@ Chosen MVP line:
 
 * Client sends 16 kHz mono PCM16 to backend over WebSocket.
 * Backend segments speech windows, then runs `faster-whisper` or `mlx-whisper`.
-* Apple Silicon demo preference: `mlx-whisper` with `large-v3-turbo`.
+* Apple Silicon demo preference: `mlx-whisper` with `breeze-asr-25` and `MEETING_BACKEND_WHISPER_LANGUAGE=zh` for Taiwan Mandarin / Mandarin-English code-switching.
 * `faster-whisper` remains the CPU-compatible route.
+* The macOS app fetches `/v1/transcribe/options` to show locally runnable STT providers/models and sends selected provider/model/language in WebSocket `session.start`.
 * System-audio speaker labels can be assigned locally with `MEETING_BACKEND_DIARIZATION_PROVIDER=local-clustering`.
 
 ### Realtime Chunking
@@ -299,7 +300,8 @@ cd apps/backend
 uv python install 3.12
 uv sync --extra mlx-whisper
 MEETING_BACKEND_PROVIDER=mlx-whisper \
-MEETING_BACKEND_MODEL=large-v3-turbo \
+MEETING_BACKEND_MODEL=breeze-asr-25 \
+MEETING_BACKEND_WHISPER_LANGUAGE=zh \
 ./scripts/dev.sh
 ```
 
@@ -330,7 +332,7 @@ uv run pytest
 
 Use this order for the graduation project live demo:
 
-1. Start backend with `MEETING_BACKEND_PROVIDER=mlx-whisper` for Apple Silicon local STT, or `faster-whisper` for a CPU-compatible route.
+1. Start backend with `MEETING_BACKEND_PROVIDER=mlx-whisper MEETING_BACKEND_MODEL=breeze-asr-25 MEETING_BACKEND_WHISPER_LANGUAGE=zh` for Apple Silicon local STT, or `faster-whisper` for a CPU-compatible route.
 2. Open `emeet.app`.
 3. Press `Start Meeting`.
 4. Show microphone and system audio level meters.

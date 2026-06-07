@@ -1,5 +1,5 @@
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 DEFAULT_PROVIDER = "faster-whisper"
 DEFAULT_WHISPER_MODEL = "large-v3-turbo"
@@ -137,3 +137,23 @@ def env_first(*names: str, default: str = "") -> str:
         if value:
             return value
     return default
+
+
+def with_transcription_overrides(
+    settings: Settings,
+    *,
+    provider: str = "",
+    model: str = "",
+    language: str = "",
+) -> Settings:
+    overrides = {}
+    if provider.strip():
+        overrides["provider"] = provider.strip()
+    if model.strip():
+        overrides["whisper_model"] = model.strip()
+    normalized_language = language.strip()
+    if normalized_language == "auto":
+        normalized_language = ""
+    if normalized_language:
+        overrides["whisper_language"] = normalized_language
+    return replace(settings, **overrides) if overrides else settings

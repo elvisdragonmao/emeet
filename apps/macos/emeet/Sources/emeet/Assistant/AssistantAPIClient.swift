@@ -30,6 +30,54 @@ struct AssistantProvidersResponse: Decodable, Equatable {
     let providers: [AssistantProviderDescriptor]
 }
 
+struct TranscriptionOptionsResponse: Decodable, Equatable {
+    let defaults: TranscriptionDefaults
+    let hardware: TranscriptionHardware
+    let providers: [TranscriptionProviderDescriptor]
+    let languages: [TranscriptionLanguageOption]
+}
+
+struct TranscriptionDefaults: Decodable, Equatable {
+    let provider: String
+    let model: String
+    let language: String
+}
+
+struct TranscriptionHardware: Decodable, Equatable {
+    let platform: String
+    let platformVersion: String
+    let machine: String
+    let cpu: String
+    let memoryGb: Double
+    let appleSilicon: Bool
+}
+
+struct TranscriptionProviderDescriptor: Decodable, Identifiable, Equatable {
+    let id: String
+    let label: String
+    let installed: Bool
+    let available: Bool
+    let recommended: Bool
+    let notes: [String]
+    let models: [TranscriptionModelDescriptor]
+}
+
+struct TranscriptionModelDescriptor: Decodable, Identifiable, Equatable {
+    let id: String
+    let label: String
+    let available: Bool
+    let recommended: Bool
+    let languageHint: String
+    let estimatedSizeGb: Double
+    let notes: [String]
+}
+
+struct TranscriptionLanguageOption: Decodable, Identifiable, Equatable {
+    let id: String
+    let label: String
+    let notes: String
+}
+
 struct AssistantTranscriptLinePayload: Encodable {
     let source: String
     let sourceLabel: String
@@ -337,6 +385,12 @@ final class AssistantAPIClient {
         let (data, response) = try await session.data(from: url(path: "/v1/assistant/providers"))
         try validate(response: response, data: data)
         return try decoder.decode(AssistantProvidersResponse.self, from: data)
+    }
+
+    func fetchTranscriptionOptions() async throws -> TranscriptionOptionsResponse {
+        let (data, response) = try await session.data(from: url(path: "/v1/transcribe/options"))
+        try validate(response: response, data: data)
+        return try decoder.decode(TranscriptionOptionsResponse.self, from: data)
     }
 
     func respond(_ request: AssistantRespondRequest) async throws -> AssistantRespondResponse {

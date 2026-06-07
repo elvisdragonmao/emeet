@@ -5,6 +5,7 @@ from meeting_backend.config import get_settings
 from meeting_backend.google_docs_api import router as google_docs_router
 from meeting_backend.meetings_api import router as meetings_router
 from meeting_backend.sessions import TranscriptionSession
+from meeting_backend.transcription.options import transcription_options
 
 app = FastAPI(title="emeet Backend", version="0.1.0")
 app.include_router(assistant_router)
@@ -19,6 +20,7 @@ async def health():
         "status": "ok",
         "provider": settings.provider,
         "model": settings.whisper_model,
+        "language": settings.whisper_language or "auto",
         "host": settings.host,
         "port": settings.port,
         "websocket_url": settings.websocket_url,
@@ -35,6 +37,11 @@ async def health():
         "google_oauth_client_path": settings.google_oauth_client_path,
         "google_token_path": settings.google_token_path,
     }
+
+
+@app.get("/v1/transcribe/options")
+async def transcribe_options():
+    return transcription_options(get_settings())
 
 
 @app.websocket("/v1/transcribe/ws")
