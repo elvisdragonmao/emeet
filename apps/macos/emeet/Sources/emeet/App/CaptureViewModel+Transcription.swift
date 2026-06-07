@@ -70,6 +70,7 @@ extension CaptureViewModel {
         )
         startAutoSummaryCountdown()
         startDocumentEditWatcher()
+        prepareMeetingFromConnectedDocumentOnStart()
 
         if microphoneStatus != .running && microphoneStatus != .starting {
             startMicrophone()

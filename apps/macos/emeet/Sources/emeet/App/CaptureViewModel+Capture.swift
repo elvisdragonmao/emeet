@@ -134,6 +134,7 @@ extension CaptureViewModel {
         summarizedFinalLineIDs.removeAll()
         documentEditCheckedFinalLineIDs.removeAll()
         appliedDocumentEditKeys.removeAll()
+        documentPreparedMeetingIDs.removeAll()
         resetLatencyReadings()
         resetMeetingDrafts()
         resetAssistantDrafts()

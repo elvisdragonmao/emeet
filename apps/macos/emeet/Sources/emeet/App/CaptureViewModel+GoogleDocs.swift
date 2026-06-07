@@ -146,6 +146,87 @@ extension CaptureViewModel {
         )
     }
 
+    func prepareMeetingFromConnectedDocumentOnStart() {
+        guard googleDocsIsConnected else {
+            return
+        }
+
+        let meetingID = ensureCurrentMeetingID()
+        guard !documentPreparedMeetingIDs.contains(meetingID) else {
+            return
+        }
+
+        guard noteDrafts.isEmpty && actionDrafts.isEmpty else {
+            appendLog("Skipping Google Doc meeting prep because notes or actions already exist.")
+            return
+        }
+
+        documentPreparedMeetingIDs.insert(meetingID)
+        googleDocsStatus = .starting
+        googleDocsMessage = "Preparing meeting from Google Doc..."
+        assistantStatus = .starting
+        assistantModeLabel = "Document prep · \(assistantProviderID)"
+        autoSummaryStatusLabel = "Preparing from Google Doc"
+        appendLog("Preparing initial meeting notes from connected Google Doc.")
+
+        Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+
+            do {
+                let snapshot = try await self.assistantClient.refreshGoogleDoc(
+                    GoogleDocMeetingRequest(meetingID: meetingID)
+                )
+                guard self.currentMeetingID == meetingID else {
+                    return
+                }
+
+                self.applyGoogleDocSnapshot(snapshot, fallbackMessage: "Google Doc context refreshed.")
+                let fullDocumentText = (snapshot.plainText ?? self.googleDocsPlainText)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                let documentSummary = fullDocumentText.isEmpty ? snapshot.preview : fullDocumentText
+
+                let request = AssistantRespondRequest(
+                    action: "document_briefing",
+                    meetingID: meetingID,
+                    provider: self.assistantProviderID,
+                    model: self.assistantModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        ? "gpt-5.5"
+                        : self.assistantModel,
+                    thinking: self.assistantThinking,
+                    transcript: [],
+                    rollingSummary: "",
+                    previousNotes: [],
+                    previousActions: [],
+                    documentTitle: snapshot.title,
+                    documentSummary: documentSummary,
+                    documentSnippets: snapshot.snippets ?? self.googleDocsSnippets,
+                    documentBriefing: ""
+                )
+
+                let response = try await self.assistantClient.respond(request)
+                guard self.currentMeetingID == meetingID else {
+                    return
+                }
+
+                self.applyInitialDocumentBriefingResponse(response)
+            } catch {
+                guard self.currentMeetingID == meetingID else {
+                    return
+                }
+
+                self.documentPreparedMeetingIDs.remove(meetingID)
+                self.googleDocsStatus = .failed(error.localizedDescription)
+                self.googleDocsMessage = error.localizedDescription
+                self.assistantStatus = .failed(error.localizedDescription)
+                self.assistantModeLabel = "Document prep failed"
+                self.autoSummaryStatusLabel = "Document prep failed"
+                self.appendLog("Google Doc meeting prep failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
     func appendMeetingNotesToGoogleDoc() {
         guard googleDocsIsConnected else {
             googleDocsMessage = "Connect a Google Doc first."
@@ -402,6 +483,37 @@ extension CaptureViewModel {
         }
     }
 
+    func applyInitialDocumentBriefingResponse(_ response: AssistantRespondResponse) {
+        let notes = response.notes.map {
+            MeetingNoteDraft(
+                title: "Doc · \($0.title)",
+                detail: documentContextDetail($0.detail)
+            )
+        }
+        let actions = response.actions.map {
+            MeetingActionDraft(
+                title: $0.title,
+                owner: $0.owner,
+                state: documentContextActionState($0.state)
+            )
+        }
+
+        if !notes.isEmpty {
+            noteDrafts = notes
+        }
+        if !actions.isEmpty {
+            actionDrafts = actions
+        }
+
+        googleDocsBriefing = documentBriefingText(notes: response.notes, actions: response.actions)
+        assistantStatus = .running
+        assistantModeLabel = "Document prep · \(response.provider) · \(response.model) · \(response.latencyMs) ms"
+        autoSummaryStatusLabel = notes.isEmpty && actions.isEmpty
+            ? "Document context loaded"
+            : "Document context ready"
+        appendLog("Initial meeting notes prepared from Google Doc: \(response.latencyMs)ms.")
+    }
+
     func applyGoogleBrowserResponse(_ response: GoogleBrowserResponse) {
         googleBrowserMessage = response.message
         googleDocsMessage = response.message
@@ -559,6 +671,36 @@ extension CaptureViewModel {
         default:
             return "document edit"
         }
+    }
+
+    func documentContextDetail(_ detail: String) -> String {
+        let trimmed = detail.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            return "Source: connected Google Doc before the meeting."
+        }
+        return "Source: connected Google Doc before the meeting.\n\(trimmed)"
+    }
+
+    func documentContextActionState(_ state: String) -> String {
+        let trimmed = state.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed.lowercased() != "draft" else {
+            return "Document Draft"
+        }
+        return "Document Draft · \(trimmed)"
+    }
+
+    func documentBriefingText(notes: [MeetingNoteResponse], actions: [MeetingActionResponse]) -> String {
+        var lines: [String] = []
+        for note in notes {
+            lines.append("\(note.title): \(note.detail)")
+        }
+        if !actions.isEmpty {
+            lines.append("Actions:")
+            for action in actions {
+                lines.append("- \(action.title) / owner=\(action.owner) / state=\(action.state)")
+            }
+        }
+        return lines.joined(separator: "\n")
     }
 
 }

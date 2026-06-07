@@ -93,6 +93,7 @@ final class CaptureViewModel: ObservableObject {
     var summarizedFinalLineIDs = Set<String>()
     var documentEditCheckedFinalLineIDs = Set<String>()
     var appliedDocumentEditKeys = Set<String>()
+    var documentPreparedMeetingIDs = Set<String>()
     var documentEditIsPlanning = false
 
     init(transcriptionBackend: TranscriptionBackendConfig = .fromEnvironment()) {
