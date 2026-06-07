@@ -112,10 +112,10 @@ struct ContentView: View {
 
     private var statusBadges: some View {
         HStack(spacing: 18) {
-            StatusBadge(title: "Mic", status: viewModel.microphoneStatus)
-            StatusBadge(title: "System", status: viewModel.systemAudioStatus)
+            StatusBadge(title: "麥克風", status: viewModel.microphoneStatus)
+            StatusBadge(title: "系統音訊", status: viewModel.systemAudioStatus)
             StatusBadge(
-                title: "STT",
+                title: "逐字稿",
                 status: viewModel.transcriptionStatus,
                 detail: viewModel.transcriptionStatusDetailLabel
             )
@@ -128,7 +128,7 @@ struct ContentView: View {
                 viewModel.toggleMeeting()
             } label: {
                 Label(
-                    viewModel.isMeetingActive ? "Stop Meeting" : "Start Meeting",
+                    viewModel.isMeetingActive ? "停止會議" : "開始會議",
                     systemImage: viewModel.isMeetingActive ? "stop.fill" : "record.circle"
                 )
             }
@@ -137,28 +137,28 @@ struct ContentView: View {
             Button {
                 viewModel.startNewMeeting()
             } label: {
-                Label("New Meeting", systemImage: "plus.circle")
+                Label("新會議", systemImage: "plus.circle")
             }
             .buttonStyle(.bordered)
 
             Button {
                 viewModel.openMeetingHistory()
             } label: {
-                Label("History", systemImage: "clock.arrow.circlepath")
+                Label("歷史紀錄", systemImage: "clock.arrow.circlepath")
             }
             .buttonStyle(.bordered)
 
             Button {
                 viewModel.openTranscriptionSettings()
             } label: {
-                Label("Settings", systemImage: "gearshape")
+                Label("設定", systemImage: "gearshape")
             }
             .buttonStyle(.bordered)
 
             Button {
                 viewModel.exportMeetingRecords()
             } label: {
-                Label("Export", systemImage: "square.and.arrow.down")
+                Label("匯出", systemImage: "square.and.arrow.down")
             }
             .buttonStyle(.bordered)
         }

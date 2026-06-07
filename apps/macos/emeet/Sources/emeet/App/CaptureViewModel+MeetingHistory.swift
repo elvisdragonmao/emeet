@@ -21,7 +21,7 @@ extension CaptureViewModel {
         meetingHistoryRequestGeneration += 1
         let requestGeneration = meetingHistoryRequestGeneration
         meetingHistoryStatus = .starting
-        meetingHistoryMessage = "Loading saved meetings..."
+        meetingHistoryMessage = "正在載入已儲存會議..."
 
         Task { @MainActor [weak self] in
             guard let self else {
@@ -39,11 +39,11 @@ extension CaptureViewModel {
                     self.selectedMeetingHistoryID = ""
                     self.selectedMeetingRecord = nil
                     self.meetingHistoryStatus = .idle
-                    self.meetingHistoryMessage = "No saved meetings yet."
+                    self.meetingHistoryMessage = "尚無已儲存會議。"
                     return
                 }
 
-                self.meetingHistoryMessage = "\(response.meetings.count) saved meetings"
+                self.meetingHistoryMessage = "\(response.meetings.count) 場已儲存會議"
                 let selected = response.meetings.first { $0.meetingId == self.selectedMeetingHistoryID }
                     ?? response.meetings.first
                 if let selected {
@@ -86,15 +86,19 @@ extension CaptureViewModel {
         appliedDocumentEditKeys.removeAll()
         noteDrafts = record.notes.map { MeetingNoteDraft(title: $0.title, detail: $0.detail) }
         actionDrafts = record.actions.map {
-            MeetingActionDraft(title: $0.title, owner: $0.owner, state: $0.state)
+            MeetingActionDraft(
+                title: $0.title,
+                owner: documentContextActionOwner($0.owner),
+                state: documentContextActionState($0.state)
+            )
         }
         assistantDrafts = record.assistantResponses.first?.suggestions.map {
             AssistantDraft(title: $0.title, detail: $0.detail, badge: $0.badge, iconName: $0.iconName)
         } ?? []
         resetLatencyReadings()
         meetingHistoryIsPresented = false
-        autoSummaryStatusLabel = "Continuing saved meeting"
-        appendLog("Continuing meeting: \(record.meeting.title).")
+        autoSummaryStatusLabel = "正在延續已儲存會議"
+        appendLog("正在延續會議：\(record.meeting.title)。")
         if wasActive {
             Task { @MainActor [weak self] in
                 try? await Task.sleep(nanoseconds: 350_000_000)
@@ -108,17 +112,17 @@ extension CaptureViewModel {
     func renameSelectedMeeting(to title: String) {
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !selectedMeetingHistoryID.isEmpty else {
-            meetingHistoryMessage = "Select a meeting first."
+            meetingHistoryMessage = "請先選擇一場會議。"
             return
         }
         guard !trimmedTitle.isEmpty else {
-            meetingHistoryMessage = "Meeting title cannot be empty."
+            meetingHistoryMessage = "會議名稱不能空白。"
             return
         }
 
         let meetingID = selectedMeetingHistoryID
         meetingHistoryStatus = .starting
-        meetingHistoryMessage = "Renaming meeting..."
+        meetingHistoryMessage = "正在重新命名會議..."
 
         Task { @MainActor [weak self] in
             guard let self else {
@@ -129,19 +133,19 @@ extension CaptureViewModel {
                 let response = try await self.assistantClient.renameMeeting(meetingID: meetingID, title: trimmedTitle)
                 self.applyUpdatedMeetingSummary(response.meeting)
                 self.meetingHistoryStatus = .running
-                self.meetingHistoryMessage = "Meeting renamed"
-                self.appendLog("Meeting renamed: \(response.meeting.title).")
+                self.meetingHistoryMessage = "會議已重新命名"
+                self.appendLog("會議已重新命名：\(response.meeting.title)。")
             } catch {
                 self.meetingHistoryStatus = .failed(error.localizedDescription)
                 self.meetingHistoryMessage = error.localizedDescription
-                self.appendLog("Meeting rename failed: \(error.localizedDescription)")
+                self.appendLog("會議重新命名失敗：\(error.localizedDescription)")
             }
         }
     }
 
     func exportSelectedMeetingRecord(_ record: MeetingHistoryRecordResponse) {
         let panel = NSSavePanel()
-        panel.title = "Export Saved Meeting"
+        panel.title = "匯出已儲存會議"
         panel.nameFieldStringValue = "\(safeFilename(record.meeting.title))-\(fileTimestamp()).md"
         panel.allowedContentTypes = [UTType(filenameExtension: "md") ?? .plainText]
         panel.canCreateDirectories = true
@@ -151,7 +155,7 @@ extension CaptureViewModel {
         }
 
         meetingHistoryStatus = .starting
-        meetingHistoryMessage = "Exporting saved meeting..."
+        meetingHistoryMessage = "正在匯出已儲存會議..."
 
         Task { @MainActor [weak self] in
             guard let self else {
@@ -162,12 +166,12 @@ extension CaptureViewModel {
                 let markdown = try await self.assistantClient.exportMeetingMarkdown(meetingID: record.meeting.meetingId)
                 try markdown.write(to: url, atomically: true, encoding: .utf8)
                 self.meetingHistoryStatus = .running
-                self.meetingHistoryMessage = "Meeting exported"
-                self.appendLog("Saved meeting exported: \(url.lastPathComponent)")
+                self.meetingHistoryMessage = "會議已匯出"
+                self.appendLog("已匯出儲存會議：\(url.lastPathComponent)")
             } catch {
                 self.meetingHistoryStatus = .failed(error.localizedDescription)
                 self.meetingHistoryMessage = error.localizedDescription
-                self.appendLog("Saved meeting export failed: \(error.localizedDescription)")
+                self.appendLog("儲存會議匯出失敗：\(error.localizedDescription)")
             }
         }
     }
@@ -176,7 +180,7 @@ extension CaptureViewModel {
         meetingHistoryRequestGeneration += 1
         let requestGeneration = meetingHistoryRequestGeneration
         meetingHistoryStatus = .starting
-        meetingHistoryMessage = "Loading meeting record..."
+        meetingHistoryMessage = "正在載入會議紀錄..."
 
         Task { @MainActor [weak self] in
             guard let self else {
@@ -192,7 +196,7 @@ extension CaptureViewModel {
 
                 self.selectedMeetingRecord = record
                 self.meetingHistoryStatus = .running
-                self.meetingHistoryMessage = "Meeting loaded"
+                self.meetingHistoryMessage = "會議已載入"
             } catch {
                 guard self.meetingHistoryRequestGeneration == requestGeneration else {
                     return
@@ -231,10 +235,10 @@ extension CaptureViewModel {
                 )
                 self.applyUpdatedMeetingSummary(response.meeting)
                 if response.generated {
-                    self.appendLog("AI generated meeting title: \(response.meeting.title).")
+                    self.appendLog("AI 已生成會議名稱：\(response.meeting.title)。")
                 }
             } catch {
-                self.appendLog("AI meeting title generation failed: \(error.localizedDescription)")
+                self.appendLog("AI 生成會議名稱失敗：\(error.localizedDescription)")
             }
         }
     }
@@ -278,7 +282,7 @@ extension CaptureViewModel {
         let parts = title.components(separatedBy: invalidCharacters)
         let normalized = parts.joined(separator: "-")
             .trimmingCharacters(in: CharacterSet(charactersIn: "-. "))
-        return normalized.isEmpty ? "meeting-record" : String(normalized.prefix(64))
+        return normalized.isEmpty ? "會議紀錄" : String(normalized.prefix(64))
     }
 
 }

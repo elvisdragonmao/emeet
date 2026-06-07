@@ -12,7 +12,7 @@ struct TranscriptWorkspace: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Live Transcript")
+                    Text("即時逐字稿")
                         .font(.title3.weight(.semibold))
                     Text(countLabel)
                         .font(.caption)
@@ -21,10 +21,10 @@ struct TranscriptWorkspace: View {
 
                 Spacer()
 
-                LatencyReadout(title: "Backend", value: backendLatencyLabel)
-                LatencyReadout(title: "STT", value: transcriptionLatencyLabel)
-                SourceLegend(label: "Self", color: .blue)
-                SourceLegend(label: "Speakers", color: .green)
+                LatencyReadout(title: "後端", value: backendLatencyLabel)
+                LatencyReadout(title: "辨識", value: transcriptionLatencyLabel)
+                SourceLegend(label: "自己", color: .blue)
+                SourceLegend(label: "講者", color: .green)
             }
 
             Divider()
@@ -138,7 +138,7 @@ private struct EmptyTranscriptView: View {
             Image(systemName: "waveform.and.magnifyingglass")
                 .font(.system(size: 34, weight: .medium))
                 .foregroundStyle(.secondary)
-            Text(status == .running ? "Listening" : "No transcript yet")
+            Text(status == .running ? "聆聽中" : "尚無逐字稿")
                 .font(.headline)
             Text(status.detail)
                 .font(.caption)
@@ -175,7 +175,7 @@ private struct TranscriptLineView: View {
 
                     Spacer()
 
-                    Text(line.isFinal ? "Final" : "Partial")
+                    Text(line.isFinal ? "完成" : "即時")
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(line.isFinal ? Color.secondary : Color.orange)
                 }

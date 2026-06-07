@@ -36,7 +36,7 @@ struct AssistantWorkspace: View {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Assistant")
+                            Text("AI 助理")
                                 .font(.title3.weight(.semibold))
                             Text(modeLabel)
                                 .font(.caption)
@@ -61,7 +61,7 @@ struct AssistantWorkspace: View {
 
                     HStack(spacing: 10) {
                         AssistantActionButton(
-                            title: "What should I say?",
+                            title: "我該怎麼說？",
                             iconName: "quote.bubble.fill",
                             color: .blue,
                             isLoading: whatShouldISayIsLoading,
@@ -70,7 +70,7 @@ struct AssistantWorkspace: View {
                         )
 
                         AssistantActionButton(
-                            title: "Follow-up questions",
+                            title: "追問問題",
                             iconName: "questionmark.bubble.fill",
                             color: .green,
                             isLoading: followUpIsLoading,
@@ -123,7 +123,7 @@ private struct AssistantSettingsBar: View {
     var body: some View {
         VStack(spacing: 8) {
             HStack(spacing: 8) {
-                Picker("Provider", selection: selectedProviderID) {
+                Picker("供應商", selection: selectedProviderID) {
                     ForEach(providerOptions) { provider in
                         Text(providerLabel(provider))
                             .tag(provider.id)
@@ -132,7 +132,7 @@ private struct AssistantSettingsBar: View {
                 .labelsHidden()
                 .frame(maxWidth: .infinity)
 
-                Picker("Thinking", selection: thinking) {
+                Picker("思考程度", selection: thinking) {
                     ForEach(AssistantThinking.allCases) { item in
                         Text(item.label)
                             .tag(item.rawValue)
@@ -144,16 +144,16 @@ private struct AssistantSettingsBar: View {
                 Button(action: refreshAction) {
                     Image(systemName: "arrow.clockwise")
                 }
-                .help("Refresh providers")
+                .help("重新整理供應商")
             }
 
             HStack(spacing: 8) {
-                TextField("Model", text: model)
+                TextField("模型", text: model)
                     .textFieldStyle(.roundedBorder)
 
                 Menu {
                     if modelOptions.isEmpty {
-                        Text("No models")
+                        Text("沒有可用模型")
                     } else {
                         ForEach(modelOptions, id: \.self) { option in
                             Button(option) {
@@ -165,13 +165,13 @@ private struct AssistantSettingsBar: View {
                     Image(systemName: "cube.box")
                 }
                 .menuStyle(.borderlessButton)
-                .help("Model options")
+                .help("模型選項")
             }
         }
     }
 
     private func providerLabel(_ provider: AssistantProviderDescriptor) -> String {
-        provider.available ? provider.label : "\(provider.label) unavailable"
+        provider.available ? provider.label : "\(provider.label) 不可用"
     }
 }
 
@@ -198,7 +198,7 @@ private struct AssistantActionButton: View {
                             .multilineTextAlignment(.leading)
 
                         if isLoading {
-                            Text("Thinking")
+                            Text("思考中")
                                 .font(.caption2.weight(.medium))
                                 .foregroundStyle(.secondary)
                         }
@@ -302,23 +302,23 @@ private struct GoogleDocsWorkspace: View {
             }
 
             HStack(spacing: 8) {
-                TextField("Google Docs URL", text: url)
+                TextField("Google Docs 連結", text: url)
                     .textFieldStyle(.roundedBorder)
 
                 Button(action: authAction) {
                     Image(systemName: "person.badge.key")
                 }
-                .help("Authorize Google Docs")
+                .help("授權 Google Docs")
                 .disabled(isBusy)
 
                 Button(action: connectAction) {
                     Image(systemName: "link")
                 }
-                .help("Connect Google Doc")
+                .help("連接 Google Doc")
                 .disabled(isBusy)
 
                 GoogleDocSmallButton(
-                    title: "Open",
+                    title: "開啟",
                     iconName: "safari",
                     disabled: isBusy,
                     action: browserOpenAction
@@ -363,7 +363,7 @@ private struct NotesWorkspace: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center) {
-                Text("Meeting Notes")
+                Text("會議紀錄")
                     .font(.headline)
                 Spacer()
                 AutoSummaryCountdownView(
@@ -389,7 +389,7 @@ private struct NotesWorkspace: View {
             Divider()
 
             HStack {
-                Text("Next Actions")
+                Text("下一步行動")
                     .font(.headline)
                 Spacer()
                 Image(systemName: "checklist")
@@ -406,7 +406,7 @@ private struct NotesWorkspace: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(item.title)
                             .font(.callout.weight(.medium))
-                        Text("\(item.owner) · \(item.state)")
+                        Text(actionMetadata(item))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -416,6 +416,39 @@ private struct NotesWorkspace: View {
             Spacer(minLength: 0)
         }
         .panelStyle()
+    }
+
+    private func actionMetadata(_ item: MeetingActionDraft) -> String {
+        "\(localizedOwner(item.owner)) · \(localizedState(item.state))"
+    }
+
+    private func localizedOwner(_ owner: String) -> String {
+        let trimmed = owner.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed.lowercased() != "unassigned" else {
+            return "未指派"
+        }
+        return trimmed
+    }
+
+    private func localizedState(_ state: String) -> String {
+        let trimmed = state.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lowered = trimmed.lowercased()
+        if trimmed.isEmpty || lowered == "draft" || lowered.contains("document draft") {
+            return "草稿"
+        }
+        if lowered.contains("open") {
+            return "待確認"
+        }
+        if lowered.contains("waiting") {
+            return "等待中"
+        }
+        if lowered.contains("confirmed") {
+            return "已確認"
+        }
+        if lowered.contains("blocked") {
+            return "受阻"
+        }
+        return trimmed
     }
 }
 
@@ -453,7 +486,7 @@ private struct AutoSummaryCountdownView: View {
             .frame(width: 34, height: 34)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Auto summarize")
+                Text("自動摘要")
                     .font(.caption.weight(.semibold))
                 Text(statusLabel)
                     .font(.caption2)
@@ -463,7 +496,7 @@ private struct AutoSummaryCountdownView: View {
             .frame(width: 112, alignment: .leading)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Auto summarize")
+        .accessibilityLabel("自動摘要")
         .accessibilityValue(statusLabel)
     }
 

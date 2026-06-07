@@ -19,9 +19,9 @@ struct TranscriptionSettingsView: View {
             header
             Divider()
             Form {
-                Section("Local Runtime") {
-                    LabeledContent("Machine", value: hardwareLabel)
-                    LabeledContent("Status") {
+                Section("本機執行環境") {
+                    LabeledContent("機器", value: hardwareLabel)
+                    LabeledContent("狀態") {
                         HStack(spacing: 8) {
                             if isLoading {
                                 ProgressView()
@@ -33,8 +33,8 @@ struct TranscriptionSettingsView: View {
                     }
                 }
 
-                Section("Meeting Transcription") {
-                    Picker("Provider", selection: selectedProviderID) {
+                Section("會議逐字稿") {
+                    Picker("供應商", selection: selectedProviderID) {
                         ForEach(providers.filter(\.available)) { provider in
                             Text(providerLabel(provider))
                                 .tag(provider.id)
@@ -42,7 +42,7 @@ struct TranscriptionSettingsView: View {
                     }
                     .disabled(isMeetingActive)
 
-                    Picker("Model", selection: selectedModelID) {
+                    Picker("模型", selection: selectedModelID) {
                         ForEach(models) { model in
                             Text(modelLabel(model))
                                 .tag(model.id)
@@ -50,7 +50,7 @@ struct TranscriptionSettingsView: View {
                     }
                     .disabled(isMeetingActive || models.isEmpty)
 
-                    Picker("Meeting Language", selection: selectedLanguageID) {
+                    Picker("會議語言", selection: selectedLanguageID) {
                         ForEach(languages) { language in
                             Text(language.label)
                                 .tag(language.id)
@@ -59,16 +59,16 @@ struct TranscriptionSettingsView: View {
                     .disabled(isMeetingActive)
                 }
 
-                Section("Model Notes") {
+                Section("模型備註") {
                     if let model = models.first(where: { $0.id == selectedModelID.wrappedValue }) {
-                        LabeledContent("Estimated size", value: sizeLabel(model.estimatedSizeGb))
+                        LabeledContent("預估大小", value: sizeLabel(model.estimatedSizeGb))
                         if !model.notes.isEmpty {
                             Text(model.notes.joined(separator: "\n"))
                                 .foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     } else {
-                        Text("No available model for the selected provider.")
+                        Text("此供應商目前沒有可用模型。")
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -82,9 +82,9 @@ struct TranscriptionSettingsView: View {
     private var header: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("App Settings")
+                Text("應用程式設定")
                     .font(.title3.weight(.semibold))
-                Text(isMeetingActive ? "Stop the meeting before changing STT settings." : "Settings apply when the next meeting starts.")
+                Text(isMeetingActive ? "請先停止會議，再變更逐字稿設定。" : "設定會在下一次開始會議時套用。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -92,7 +92,7 @@ struct TranscriptionSettingsView: View {
             Spacer()
 
             Button(action: refreshAction) {
-                Label("Check", systemImage: "arrow.clockwise")
+                Label("檢查", systemImage: "arrow.clockwise")
             }
             .buttonStyle(.bordered)
 
@@ -101,21 +101,21 @@ struct TranscriptionSettingsView: View {
                     .frame(width: 16, height: 16)
             }
             .buttonStyle(.bordered)
-            .help("Close")
+            .help("關閉")
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
     }
 
     private func providerLabel(_ provider: TranscriptionProviderDescriptor) -> String {
-        provider.recommended ? "\(provider.label) (Recommended)" : provider.label
+        provider.recommended ? "\(provider.label)（建議）" : provider.label
     }
 
     private func modelLabel(_ model: TranscriptionModelDescriptor) -> String {
-        model.recommended ? "\(model.label) (Recommended)" : model.label
+        model.recommended ? "\(model.label)（建議）" : model.label
     }
 
     private func sizeLabel(_ size: Double) -> String {
-        size > 0 ? String(format: "%.1f GB", size) : "Varies"
+        size > 0 ? String(format: "%.1f GB", size) : "依模型而定"
     }
 }

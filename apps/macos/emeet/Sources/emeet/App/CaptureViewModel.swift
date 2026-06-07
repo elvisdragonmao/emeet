@@ -17,8 +17,8 @@ final class CaptureViewModel: ObservableObject {
     @Published var transcriptionEndpointLabel: String
     @Published var transcriptionSettingsIsPresented = false
     @Published var transcriptionOptionsStatus: CaptureStatus = .idle
-    @Published var transcriptionOptionsMessage = "Checking local STT runtime..."
-    @Published var transcriptionHardwareLabel = "Unknown Mac"
+    @Published var transcriptionOptionsMessage = "正在檢查本機 STT 執行環境..."
+    @Published var transcriptionHardwareLabel = "未知 Mac"
     @Published var transcriptionProviders: [TranscriptionProviderDescriptor] = []
     @Published var transcriptionLanguages: [TranscriptionLanguageOption] = []
     @Published var transcriptionProviderID = "mlx-whisper"
@@ -28,7 +28,7 @@ final class CaptureViewModel: ObservableObject {
     @Published var systemBackendLatencyMs: Int?
     @Published var microphoneTranscriptionLatencyMs: Int?
     @Published var systemTranscriptionLatencyMs: Int?
-    @Published var assistantModeLabel = "Ready"
+    @Published var assistantModeLabel = "就緒"
     @Published var assistantStatus: CaptureStatus = .idle
     @Published var assistantProviders: [AssistantProviderDescriptor] = []
     @Published var assistantProviderID = "codex-cli"
@@ -39,7 +39,7 @@ final class CaptureViewModel: ObservableObject {
     @Published var noteDrafts: [MeetingNoteDraft] = []
     @Published var actionDrafts: [MeetingActionDraft] = []
     @Published var autoSummaryRemainingSeconds = 30
-    @Published var autoSummaryStatusLabel = "Start Meeting to begin"
+    @Published var autoSummaryStatusLabel = "開始會議後啟動"
     @Published var autoSummaryIsGenerating = false
     @Published var googleDocsURL = ""
     @Published var googleDocsStatus: CaptureStatus = .idle
@@ -53,20 +53,20 @@ final class CaptureViewModel: ObservableObject {
     @Published var googleDocsPlainText = ""
     @Published var googleDocsBriefing = ""
     @Published var googleDocsSnippets: [String] = []
-    @Published var googleDocsMessage = "Google Docs not connected."
-    @Published var googleBrowserMessage = "Browser helper optional."
+    @Published var googleDocsMessage = "尚未連接 Google Docs。"
+    @Published var googleBrowserMessage = "瀏覽器輔助工具為選用功能。"
     @Published var googleBrowserSeleniumAvailable = false
     @Published var googleBrowserChromeDriverAvailable = false
     @Published var googleBrowserSessionActive = false
     @Published var googleBrowserFindText = ""
     @Published var meetingHistoryIsPresented = false
     @Published var meetingHistoryStatus: CaptureStatus = .idle
-    @Published var meetingHistoryMessage = "Open saved meetings from the backend."
+    @Published var meetingHistoryMessage = "從後端開啟已儲存會議。"
     @Published var meetingHistory: [MeetingHistorySummary] = []
     @Published var selectedMeetingHistoryID = ""
     @Published var selectedMeetingRecord: MeetingHistoryRecordResponse?
     @Published var eventLog: [String] = [
-        "Ready. Start Meeting begins capture, STT, and auto summaries."
+        "就緒。開始會議後會啟動擷取、逐字稿與自動摘要。"
     ]
 
     let microphoneService = MicrophoneCaptureService()
@@ -124,7 +124,7 @@ final class CaptureViewModel: ObservableObject {
         microphoneService.onError = { [weak self] message in
             Task { @MainActor in
                 self?.microphoneStatus = .failed(message)
-                self?.appendLog("Microphone error: \(message)")
+                self?.appendLog("麥克風錯誤：\(message)")
             }
         }
 
@@ -141,19 +141,19 @@ final class CaptureViewModel: ObservableObject {
         systemAudioService.onError = { [weak self] message in
             Task { @MainActor in
                 self?.systemAudioStatus = .failed(message)
-                self?.appendLog("System audio error: \(message)")
+                self?.appendLog("系統音訊錯誤：\(message)")
             }
         }
 
         configureTranscriptionClient(
             microphoneTranscriptionClient,
             source: .microphone,
-            label: "Microphone"
+            label: "麥克風"
         )
         configureTranscriptionClient(
             systemTranscriptionClient,
             source: .systemAudio,
-            label: "System audio"
+            label: "系統音訊"
         )
 
         refreshAssistantProviders()

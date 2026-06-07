@@ -47,7 +47,7 @@ class BrowserController:
             driver.get(clean_url)
             return BrowserResult(
                 ok=True,
-                message="Opened Google Doc in ChromeDriver browser session.",
+                message="已在 ChromeDriver 瀏覽器工作階段開啟 Google Doc。",
                 selenium_available=True,
                 chromedriver_available=chromedriver_available(),
                 browser_session_active=True,
@@ -56,14 +56,14 @@ class BrowserController:
             if open_with_system_browser(clean_url):
                 return BrowserResult(
                     ok=True,
-                    message="Opened Google Doc with the system browser.",
+                    message="已使用系統瀏覽器開啟 Google Doc。",
                     selenium_available=selenium_available(),
                     chromedriver_available=chromedriver_available(),
                     browser_session_active=False,
                 ).to_dict()
             return BrowserResult(
                 ok=False,
-                message="Browser open failed: {}".format(error),
+                message="瀏覽器開啟失敗：{}".format(error),
                 selenium_available=selenium_available(),
                 chromedriver_available=chromedriver_available(),
                 browser_session_active=False,
@@ -74,7 +74,7 @@ class BrowserController:
         driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
         return BrowserResult(
             ok=True,
-            message="Scrolled browser view to bottom.",
+            message="已將瀏覽器畫面捲到底部。",
             selenium_available=True,
             chromedriver_available=chromedriver_available(),
             browser_session_active=True,
@@ -83,7 +83,7 @@ class BrowserController:
     def find_visible_text(self, text: str) -> Dict[str, Any]:
         query = text.strip()
         if not query:
-            raise ValueError("Find text is empty")
+            raise ValueError("搜尋文字是空的")
 
         driver = self._driver()
         body = driver.find_element(selenium_by().TAG_NAME, "body")
@@ -94,7 +94,7 @@ class BrowserController:
         body.send_keys(keys.ENTER)
         return BrowserResult(
             ok=True,
-            message="Sent browser find command for visible text.",
+            message="已送出瀏覽器可見文字搜尋指令。",
             selenium_available=True,
             chromedriver_available=chromedriver_available(),
             browser_session_active=True,
@@ -120,7 +120,7 @@ class BrowserController:
 def validate_url(url: str) -> str:
     clean_url = url.strip()
     if not clean_url.startswith("https://docs.google.com/document/"):
-        raise ValueError("Only Google Docs document URLs can be opened")
+        raise ValueError("只能開啟 Google Docs 文件連結")
     return clean_url
 
 
@@ -141,10 +141,10 @@ def open_with_system_browser(url: str) -> bool:
 
 def browser_status_message() -> str:
     if not selenium_available():
-        return "Selenium is not installed. Browser open can use macOS open."
+        return "尚未安裝 Selenium。瀏覽器開啟可改用 macOS open。"
     if chromedriver_available():
-        return "Selenium and ChromeDriver are available."
-    return "Selenium is available. ChromeDriver was not found; set CHROMEDRIVER_PATH if Chrome does not launch."
+        return "Selenium 與 ChromeDriver 可用。"
+    return "Selenium 可用，但找不到 ChromeDriver；若 Chrome 無法啟動，請設定 CHROMEDRIVER_PATH。"
 
 
 def selenium_available() -> bool:

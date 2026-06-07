@@ -5,11 +5,11 @@ extension CaptureViewModel {
     var googleDocsStatusLabel: String {
         switch googleDocsStatus {
         case .idle:
-            return googleDocsAuthReady ? "Auth ready" : "Not authorized"
+            return googleDocsAuthReady ? "已授權" : "未授權"
         case .starting:
-            return "Syncing"
+            return "同步中"
         case .running:
-            return googleDocsConnectedTitle.isEmpty ? "Ready" : "Connected"
+            return googleDocsConnectedTitle.isEmpty ? "就緒" : "已連接"
         case .failed(let message):
             return message
         }
@@ -20,15 +20,15 @@ extension CaptureViewModel {
             return googleDocsConnectedTitle
         }
         if !googleDocsDependenciesAvailable {
-            return "Install Google Python dependencies"
+            return "請安裝 Google Python 依賴"
         }
         if !googleDocsClientConfigured {
-            return "Missing OAuth client JSON"
+            return "缺少 OAuth client JSON"
         }
         if googleDocsConnectedTitle.isEmpty {
-            return googleDocsAuthReady ? "Paste a Google Docs URL" : "Authorize Google Docs"
+            return googleDocsAuthReady ? "貼上 Google Docs 連結" : "授權 Google Docs"
         }
-        return "Google Docs ready"
+        return "Google Docs 就緒"
     }
 
     var googleDocsIsConnected: Bool {
@@ -52,11 +52,11 @@ extension CaptureViewModel {
             do {
                 let response = try await assistantClient.fetchGoogleAuthStatus()
                 applyGoogleAuthStatus(response)
-                appendLog("Google Docs auth status loaded.")
+                appendLog("Google Docs 授權狀態已載入。")
             } catch {
                 googleDocsStatus = .failed(error.localizedDescription)
                 googleDocsMessage = error.localizedDescription
-                appendLog("Google Docs auth status failed: \(error.localizedDescription)")
+                appendLog("Google Docs 授權狀態載入失敗：\(error.localizedDescription)")
             }
         }
     }
@@ -67,19 +67,19 @@ extension CaptureViewModel {
         }
 
         googleDocsStatus = .starting
-        googleDocsMessage = "Opening Google OAuth flow..."
-        appendLog("Starting Google Docs OAuth flow.")
+        googleDocsMessage = "正在開啟 Google OAuth 授權流程..."
+        appendLog("正在啟動 Google Docs OAuth 授權流程。")
         Task {
             do {
                 let response = try await assistantClient.startGoogleAuth()
                 applyGoogleAuthStatus(response)
                 googleDocsStatus = .idle
-                googleDocsMessage = response.ready ? "Google Docs authorization is ready." : "Google Docs authorization is incomplete."
-                appendLog("Google Docs OAuth flow finished.")
+                googleDocsMessage = response.ready ? "Google Docs 授權已就緒。" : "Google Docs 授權尚未完成。"
+                appendLog("Google Docs OAuth 授權流程已完成。")
             } catch {
                 googleDocsStatus = .failed(error.localizedDescription)
                 googleDocsMessage = error.localizedDescription
-                appendLog("Google Docs OAuth failed: \(error.localizedDescription)")
+                appendLog("Google Docs OAuth 授權失敗：\(error.localizedDescription)")
             }
         }
     }
@@ -89,10 +89,10 @@ extension CaptureViewModel {
             do {
                 let response = try await assistantClient.fetchGoogleBrowserStatus()
                 applyGoogleBrowserResponse(response)
-                appendLog("Google Docs browser helper status loaded.")
+                appendLog("Google Docs 瀏覽器輔助工具狀態已載入。")
             } catch {
                 googleBrowserMessage = error.localizedDescription
-                appendLog("Google Docs browser helper status failed: \(error.localizedDescription)")
+                appendLog("Google Docs 瀏覽器輔助工具狀態載入失敗：\(error.localizedDescription)")
             }
         }
     }
@@ -104,15 +104,15 @@ extension CaptureViewModel {
 
         let trimmedURL = googleDocsURL.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedURL.isEmpty else {
-            googleDocsStatus = .failed("Paste a Google Docs URL first.")
-            googleDocsMessage = "Paste a Google Docs URL first."
+            googleDocsStatus = .failed("請先貼上 Google Docs 連結。")
+            googleDocsMessage = "請先貼上 Google Docs 連結。"
             return
         }
 
         let meetingID = ensureCurrentMeetingID()
         googleDocsStatus = .starting
-        googleDocsMessage = "Connecting Google Doc..."
-        appendLog("Connecting Google Doc to \(meetingID).")
+        googleDocsMessage = "正在連接 Google Doc..."
+        appendLog("正在將 Google Doc 連接到會議 \(meetingID)。")
 
         let request = GoogleDocConnectRequest(
             url: trimmedURL,
@@ -127,23 +127,23 @@ extension CaptureViewModel {
         Task {
             do {
                 let response = try await assistantClient.connectGoogleDoc(request)
-                applyGoogleDocSnapshot(response, fallbackMessage: "Google Doc connected.")
-                appendLog("Google Doc connected: \(response.title).")
+                applyGoogleDocSnapshot(response, fallbackMessage: "Google Doc 已連接。")
+                appendLog("Google Doc 已連接：\(response.title)。")
             } catch {
                 googleDocsStatus = .failed(error.localizedDescription)
                 googleDocsMessage = error.localizedDescription
-                appendLog("Google Doc connect failed: \(error.localizedDescription)")
+                appendLog("Google Doc 連接失敗：\(error.localizedDescription)")
             }
         }
     }
 
     func refreshGoogleDocContext() {
         guard googleDocsIsConnected else {
-            googleDocsMessage = "Connect a Google Doc first."
+            googleDocsMessage = "請先連接 Google Doc。"
             return
         }
         runGoogleDocSnapshotAction(
-            label: "Refreshing Google Doc context...",
+            label: "正在重新整理 Google Doc 內容...",
             request: GoogleDocMeetingRequest(meetingID: ensureCurrentMeetingID()),
             call: assistantClient.refreshGoogleDoc
         )
@@ -160,17 +160,17 @@ extension CaptureViewModel {
         }
 
         guard noteDrafts.isEmpty && actionDrafts.isEmpty else {
-            appendLog("Skipping Google Doc meeting prep because notes or actions already exist.")
+            appendLog("已略過 Google Doc 會議準備，因為已有會議紀錄或行動項目。")
             return
         }
 
         documentPreparedMeetingIDs.insert(meetingID)
         googleDocsStatus = .starting
-        googleDocsMessage = "Preparing meeting from Google Doc..."
+        googleDocsMessage = "正在根據 Google Doc 準備會議..."
         assistantStatus = .starting
-        assistantModeLabel = "Document prep · \(assistantProviderID)"
-        autoSummaryStatusLabel = "Preparing from Google Doc"
-        appendLog("Preparing initial meeting notes from connected Google Doc.")
+        assistantModeLabel = "文件準備 · \(assistantProviderID)"
+        autoSummaryStatusLabel = "正在根據文件準備"
+        appendLog("正在根據已連接的 Google Doc 準備初始會議紀錄。")
 
         Task { @MainActor [weak self] in
             guard let self else {
@@ -185,7 +185,7 @@ extension CaptureViewModel {
                     return
                 }
 
-                self.applyGoogleDocSnapshot(snapshot, fallbackMessage: "Google Doc context refreshed.")
+                self.applyGoogleDocSnapshot(snapshot, fallbackMessage: "Google Doc 內容已重新整理。")
                 let fullDocumentText = (snapshot.plainText ?? self.googleDocsPlainText)
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                 let documentSummary = fullDocumentText.isEmpty ? snapshot.preview : fullDocumentText
@@ -223,33 +223,33 @@ extension CaptureViewModel {
                 self.googleDocsStatus = .failed(error.localizedDescription)
                 self.googleDocsMessage = error.localizedDescription
                 self.assistantStatus = .failed(error.localizedDescription)
-                self.assistantModeLabel = "Document prep failed"
-                self.autoSummaryStatusLabel = "Document prep failed"
-                self.appendLog("Google Doc meeting prep failed: \(error.localizedDescription)")
+                self.assistantModeLabel = "文件準備失敗"
+                self.autoSummaryStatusLabel = "文件準備失敗"
+                self.appendLog("Google Doc 會議準備失敗：\(error.localizedDescription)")
             }
         }
     }
 
     func appendMeetingNotesToGoogleDoc() {
         guard googleDocsIsConnected else {
-            googleDocsMessage = "Connect a Google Doc first."
+            googleDocsMessage = "請先連接 Google Doc。"
             return
         }
 
         let request = googleDocMeetingNotesRequest()
         googleDocsStatus = .starting
-        googleDocsMessage = "Appending meeting notes..."
-        appendLog("Appending meeting notes to Google Doc.")
+        googleDocsMessage = "正在附加會議紀錄..."
+        appendLog("正在將會議紀錄附加到 Google Doc。")
 
         Task {
             do {
                 let response = try await assistantClient.appendMeetingNotesToGoogleDoc(request)
-                applyGoogleDocSnapshot(response, fallbackMessage: "Meeting notes appended.")
-                appendLog("Meeting notes appended to Google Doc.")
+                applyGoogleDocSnapshot(response, fallbackMessage: "會議紀錄已附加。")
+                appendLog("會議紀錄已附加到 Google Doc。")
             } catch {
                 googleDocsStatus = .failed(error.localizedDescription)
                 googleDocsMessage = error.localizedDescription
-                appendLog("Append to Google Doc failed: \(error.localizedDescription)")
+                appendLog("附加到 Google Doc 失敗：\(error.localizedDescription)")
             }
         }
     }
@@ -260,7 +260,7 @@ extension CaptureViewModel {
 
     func openGoogleDocInBrowser() {
         guard googleDocsIsConnected || !googleDocsURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            googleBrowserMessage = "Connect a Google Doc or paste a URL first."
+            googleBrowserMessage = "請先連接 Google Doc 或貼上連結。"
             googleDocsMessage = googleBrowserMessage
             return
         }
@@ -269,32 +269,32 @@ extension CaptureViewModel {
             meetingID: ensureCurrentMeetingID(),
             url: googleDocsURL.trimmingCharacters(in: .whitespacesAndNewlines)
         )
-        googleDocsMessage = "Opening Google Doc..."
-        appendLog("Opening Google Doc in browser helper.")
+        googleDocsMessage = "正在開啟 Google Doc..."
+        appendLog("正在透過瀏覽器輔助工具開啟 Google Doc。")
         Task {
             do {
                 let response = try await assistantClient.openGoogleDocInBrowser(request)
                 applyGoogleBrowserResponse(response)
-                appendLog("Google Doc browser open result: \(response.message)")
+                appendLog("Google Doc 瀏覽器開啟結果：\(response.message)")
             } catch {
                 googleBrowserMessage = error.localizedDescription
                 googleDocsMessage = error.localizedDescription
-                appendLog("Google Doc browser open failed: \(error.localizedDescription)")
+                appendLog("Google Doc 瀏覽器開啟失敗：\(error.localizedDescription)")
             }
         }
     }
 
     func scrollGoogleDocBrowserToBottom() {
         let request = GoogleBrowserMeetingRequest(meetingID: ensureCurrentMeetingID())
-        appendLog("Scrolling Google Doc browser view.")
+        appendLog("正在捲動 Google Doc 瀏覽器畫面。")
         Task {
             do {
                 let response = try await assistantClient.scrollGoogleDocBrowserToBottom(request)
                 applyGoogleBrowserResponse(response)
-                appendLog("Google Doc browser scroll result: \(response.message)")
+                appendLog("Google Doc 瀏覽器捲動結果：\(response.message)")
             } catch {
                 googleBrowserMessage = error.localizedDescription
-                appendLog("Google Doc browser scroll failed: \(error.localizedDescription)")
+                appendLog("Google Doc 瀏覽器捲動失敗：\(error.localizedDescription)")
             }
         }
     }
@@ -302,20 +302,20 @@ extension CaptureViewModel {
     func findVisibleTextInGoogleDocBrowser() {
         let query = googleBrowserFindText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else {
-            googleBrowserMessage = "Enter text for browser find."
+            googleBrowserMessage = "請輸入要在瀏覽器中尋找的文字。"
             return
         }
 
         let request = GoogleBrowserFindRequest(meetingID: ensureCurrentMeetingID(), text: query)
-        appendLog("Finding visible text in Google Doc browser view.")
+        appendLog("正在 Google Doc 瀏覽器畫面尋找可見文字。")
         Task {
             do {
                 let response = try await assistantClient.findVisibleGoogleDocText(request)
                 applyGoogleBrowserResponse(response)
-                appendLog("Google Doc browser find result: \(response.message)")
+                appendLog("Google Doc 瀏覽器搜尋結果：\(response.message)")
             } catch {
                 googleBrowserMessage = error.localizedDescription
-                appendLog("Google Doc browser find failed: \(error.localizedDescription)")
+                appendLog("Google Doc 瀏覽器搜尋失敗：\(error.localizedDescription)")
             }
         }
     }
@@ -485,7 +485,7 @@ extension CaptureViewModel {
                     iconName: "checkmark.circle",
                     style: .success
                 )
-                self.appendLog("AI voice edit applied: \(self.documentEditLabel(plan.intent)).")
+                self.appendLog("AI 語音文件修改已套用：\(self.documentEditLabel(plan.intent))。")
             } catch {
                 guard self.documentEditRequestGeneration == requestGeneration else {
                     return
@@ -500,7 +500,7 @@ extension CaptureViewModel {
                     iconName: "xmark.octagon",
                     style: .failure
                 )
-                self.appendLog("AI voice edit failed: \(error.localizedDescription)")
+                self.appendLog("AI 語音文件修改失敗：\(error.localizedDescription)")
             }
 
         }
@@ -511,16 +511,16 @@ extension CaptureViewModel {
         googleDocsClientConfigured = response.clientConfigured
         googleDocsDependenciesAvailable = response.dependenciesAvailable
         if googleDocsStatus != .starting {
-            googleDocsStatus = response.ready ? .idle : .failed("Google Docs authorization required.")
+            googleDocsStatus = response.ready ? .idle : .failed("需要 Google Docs 授權。")
         }
         if !response.dependenciesAvailable {
-            googleDocsMessage = "Install Google API Python dependencies in the backend environment."
+            googleDocsMessage = "請在後端環境安裝 Google API Python 依賴。"
         } else if !response.clientConfigured {
-            googleDocsMessage = "Save OAuth client JSON to apps/backend/secrets/google_oauth_client.json."
+            googleDocsMessage = "請將 OAuth client JSON 儲存到 apps/backend/secrets/google_oauth_client.json。"
         } else if !response.ready {
-            googleDocsMessage = "Click Authorize to create apps/backend/secrets/google_token.json."
+            googleDocsMessage = "請按授權以建立 apps/backend/secrets/google_token.json。"
         } else if googleDocsConnectedTitle.isEmpty {
-            googleDocsMessage = "Google Docs authorization is ready."
+            googleDocsMessage = "Google Docs 授權已就緒。"
         }
     }
 
@@ -540,7 +540,7 @@ extension CaptureViewModel {
         googleDocsBriefing = response.documentBriefing ?? googleDocsBriefing
         googleDocsSnippets = response.snippets ?? googleDocsSnippets
         if let briefingError = response.briefingError, !briefingError.isEmpty {
-            googleDocsMessage = "Connected, but briefing failed: \(briefingError)"
+            googleDocsMessage = "已連接，但文件整理失敗：\(briefingError)"
         } else {
             googleDocsMessage = response.message ?? fallbackMessage
         }
@@ -570,11 +570,11 @@ extension CaptureViewModel {
 
         googleDocsBriefing = documentBriefingText(notes: response.notes, actions: response.actions)
         assistantStatus = .running
-        assistantModeLabel = "Document prep · \(response.provider) · \(response.model) · \(response.latencyMs) ms"
+        assistantModeLabel = "文件準備 · \(response.provider) · \(response.model) · \(response.latencyMs) ms"
         autoSummaryStatusLabel = notes.isEmpty && actions.isEmpty
-            ? "Document context loaded"
-            : "Document context ready"
-        appendLog("Initial meeting notes prepared from Google Doc: \(response.latencyMs)ms.")
+            ? "文件內容已載入"
+            : "文件內容已準備"
+        appendLog("已根據 Google Doc 準備初始會議紀錄：\(response.latencyMs)ms。")
     }
 
     func applyGoogleBrowserResponse(_ response: GoogleBrowserResponse) {
@@ -600,42 +600,42 @@ extension CaptureViewModel {
         Task {
             do {
                 let response = try await call(request)
-                applyGoogleDocSnapshot(response, fallbackMessage: "Google Doc context refreshed.")
-                appendLog("Google Doc context refreshed.")
+                applyGoogleDocSnapshot(response, fallbackMessage: "Google Doc 內容已重新整理。")
+                appendLog("Google Doc 內容已重新整理。")
             } catch {
                 googleDocsStatus = .failed(error.localizedDescription)
                 googleDocsMessage = error.localizedDescription
-                appendLog("Google Doc refresh failed: \(error.localizedDescription)")
+                appendLog("Google Doc 重新整理失敗：\(error.localizedDescription)")
             }
         }
     }
 
     func updateGoogleDocLiveNotes(triggeredByAutoSummary: Bool) {
         guard googleDocsIsConnected else {
-            googleDocsMessage = "Connect a Google Doc first."
+            googleDocsMessage = "請先連接 Google Doc。"
             return
         }
         guard !googleDocsIsBusy else {
             if !triggeredByAutoSummary {
-                googleDocsMessage = "Google Docs request is already running."
+                googleDocsMessage = "Google Docs 請求仍在執行。"
             }
             return
         }
 
         let request = googleDocMeetingNotesRequest()
         googleDocsStatus = .starting
-        googleDocsMessage = triggeredByAutoSummary ? "Auto-updating live notes..." : "Updating live notes..."
-        appendLog(triggeredByAutoSummary ? "Auto-updating Google Doc live notes." : "Updating Google Doc live notes.")
+        googleDocsMessage = triggeredByAutoSummary ? "正在自動更新即時紀錄..." : "正在更新即時紀錄..."
+        appendLog(triggeredByAutoSummary ? "正在自動更新 Google Doc 即時紀錄。" : "正在更新 Google Doc 即時紀錄。")
 
         Task {
             do {
                 let response = try await assistantClient.updateGoogleDocLiveNotes(request)
-                applyGoogleDocSnapshot(response, fallbackMessage: "Live notes updated.")
-                appendLog("Google Doc live notes updated.")
+                applyGoogleDocSnapshot(response, fallbackMessage: "即時紀錄已更新。")
+                appendLog("Google Doc 即時紀錄已更新。")
             } catch {
                 googleDocsStatus = .failed(error.localizedDescription)
                 googleDocsMessage = error.localizedDescription
-                appendLog("Google Doc live notes failed: \(error.localizedDescription)")
+                appendLog("Google Doc 即時紀錄更新失敗：\(error.localizedDescription)")
             }
         }
     }
@@ -645,7 +645,7 @@ extension CaptureViewModel {
         case "replace_text":
             let find = plan.find.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !find.isEmpty else {
-                throw VoiceEditError("AI edit plan did not include find text.")
+                throw VoiceEditError("AI 修改計畫缺少要尋找的文字。")
             }
             return try await assistantClient.replaceGoogleDocText(
                 GoogleDocReplaceTextRequest(
@@ -660,10 +660,10 @@ extension CaptureViewModel {
             let heading = plan.heading.trimmingCharacters(in: .whitespacesAndNewlines)
             let text = plan.text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !heading.isEmpty else {
-                throw VoiceEditError("AI edit plan did not include a heading.")
+                throw VoiceEditError("AI 修改計畫缺少標題。")
             }
             guard !text.isEmpty else {
-                throw VoiceEditError("AI edit plan did not include text to insert.")
+                throw VoiceEditError("AI 修改計畫缺少要新增的文字。")
             }
             return try await assistantClient.insertGoogleDocTextUnderHeading(
                 GoogleDocInsertUnderHeadingRequest(
@@ -677,10 +677,10 @@ extension CaptureViewModel {
             let anchor = plan.anchor.trimmingCharacters(in: .whitespacesAndNewlines)
             let text = plan.text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !anchor.isEmpty else {
-                throw VoiceEditError("AI edit plan did not include anchor text.")
+                throw VoiceEditError("AI 修改計畫缺少定位文字。")
             }
             guard !text.isEmpty else {
-                throw VoiceEditError("AI edit plan did not include replacement text.")
+                throw VoiceEditError("AI 修改計畫缺少替換文字。")
             }
             return try await assistantClient.rewriteGoogleDocParagraph(
                 GoogleDocRewriteParagraphRequest(
@@ -694,7 +694,7 @@ extension CaptureViewModel {
             return try await assistantClient.appendMeetingNotesToGoogleDoc(googleDocMeetingNotesRequest())
 
         default:
-            throw VoiceEditError("AI edit plan did not include an executable intent.")
+            throw VoiceEditError("AI 修改計畫缺少可執行的意圖。")
         }
     }
 

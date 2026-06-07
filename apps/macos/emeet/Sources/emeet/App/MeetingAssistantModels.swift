@@ -20,9 +20,9 @@ struct TranscriptLine: Identifiable, Equatable {
 
         switch speakerHint {
         case "self":
-            return "Self"
+            return "自己"
         case "other":
-            return "Other"
+            return "對方"
         default:
             return source.capitalized
         }
@@ -102,15 +102,15 @@ enum AssistantThinking: String, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .none:
-            return "None"
+            return "無"
         case .low:
-            return "Low"
+            return "低"
         case .medium:
-            return "Medium"
+            return "中"
         case .high:
-            return "High"
+            return "高"
         case .xhigh:
-            return "XHigh"
+            return "最高"
         }
     }
 }
@@ -131,9 +131,9 @@ enum AssistantQuickAction: String, Equatable {
     var label: String {
         switch self {
         case .whatShouldISay:
-            return "What should I say?"
+            return "我該怎麼說？"
         case .followUpQuestions:
-            return "Follow-up questions"
+            return "追問問題"
         }
     }
 }

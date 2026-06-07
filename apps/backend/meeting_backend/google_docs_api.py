@@ -256,7 +256,7 @@ async def google_docs_append_meeting_notes(body: GoogleAppendMeetingNotesBody):
         raise HTTPException(status_code=502, detail=str(error)) from error
 
     updated = GOOGLE_DOC_CONNECTIONS.update_snapshot(body.meeting_id, snapshot)
-    return write_response(updated, "Meeting notes appended to Google Doc.")
+    return write_response(updated, "會議紀錄已附加到 Google Doc。")
 
 
 @router.post("/docs/update-live-notes")
@@ -283,7 +283,7 @@ async def google_docs_update_live_notes(body: GoogleUpdateLiveNotesBody):
         raise HTTPException(status_code=502, detail=str(error)) from error
 
     updated = GOOGLE_DOC_CONNECTIONS.update_snapshot(body.meeting_id, snapshot)
-    return write_response(updated, "emeet Live Notes updated.")
+    return write_response(updated, "emeet 即時紀錄已更新。")
 
 
 @router.get("/browser/status")
@@ -375,7 +375,7 @@ def document_briefing_text(notes: List[Dict[str, str]], actions: List[Dict[str, 
 def connection_for_body(body: GoogleMeetingBody) -> GoogleDocMeetingConnection:
     connection = GOOGLE_DOC_CONNECTIONS.get(body.meeting_id)
     if not connection:
-        raise HTTPException(status_code=404, detail="No Google Doc is connected to this meeting")
+        raise HTTPException(status_code=404, detail="這場會議尚未連接 Google Doc")
     return connection
 
 

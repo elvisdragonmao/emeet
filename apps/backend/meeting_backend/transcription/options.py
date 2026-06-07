@@ -8,10 +8,10 @@ from meeting_backend.config import Settings
 
 
 LANGUAGE_OPTIONS = [
-    {"id": "auto", "label": "Auto detect", "notes": "Use model language detection."},
-    {"id": "zh", "label": "Chinese / Mandarin", "notes": "Recommended for Taiwanese Mandarin meetings."},
-    {"id": "en", "label": "English", "notes": "Force English transcription."},
-    {"id": "ja", "label": "Japanese", "notes": "Force Japanese transcription."},
+    {"id": "auto", "label": "自動偵測", "notes": "使用模型語言偵測。"},
+    {"id": "zh", "label": "中文 / 華語", "notes": "建議用於台灣華語會議。"},
+    {"id": "en", "label": "英文", "notes": "強制使用英文逐字稿。"},
+    {"id": "ja", "label": "日文", "notes": "強制使用日文逐字稿。"},
 ]
 
 
@@ -40,8 +40,8 @@ def transcription_options(settings: Settings) -> Dict[str, Any]:
                 "available": mlx_available,
                 "recommended": mlx_available,
                 "notes": [
-                    "Uses Apple Silicon GPU through MLX.",
-                    "First model run downloads weights from Hugging Face.",
+                    "透過 MLX 使用 Apple Silicon GPU。",
+                    "第一次執行模型時會從 Hugging Face 下載權重。",
                 ],
                 "models": [
                     {
@@ -52,8 +52,8 @@ def transcription_options(settings: Settings) -> Dict[str, Any]:
                         "language_hint": "zh",
                         "estimated_size_gb": 3.1,
                         "notes": [
-                            "Taiwan Mandarin and Mandarin-English code-switching.",
-                            "MLX conversion: schsu/breeze-asr-25-mlx.",
+                            "適合台灣華語與中英夾雜會議。",
+                            "MLX 轉換版本：schsu/breeze-asr-25-mlx。",
                         ],
                     },
                     {
@@ -63,7 +63,7 @@ def transcription_options(settings: Settings) -> Dict[str, Any]:
                         "recommended": False,
                         "language_hint": "auto",
                         "estimated_size_gb": 1.6,
-                        "notes": ["Fast general-purpose Whisper model."],
+                        "notes": ["快速通用 Whisper 模型。"],
                     },
                     {
                         "id": "large-v3",
@@ -72,7 +72,7 @@ def transcription_options(settings: Settings) -> Dict[str, Any]:
                         "recommended": False,
                         "language_hint": "auto",
                         "estimated_size_gb": 3.1,
-                        "notes": ["Higher accuracy, heavier than turbo."],
+                        "notes": ["準確度較高，但比 turbo 更吃資源。"],
                     },
                     {
                         "id": "medium",
@@ -81,7 +81,7 @@ def transcription_options(settings: Settings) -> Dict[str, Any]:
                         "recommended": False,
                         "language_hint": "auto",
                         "estimated_size_gb": 1.5,
-                        "notes": ["Fallback for lower-memory systems."],
+                        "notes": ["低記憶體機器的備用模型。"],
                     },
                 ],
             },
@@ -92,8 +92,8 @@ def transcription_options(settings: Settings) -> Dict[str, Any]:
                 "available": faster_whisper_available,
                 "recommended": not mlx_available and faster_whisper_available,
                 "notes": [
-                    "CPU-compatible CTranslate2 route.",
-                    "Use smaller models for real-time demos on CPU.",
+                    "CPU 相容的 CTranslate2 路線。",
+                    "CPU 即時 demo 建議使用較小模型。",
                 ],
                 "models": [
                     model_option("large-v3-turbo", faster_whisper_available, "auto"),

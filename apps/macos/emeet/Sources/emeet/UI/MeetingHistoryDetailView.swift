@@ -13,7 +13,7 @@ struct MeetingHistoryDetail: View {
         VStack(alignment: .leading, spacing: 14) {
             if let record {
                 summary(record)
-                Picker("History section", selection: $selectedTab) {
+                Picker("歷史紀錄區段", selection: $selectedTab) {
                     ForEach(MeetingHistoryTab.allCases) { tab in
                         Text(tab.label).tag(tab)
                     }
@@ -34,9 +34,9 @@ struct MeetingHistoryDetail: View {
                             .font(.system(size: 32, weight: .medium))
                             .foregroundStyle(.secondary)
                     }
-                    Text(isLoading ? "Loading meeting" : "Select a meeting")
+                    Text(isLoading ? "正在載入會議" : "選擇一場會議")
                         .font(.headline)
-                    Text("Transcript, reply history, meeting notes, and next actions will appear here.")
+                    Text("逐字稿、回覆紀錄、會議紀錄和下一步行動會顯示在這裡。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -72,40 +72,40 @@ struct MeetingHistoryDetail: View {
             HStack(spacing: 12) {
                 Label(historyDate(milliseconds: meeting.startedAtMs), systemImage: "calendar")
                 Label(providerLabel(meeting), systemImage: "cpu")
-                Label("\(meeting.transcriptCount) transcript", systemImage: "text.quote")
-                Label("\(meeting.assistantResponseCount) responses", systemImage: "sparkles")
+                Label("\(meeting.transcriptCount) 句逐字稿", systemImage: "text.quote")
+                Label("\(meeting.assistantResponseCount) 筆回覆", systemImage: "sparkles")
             }
             .font(.caption)
             .foregroundStyle(.secondary)
             .lineLimit(1)
 
             HStack(spacing: 8) {
-                TextField("Meeting name", text: $titleDraft)
+                TextField("會議名稱", text: $titleDraft)
                     .textFieldStyle(.roundedBorder)
 
                 Button {
                     renameAction(titleDraft)
                 } label: {
-                    Label("Rename", systemImage: "pencil")
+                    Label("重新命名", systemImage: "pencil")
                 }
                 .disabled(titleDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
                 Button {
                     exportAction(record)
                 } label: {
-                    Label("Export", systemImage: "square.and.arrow.down")
+                    Label("匯出", systemImage: "square.and.arrow.down")
                 }
 
                 Button {
                     continueAction(record)
                 } label: {
-                    Label("Continue", systemImage: "arrowshape.turn.up.right")
+                    Label("延續", systemImage: "arrowshape.turn.up.right")
                 }
                 .buttonStyle(.borderedProminent)
             }
             .controlSize(.regular)
 
-            Label(meeting.titleIsManual ? "Manual name" : "AI/generated name", systemImage: meeting.titleIsManual ? "person.fill" : "sparkles")
+            Label(meeting.titleIsManual ? "手動命名" : "AI 生成名稱", systemImage: meeting.titleIsManual ? "person.fill" : "sparkles")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
@@ -137,13 +137,13 @@ enum MeetingHistoryTab: String, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .transcript:
-            return "Transcript"
+            return "逐字稿"
         case .responses:
-            return "Replies"
+            return "回覆"
         case .notes:
-            return "Notes"
+            return "會議紀錄"
         case .actions:
-            return "Actions"
+            return "行動項目"
         }
     }
 }
@@ -153,7 +153,7 @@ struct HistoryTranscriptList: View {
 
     var body: some View {
         if lines.isEmpty {
-            HistoryEmptyState(icon: "text.quote", title: "No transcript", detail: "Final transcript segments are saved after STT emits them.")
+            HistoryEmptyState(icon: "text.quote", title: "尚無逐字稿", detail: "STT 產生完成句後會儲存在這裡。")
         } else {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 10) {
@@ -219,8 +219,8 @@ struct HistoryAssistantResponses: View {
         if responses.isEmpty {
             HistoryEmptyState(
                 icon: "sparkles",
-                title: "No reply history",
-                detail: "Use What should I say? or Follow-up questions during a meeting to save replies."
+                title: "尚無回覆紀錄",
+                detail: "會議中使用「我該怎麼說？」或「追問問題」後，回覆會儲存在這裡。"
             )
         } else {
             ScrollView {
@@ -267,7 +267,7 @@ struct HistoryNotes: View {
 
     var body: some View {
         if notes.isEmpty {
-            HistoryEmptyState(icon: "note.text", title: "No meeting notes", detail: "Meeting notes are saved from the latest automatic summary.")
+            HistoryEmptyState(icon: "note.text", title: "尚無會議紀錄", detail: "最新的自動摘要會儲存會議紀錄。")
         } else {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 10) {
@@ -295,7 +295,7 @@ struct HistoryActions: View {
 
     var body: some View {
         if actions.isEmpty {
-            HistoryEmptyState(icon: "checklist", title: "No next actions", detail: "Explicit TODOs from meeting notes appear here.")
+            HistoryEmptyState(icon: "checklist", title: "尚無下一步行動", detail: "會議紀錄中明確的 TODO 會顯示在這裡。")
         } else {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 10) {
@@ -309,7 +309,7 @@ struct HistoryActions: View {
                                 Text(pair.element.title)
                                     .font(.headline)
                                     .fixedSize(horizontal: false, vertical: true)
-                                Text("Owner: \(pair.element.owner.isEmpty ? "Unassigned" : pair.element.owner) / State: \(pair.element.state)")
+                                Text("負責人：\(localizedHistoryOwner(pair.element.owner)) / 狀態：\(localizedHistoryState(pair.element.state))")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -362,11 +362,11 @@ struct HistoryEmptyState: View {
 func actionLabel(_ action: String) -> String {
     switch action {
     case "what_should_i_say":
-        return "What should I say?"
+        return "我該怎麼說？"
     case "follow_up_questions":
-        return "Follow-up questions"
+        return "追問問題"
     case "chat":
-        return "Chat"
+        return "對話"
     default:
         return action.replacingOccurrences(of: "_", with: " ").capitalized
     }
@@ -379,12 +379,41 @@ func providerLabel(_ meeting: MeetingHistorySummary) -> String {
     if !meeting.sttProvider.isEmpty {
         return "\(meeting.sttProvider) / \(meeting.sttModel)"
     }
-    return "Provider unavailable"
+    return "供應商不可用"
+}
+
+func localizedHistoryOwner(_ owner: String) -> String {
+    let trimmed = owner.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty, trimmed.lowercased() != "unassigned" else {
+        return "未指派"
+    }
+    return trimmed
+}
+
+func localizedHistoryState(_ state: String) -> String {
+    let trimmed = state.trimmingCharacters(in: .whitespacesAndNewlines)
+    let lowered = trimmed.lowercased()
+    if trimmed.isEmpty || lowered == "draft" || lowered.contains("document draft") {
+        return "草稿"
+    }
+    if lowered.contains("open") {
+        return "待確認"
+    }
+    if lowered.contains("waiting") {
+        return "等待中"
+    }
+    if lowered.contains("confirmed") {
+        return "已確認"
+    }
+    if lowered.contains("blocked") {
+        return "受阻"
+    }
+    return trimmed
 }
 
 func historyDate(milliseconds: Int?) -> String {
     guard let milliseconds, milliseconds > 0 else {
-        return "Unknown time"
+        return "未知時間"
     }
 
     let formatter = DateFormatter()

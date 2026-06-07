@@ -11,7 +11,7 @@ extension CaptureViewModel {
                     installed: false,
                     available: false,
                     recommended: true,
-                    notes: ["Backend STT options are not loaded yet."],
+                    notes: ["後端 STT 選項尚未載入。"],
                     models: []
                 )
             ]
@@ -28,9 +28,9 @@ extension CaptureViewModel {
     var transcriptionLanguageOptions: [TranscriptionLanguageOption] {
         transcriptionLanguages.isEmpty
             ? [
-                TranscriptionLanguageOption(id: "auto", label: "Auto detect", notes: "Use model language detection."),
-                TranscriptionLanguageOption(id: "zh", label: "Chinese / Mandarin", notes: "Recommended for Taiwan Mandarin meetings."),
-                TranscriptionLanguageOption(id: "en", label: "English", notes: "Force English transcription."),
+                TranscriptionLanguageOption(id: "auto", label: "自動偵測", notes: "使用模型語言偵測。"),
+                TranscriptionLanguageOption(id: "zh", label: "中文 / 華語", notes: "建議用於台灣華語會議。"),
+                TranscriptionLanguageOption(id: "en", label: "英文", notes: "強制使用英文逐字稿。"),
             ]
             : transcriptionLanguages
     }
@@ -52,7 +52,7 @@ extension CaptureViewModel {
 
     func refreshTranscriptionOptions() {
         transcriptionOptionsStatus = .starting
-        transcriptionOptionsMessage = "Checking local STT runtime..."
+        transcriptionOptionsMessage = "正在檢查本機 STT 執行環境..."
 
         Task { @MainActor [weak self] in
             guard let self else {
@@ -63,12 +63,12 @@ extension CaptureViewModel {
                 let response = try await self.assistantClient.fetchTranscriptionOptions()
                 self.applyTranscriptionOptions(response)
                 self.transcriptionOptionsStatus = .running
-                self.transcriptionOptionsMessage = "STT runtime ready"
-                self.appendLog("STT options loaded for \(response.hardware.cpu).")
+                self.transcriptionOptionsMessage = "STT 執行環境就緒"
+                self.appendLog("STT 選項已載入：\(response.hardware.cpu)。")
             } catch {
                 self.transcriptionOptionsStatus = .failed(error.localizedDescription)
                 self.transcriptionOptionsMessage = error.localizedDescription
-                self.appendLog("STT options failed: \(error.localizedDescription)")
+                self.appendLog("STT 選項載入失敗：\(error.localizedDescription)")
             }
         }
     }

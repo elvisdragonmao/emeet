@@ -525,7 +525,7 @@ def build_replace_text_requests(
 
     ranges = calculate_replacement_ranges(snapshot, find, occurrence=occurrence)
     if not ranges:
-        raise ValueError("Text was not found in the connected Google Doc")
+        raise ValueError("在已連接的 Google Doc 中找不到指定文字")
 
     target = ranges[0]
     return [
@@ -595,7 +595,7 @@ def calculate_replacement_ranges(
 def validate_find_text(find: str) -> str:
     find = find.strip()
     if not find:
-        raise ValueError("Find text is empty")
+        raise ValueError("搜尋文字是空的")
     return find
 
 

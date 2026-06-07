@@ -9,18 +9,18 @@ enum CaptureSource: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .microphone:
-            return "Microphone"
+            return "麥克風"
         case .systemAudio:
-            return "System Audio"
+            return "系統音訊"
         }
     }
 
     var subtitle: String {
         switch self {
         case .microphone:
-            return "AVAudioEngine input"
+            return "AVAudioEngine 輸入"
         case .systemAudio:
-            return "ScreenCaptureKit audio"
+            return "ScreenCaptureKit 音訊"
         }
     }
 
@@ -43,13 +43,13 @@ enum CaptureStatus: Equatable {
     var label: String {
         switch self {
         case .idle:
-            return "Idle"
+            return "閒置"
         case .starting:
-            return "Starting"
+            return "啟動中"
         case .running:
-            return "Running"
+            return "執行中"
         case .failed:
-            return "Error"
+            return "錯誤"
         }
     }
 

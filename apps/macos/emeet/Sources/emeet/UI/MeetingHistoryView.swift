@@ -26,7 +26,7 @@ struct MeetingHistoryView: View {
     private var header: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Meeting History")
+                Text("會議歷史紀錄")
                     .font(.title3.weight(.semibold))
                 Text(message)
                     .font(.caption)
@@ -42,7 +42,7 @@ struct MeetingHistoryView: View {
             }
 
             Button(action: refreshAction) {
-                Label("Refresh", systemImage: "arrow.clockwise")
+                Label("重新整理", systemImage: "arrow.clockwise")
             }
             .buttonStyle(.bordered)
 
@@ -51,7 +51,7 @@ struct MeetingHistoryView: View {
                     .frame(width: 16, height: 16)
             }
             .buttonStyle(.bordered)
-            .help("Close")
+            .help("關閉")
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
@@ -80,9 +80,9 @@ struct MeetingHistoryView: View {
                     Image(systemName: "clock")
                         .font(.system(size: 30, weight: .medium))
                         .foregroundStyle(.secondary)
-                    Text(isLoading ? "Loading meetings" : "No saved meetings")
+                    Text(isLoading ? "正在載入會議" : "尚無已儲存會議")
                         .font(.headline)
-                    Text("Meetings appear here after Start Meeting creates transcript or assistant results.")
+                    Text("開始會議並產生逐字稿或 AI 結果後，會議會出現在這裡。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)

@@ -35,17 +35,17 @@ extension CaptureViewModel {
 
         didRequestScreenRecordingPermission = true
         guard !CGPreflightScreenCaptureAccess() else {
-            appendLog("Screen Recording permission is available.")
+            appendLog("螢幕錄製權限可用。")
             return
         }
 
-        appendLog("Requesting Screen Recording permission...")
+        appendLog("正在請求螢幕錄製權限...")
         let granted = CGRequestScreenCaptureAccess()
         if granted {
-            appendLog("Screen Recording permission granted.")
+            appendLog("螢幕錄製權限已授權。")
         } else {
             systemAudioStatus = .failed("螢幕錄製權限尚未授權。授權後通常需要重新啟動 App。")
-            appendLog("Screen Recording permission is not granted yet.")
+            appendLog("螢幕錄製權限尚未授權。")
         }
     }
 
@@ -57,16 +57,16 @@ extension CaptureViewModel {
 
     func startMicrophone() {
         microphoneStatus = .starting
-        appendLog("Starting microphone capture...")
+        appendLog("正在啟動麥克風擷取...")
 
         Task {
             do {
                 try await microphoneService.start()
                 microphoneStatus = .running
-                appendLog("Microphone capture is running.")
+                appendLog("麥克風擷取已啟動。")
             } catch {
                 microphoneStatus = .failed(error.localizedDescription)
-                appendLog("Microphone failed: \(error.localizedDescription)")
+                appendLog("麥克風擷取失敗：\(error.localizedDescription)")
             }
         }
     }
@@ -82,21 +82,21 @@ extension CaptureViewModel {
     func stopMicrophone() {
         microphoneService.stop()
         microphoneStatus = .idle
-        appendLog("Microphone capture stopped.")
+        appendLog("麥克風擷取已停止。")
     }
 
     func startSystemAudio() {
         systemAudioStatus = .starting
-        appendLog("Starting ScreenCaptureKit system audio...")
+        appendLog("正在啟動 ScreenCaptureKit 系統音訊...")
 
         Task {
             do {
                 try await systemAudioService.start()
                 systemAudioStatus = .running
-                appendLog("System audio capture is running. Play audio from another app to test it.")
+                appendLog("系統音訊擷取已啟動。可播放其他 App 的音訊測試。")
             } catch {
                 systemAudioStatus = .failed(error.localizedDescription)
-                appendLog("System audio failed: \(error.localizedDescription)")
+                appendLog("系統音訊擷取失敗：\(error.localizedDescription)")
             }
         }
     }
@@ -113,7 +113,7 @@ extension CaptureViewModel {
         Task {
             await systemAudioService.stop()
             systemAudioStatus = .idle
-            appendLog("System audio capture stopped.")
+            appendLog("系統音訊擷取已停止。")
         }
     }
 
@@ -141,13 +141,13 @@ extension CaptureViewModel {
         resetAssistantDrafts()
 
         if transcriptionStatus == .starting || transcriptionStatus == .running {
-            resetAutoSummaryCountdown(status: "Records cleared")
+            resetAutoSummaryCountdown(status: "紀錄已清除")
         } else {
             autoSummaryRemainingSeconds = autoSummaryIntervalSeconds
-            autoSummaryStatusLabel = "Start Meeting to begin"
+            autoSummaryStatusLabel = "開始會議後啟動"
         }
 
-        appendLog("New meeting ready.")
+        appendLog("新會議已準備好。")
     }
 
     func openMicrophoneSettings() {

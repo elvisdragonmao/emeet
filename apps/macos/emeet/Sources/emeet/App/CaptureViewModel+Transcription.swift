@@ -5,7 +5,7 @@ extension CaptureViewModel {
     var transcriptCountsLabel: String {
         let finalCount = transcriptLines.filter(\.isFinal).count
         let partialCount = transcriptLines.count - finalCount
-        return "\(finalCount) final / \(partialCount) live"
+        return "\(finalCount) 句完成 / \(partialCount) 句即時"
     }
 
     var backendLatencyLabel: String {
@@ -25,7 +25,7 @@ extension CaptureViewModel {
             return "\(latencyMs) ms"
         }
 
-        return "Connected"
+        return "已連線"
     }
 
     func connectTranscription() {
@@ -56,7 +56,7 @@ extension CaptureViewModel {
             resetAssistantDrafts()
         }
         resetLatencyReadings()
-        appendLog("Connecting transcription backend at \(transcriptionBackend.displayAddress) for \(currentMeetingID)...")
+        appendLog("正在連接逐字稿後端：\(transcriptionBackend.displayAddress)，會議 \(currentMeetingID)...")
         microphoneTranscriptionClient.connect(
             meetingID: currentMeetingID,
             sttProvider: transcriptionProviderID,
@@ -91,21 +91,21 @@ extension CaptureViewModel {
         stopAutoSummaryCountdown()
         stopDocumentEditWatcher()
         shouldCreateNewMeetingOnNextStart = !currentMeetingID.isEmpty
-        appendLog("Transcription backend disconnected.")
+        appendLog("逐字稿後端已斷線。")
         requestGeneratedMeetingTitle(meetingID: endedMeetingID)
     }
 
     func handleTranscriptionEvent(_ event: TranscriptEvent) {
         if let provider = event.provider, !provider.isEmpty, event.type == "session.status" {
             transcriptionStatus = .running
-            appendLog("Transcription backend ready: \(provider).")
+            appendLog("逐字稿後端就緒：\(provider)。")
             return
         }
 
         if event.type == "session.error" {
-            let message = event.message ?? "Unknown backend error."
+            let message = event.message ?? "未知後端錯誤。"
             transcriptionStatus = .failed(message)
-            appendLog("Transcription backend error: \(message)")
+            appendLog("逐字稿後端錯誤：\(message)")
             return
         }
 
@@ -179,7 +179,7 @@ extension CaptureViewModel {
         client.onError = { [weak self] message in
             Task { @MainActor in
                 self?.transcriptionStatus = .failed(message)
-                self?.appendLog("\(label) transcription error: \(message)")
+                self?.appendLog("\(label) 逐字稿錯誤：\(message)")
             }
         }
     }

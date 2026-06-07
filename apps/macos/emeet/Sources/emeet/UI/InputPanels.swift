@@ -40,12 +40,12 @@ struct CompactInputPanel: View {
                 Button(action: toggleAction) {
                     Image(systemName: isActive ? "stop.fill" : "play.fill")
                 }
-                .help(isActive ? "Stop" : "Start")
+                .help(isActive ? "停止" : "開始")
 
                 Button(action: settingsAction) {
                     Image(systemName: "gear")
                 }
-                .help("Permission")
+                .help("權限設定")
 
                 Spacer()
 

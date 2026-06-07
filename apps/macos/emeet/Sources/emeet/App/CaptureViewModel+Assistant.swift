@@ -17,7 +17,7 @@ extension CaptureViewModel {
                     authMode: "provider_owned",
                     endpoint: "",
                     binaryPath: "",
-                    notes: ["Provider discovery failed. Start the backend and install Codex CLI, then refresh."]
+                    notes: ["供應商探索失敗。請啟動後端並安裝 Codex CLI 後重新整理。"]
                 )
             ]
             : assistantProviders
@@ -33,11 +33,11 @@ extension CaptureViewModel {
     var assistantStatusLabel: String {
         switch assistantStatus {
         case .idle:
-            return "Ready"
+            return "就緒"
         case .starting:
-            return "Generating"
+            return "生成中"
         case .running:
-            return "Ready"
+            return "就緒"
         case .failed(let message):
             return message
         }
@@ -74,7 +74,7 @@ extension CaptureViewModel {
 
     func refreshAssistantProviders() {
         assistantStatus = .starting
-        appendLog("Loading assistant providers...")
+        appendLog("正在載入 AI 供應商...")
 
         Task {
             do {
@@ -84,11 +84,11 @@ extension CaptureViewModel {
                 assistantModel = response.defaults.model
                 assistantThinking = response.defaults.thinking
                 assistantStatus = .idle
-                assistantModeLabel = "Ready"
-                appendLog("Assistant providers loaded: \(response.providers.count).")
+                assistantModeLabel = "就緒"
+                appendLog("AI 供應商已載入：\(response.providers.count) 個。")
             } catch {
                 assistantStatus = .failed(error.localizedDescription)
-                appendLog("Assistant provider load failed: \(error.localizedDescription)")
+                appendLog("AI 供應商載入失敗：\(error.localizedDescription)")
             }
         }
     }
@@ -111,7 +111,7 @@ extension CaptureViewModel {
 
     func runAssistant(_ quickAction: AssistantQuickAction) {
         guard activeAssistantAction == nil else {
-            appendLog("Assistant request ignored because another quick action is still running.")
+            appendLog("已略過 AI 請求，另一個快速動作仍在執行。")
             return
         }
 
@@ -120,7 +120,7 @@ extension CaptureViewModel {
         let requestGeneration = assistantRequestGeneration
         assistantStatus = .starting
         assistantModeLabel = "\(quickAction.label) · \(assistantProviderID)"
-        appendLog("Requesting assistant response: \(quickAction.label).")
+        appendLog("正在請求 AI 回覆：\(quickAction.label)。")
 
         let request = AssistantRespondRequest(
             action: quickAction.requestAction,
@@ -149,8 +149,8 @@ extension CaptureViewModel {
             } catch {
                 if requestGeneration == assistantRequestGeneration {
                     assistantStatus = .failed(error.localizedDescription)
-                    assistantModeLabel = "AI error"
-                    appendLog("Assistant response failed: \(error.localizedDescription)")
+                    assistantModeLabel = "AI 錯誤"
+                    appendLog("AI 回覆失敗：\(error.localizedDescription)")
                 }
             }
 
@@ -176,7 +176,7 @@ extension CaptureViewModel {
             )
         }
 
-        appendLog("Assistant response ready: \(response.provider) \(response.model) \(response.latencyMs)ms.")
+        appendLog("AI 回覆完成：\(response.provider) \(response.model) \(response.latencyMs)ms。")
     }
 
     func assistantTranscriptPayload(finalOnly: Bool = false) -> [AssistantTranscriptLinePayload] {
@@ -216,7 +216,7 @@ extension CaptureViewModel {
         autoSummaryTask?.cancel()
         autoSummaryRequestGeneration += 1
         autoSummaryRemainingSeconds = autoSummaryIntervalSeconds
-        autoSummaryStatusLabel = "Next summary in \(autoSummaryIntervalSeconds)s"
+        autoSummaryStatusLabel = "\(autoSummaryIntervalSeconds) 秒後摘要"
         autoSummaryIsGenerating = false
 
         autoSummaryTask = Task { @MainActor [weak self] in
@@ -239,13 +239,13 @@ extension CaptureViewModel {
         autoSummaryRequestGeneration += 1
         autoSummaryIsGenerating = false
         autoSummaryRemainingSeconds = autoSummaryIntervalSeconds
-        autoSummaryStatusLabel = "Start Meeting to begin"
+        autoSummaryStatusLabel = "開始會議後啟動"
     }
 
     func tickAutoSummaryCountdown() {
         guard transcriptionStatus == .starting || transcriptionStatus == .running else {
             autoSummaryRemainingSeconds = autoSummaryIntervalSeconds
-            autoSummaryStatusLabel = "Waiting for STT"
+            autoSummaryStatusLabel = "等待逐字稿"
             return
         }
 
@@ -255,7 +255,7 @@ extension CaptureViewModel {
 
         if autoSummaryRemainingSeconds > 1 {
             autoSummaryRemainingSeconds -= 1
-            autoSummaryStatusLabel = "Next summary in \(autoSummaryRemainingSeconds)s"
+            autoSummaryStatusLabel = "\(autoSummaryRemainingSeconds) 秒後摘要"
             return
         }
 
@@ -271,14 +271,14 @@ extension CaptureViewModel {
         let newFinalLines = finalTranscriptArchive.filter { !summarizedFinalLineIDs.contains($0.id) }
         let transcript = assistantTranscriptPayload(lines: newFinalLines)
         guard !transcript.isEmpty else {
-            resetAutoSummaryCountdown(status: "Waiting for final transcript")
+            resetAutoSummaryCountdown(status: "等待完成逐字稿")
             return
         }
         let lineIDsToMark = Set(newFinalLines.map(\.id))
 
         autoSummaryIsGenerating = true
-        autoSummaryStatusLabel = "Summarizing now"
-        appendLog("Auto summarizing meeting notes and next actions...")
+        autoSummaryStatusLabel = "正在摘要"
+        appendLog("正在自動整理會議紀錄與下一步行動...")
         autoSummaryRequestGeneration += 1
         let requestGeneration = autoSummaryRequestGeneration
 
@@ -315,14 +315,14 @@ extension CaptureViewModel {
                 }
                 self.applyAutomaticSummaryResponse(response)
                 self.summarizedFinalLineIDs.formUnion(lineIDsToMark)
-                self.resetAutoSummaryCountdown(status: "Updated \(self.shortTimeLabel())")
+                self.resetAutoSummaryCountdown(status: "\(self.shortTimeLabel()) 已更新")
             } catch {
                 guard self.autoSummaryRequestGeneration == requestGeneration else {
                     return
                 }
-                self.autoSummaryStatusLabel = "Summary failed"
-                self.appendLog("Auto summary failed: \(error.localizedDescription)")
-                self.resetAutoSummaryCountdown(status: "Retry in \(self.autoSummaryIntervalSeconds)s")
+                self.autoSummaryStatusLabel = "摘要失敗"
+                self.appendLog("自動摘要失敗：\(error.localizedDescription)")
+                self.resetAutoSummaryCountdown(status: "\(self.autoSummaryIntervalSeconds) 秒後重試")
             }
 
             self.autoSummaryIsGenerating = false
@@ -338,11 +338,15 @@ extension CaptureViewModel {
 
         if !response.actions.isEmpty {
             actionDrafts = response.actions.map {
-                MeetingActionDraft(title: $0.title, owner: $0.owner, state: $0.state)
+                MeetingActionDraft(
+                    title: $0.title,
+                    owner: documentContextActionOwner($0.owner),
+                    state: documentContextActionState($0.state)
+                )
             }
         }
 
-        appendLog("Auto summary ready: \(response.provider) \(response.model) \(response.latencyMs)ms.")
+        appendLog("自動摘要完成：\(response.provider) \(response.model) \(response.latencyMs)ms。")
 
         if googleDocsIsConnected {
             updateGoogleDocLiveNotes(triggeredByAutoSummary: true)
@@ -362,14 +366,14 @@ extension CaptureViewModel {
     func rollingSummaryContext() -> String {
         var lines: [String] = []
         if !noteDrafts.isEmpty {
-            lines.append("Current notes:")
+            lines.append("目前會議紀錄:")
             for note in noteDrafts {
                 lines.append("- \(note.title): \(note.detail)")
             }
         }
 
         if !actionDrafts.isEmpty {
-            lines.append("Current actions:")
+            lines.append("目前行動項目:")
             for action in actionDrafts {
                 lines.append("- \(action.title) / owner=\(action.owner) / state=\(action.state)")
             }
@@ -391,7 +395,7 @@ extension CaptureViewModel {
     func resetAssistantDrafts() {
         assistantRequestGeneration += 1
         activeAssistantAction = nil
-        assistantModeLabel = "Ready"
+        assistantModeLabel = "就緒"
         assistantStatus = .idle
         assistantDrafts = []
     }
