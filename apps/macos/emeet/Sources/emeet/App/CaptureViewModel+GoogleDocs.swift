@@ -16,6 +16,9 @@ extension CaptureViewModel {
     }
 
     var googleDocsDetailLabel: String {
+        if !googleDocsConnectedTitle.isEmpty {
+            return googleDocsConnectedTitle
+        }
         if !googleDocsDependenciesAvailable {
             return "Install Google Python dependencies"
         }
@@ -25,7 +28,7 @@ extension CaptureViewModel {
         if googleDocsConnectedTitle.isEmpty {
             return googleDocsAuthReady ? "Paste a Google Docs URL" : "Authorize Google Docs"
         }
-        return googleDocsConnectedTitle
+        return "Google Docs ready"
     }
 
     var googleDocsIsConnected: Bool {
@@ -469,6 +472,8 @@ extension CaptureViewModel {
     ) {
         googleDocsStatus = .running
         googleDocsAuthReady = true
+        googleDocsClientConfigured = true
+        googleDocsDependenciesAvailable = true
         googleDocsConnectedTitle = response.title
         googleDocsDocumentID = response.documentId
         googleDocsRevisionID = response.revisionId
