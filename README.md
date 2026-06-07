@@ -177,6 +177,14 @@ App 預設連到：
 ws://127.0.0.1:8765/v1/transcribe/ws
 ```
 
+## Final Report
+
+期末報告在：
+
+```text
+docs/final-report.md
+```
+
 ## Slides
 
 畢業專題 Slidev 簡報在：
