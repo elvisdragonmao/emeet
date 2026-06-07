@@ -1,9 +1,12 @@
-@import url("https://font.emtech.cc/css/GenKiGothicTW") @page {
-	size: A2 portrait;
+@import url("https://font.emtech.cc/css/GenKiGothicTW");
+
+@page {
+	size: 594mm 841mm;
 	margin: 0;
 }
 
 :root {
+	--poster-scale: 1.4142857;
 	--bg: #070a0c;
 	--panel: #11171a;
 	--panel-soft: #151d21;
@@ -65,6 +68,8 @@ li + li {
 	margin: 0 auto;
 	padding: 10mm 11mm;
 	overflow: hidden;
+	transform: scale(var(--poster-scale));
+	transform-origin: top left;
 	background:
 		linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px) 0 0 / 8mm 8mm,
 		linear-gradient(0deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px) 0 0 / 8mm 8mm,
@@ -97,6 +102,33 @@ li + li {
 	border-bottom: 1px solid rgba(255, 194, 71, 0.48);
 	background: repeating-linear-gradient(-45deg, rgba(255, 194, 71, 0.48) 0 6mm, rgba(255, 194, 71, 0.08) 6mm 12mm);
 	transform: rotate(-23deg);
+}
+
+.poster-qr {
+	position: absolute;
+	left: 18mm;
+	bottom: 18mm;
+	z-index: 8;
+	display: grid;
+	justify-items: center;
+	gap: 4mm;
+	width: 38mm;
+}
+
+.poster-qr img {
+	display: block;
+	width: 100%;
+	aspect-ratio: 1;
+	object-fit: contain;
+}
+
+.poster-qr figcaption {
+	color: var(--text);
+	font-size: 3mm;
+	font-weight: 950;
+	letter-spacing: 0;
+	line-height: 1;
+	text-shadow: 0 1mm 2.5mm rgba(0, 0, 0, 0.72);
 }
 
 .kicker,
@@ -645,9 +677,13 @@ li + li {
 @media screen {
 	body {
 		padding: 24px;
+		min-width: calc(420mm * var(--poster-scale));
+		min-height: calc(594mm * var(--poster-scale));
 	}
 
 	.poster {
+		margin: 0 auto;
+		transform-origin: top center;
 		box-shadow: 0 24px 100px rgba(0, 0, 0, 0.62);
 	}
 }
@@ -655,8 +691,8 @@ li + li {
 @media print {
 	html,
 	body {
-		width: 420mm;
-		height: 594mm;
+		width: 594mm;
+		height: 841mm;
 		background: var(--bg);
 	}
 
@@ -666,6 +702,7 @@ li + li {
 
 	.poster {
 		margin: 0;
+		transform-origin: top left;
 		box-shadow: none;
 		print-color-adjust: exact;
 		-webkit-print-color-adjust: exact;

@@ -40,3 +40,5 @@ apps/backend/secrets/
 apps/backend/token.json
 *.credentials.json
 google_oauth_client.json
+
+docs/poster/emeet-a1-poster.pdf
