@@ -1,4 +1,4 @@
-# 國立陽明交通大學百川學士學位學程<br>專題探索期末報告
+# 國立陽明交通大學百川學士學位學程 專題探索期末報告
 
 ## emeet：即時會議輔助與文件共編系統
 
@@ -123,6 +123,16 @@ emeet 的主要價值發生在會議進行中。它希望在使用者還在對�
 
 這樣的節奏能避免系統過度頻繁呼叫模型，也能讓不同功能使用適合自己的延遲與準確性取捨。
 
+| 層級 | 目前或建議節奏 | 使用資料 | 目的 |
+| --- | --- | --- | --- |
+| 音訊傳輸層 | 目前約每 100 ms 傳送一次，研究建議可維持在 50 到 200 ms 內 | 16 kHz mono PCM16 audio frame | 讓 STT 後端穩定收到小而均勻的音訊封包。 |
+| STT 分段層 | 目前以 speech window 定稿，最短 800 ms、靜音 700 ms、最長 8 秒 | 已累積的語音片段 | 避免每 100 ms 都呼叫 Whisper，也避免過短片段導致辨識不穩。 |
+| 即時建議層 | 目前由 `What should I say?` 與 `Follow-up questions` 按鈕觸發；未來可在語意邊界或 6 到 10 秒心跳預先更新候選 | 最近逐字稿、目前議題、未解問題、rolling summary | 服務當下回話與追問，不應等待 30 秒摘要週期。 |
+| 筆記整理層 | 目前每 30 秒更新一次；研究建議 30 到 60 秒或 8 到 12 個 final utterance 一輪 | 新增 final transcript、既有 notes/actions、文件脈絡 | 產生較穩定的會議紀錄與下一步行動。 |
+| 文件操作層 | 目前每 10 秒檢查一次明確文件編輯指令 | final transcript 與 Google Docs snippets | 只在使用者明確要求時規劃文件修改。 |
+
+這個分層有兩個重要理由。第一，音訊與逐字稿是高頻資料，但 LLM 推理成本高、延遲也高，不能跟音訊 frame 同頻。第二，會議紀錄應該使用 final transcript，而不是還可能被修正的 partial transcript，否則筆記會把尚未定稿的文字當成事實。未來若加入真正 partial transcript，資料模型也必須分成 `transcript.partial` 與 `transcript.final`，讓 UI 可快速顯示暫時結果，但儲存、筆記與 action item 只使用定稿結果。
+
 ### 4.2 音訊來源需要分流
 
 若一開始就把自己和遠端聲音混成同一軌，再嘗試做 speaker diarization，難度會大幅提高。因此 emeet 在 MVP 階段採用較務實的做法：將麥克風音訊與系統音訊拆成兩條 session。
@@ -133,6 +143,14 @@ emeet 的主要價值發生在會議進行中。它希望在使用者還在對�
 * 系統音訊：透過 `ScreenCaptureKit` 的 `.audio` 擷取。
 
 這樣可以穩定區分 `Self` 與 `Other`。對系統音訊內的多位遠端說話者，emeet 目前使用本機音訊特徵做 segment-level clustering，標示為 `Speaker 1`、`Speaker 2`。這不是完整的說話者辨識，但足以展示「不同來源與不同遠端說話者初步區分」的概念。
+
+| 層級 | 要回答的問題 | emeet 目前做法 | 限制 |
+| --- | --- | --- | --- |
+| 來源歸屬 | 這句話是我說的，還是會議裡其他人說的？ | 麥克風 session 標示 `Self`，系統音訊 session 標示 `Other`。 | 若使用外放喇叭，遠端聲音可能回灌到麥克風。 |
+| 工作階段內分群 | 系統音訊裡是否可能有不同遠端說話者？ | 以本機音訊特徵做 online clustering，輸出 `Speaker 1`、`Speaker 2`。 | 只能做 segment-level speaker numbering，不保證長會議身份完全穩定。 |
+| 真實身份命名 | `Speaker 1` 到底是誰？ | 目前不做。 | 需要會議平台 participant metadata、每人獨立音軌、已知聲紋參考或人工命名。 |
+
+因此，報告中不能把目前功能寫成「完整知道誰在講話」。比較準確的說法是：emeet 先用音訊來源可靠區分 `Self` / `Other`，再對 `Other` 做本機初步分群；若未來要達到更高可信度，應整合 Zoom RTMS、WebRTC participant tracks、SpeakerKit、pyannote 或雲端 diarization 作為補正層。
 
 ### 4.3 模型不應綁死
 
@@ -356,6 +374,10 @@ WebSocket client 會將 PCM16 audio buffer 聚合成 100 ms chunk 傳送至後�
 
 目前逐字稿輸出是 speech-window final segment，並不是真正 token-level streaming partial。也就是說，使用者會在一句話或一小段話結束後看到 final transcript，而不是每個字即時跳出。這對專題展示已足夠，但若要接近商用品質，仍需要加入真正的 partial transcript。
 
+目前 `SpeechWindowSegmenter` 的實作邏輯是：先忽略 leading silence；只要 RMS 超過門檻就開始累積語音；當片段已達最短長度且 trailing silence 超過 700 ms，就以 `reason = "silence"` 定稿；若講者一直說話，最長到 8 秒會以 `reason = "max_duration"` 強制切段；會議結束時則以 `reason = "session_end"` flush 最後片段。後端取得 Whisper 類模型輸出的文字後，會再用標點切成句子，並依句子長度把原始音訊時間範圍分配給各句，輸出 `transcript.final` event。
+
+研究文件中較完整的未來路線，是把資料模型改成「可變作用中假設 + 不可變 final segment」。也就是 UI 可顯示 `active_partial`，但資料庫中的 `transcript_segments` 只保存 final 或 soft-committed segment；若 STT 供應商提供 word timestamp、stability、confidence 或 speech-final 訊號，也應一併保存。這樣做能避免把不穩定文字送進會議紀錄，也能為後續 evidence link、逐字稿搜尋與會後校正保留依據。
+
 ### 6.3 說話者標籤
 
 目前最穩定的說話者區分方式是來源標籤：
@@ -372,6 +394,16 @@ WebSocket client 會將 PCM16 audio buffer 聚合成 100 ms chunk 傳送至後�
 * 長時間會議中可能發生 identity drift。
 
 因此在本專題中，這項功能應被定位為「來源分流與初步說話者分群」，而非完整的說話者辨識系統。
+
+目前程式中的 `LocalSpeakerAssigner` 是一個可替換的本機分群器。它的流程如下：
+
+1. 如果來源是 `microphone`，直接回傳 `speaker_hint = self`、`speaker_id = self`、`speaker_label = Self`。
+2. 如果來源是 `system` 且未啟用 diarization provider，直接回傳 `Other`。
+3. 如果啟用 `local-clustering`，就從 PCM16 音訊抽取 voice feature。
+4. 若環境有 NumPy，feature 會包含 25 ms frame、10 ms hop 的頻帶能量平均值、頻帶能量標準差、RMS 統計與 zero-crossing rate 統計；若沒有 NumPy，則使用 mean absolute amplitude、RMS、peak、zero-crossing rate 等基本特徵作為 fallback。
+5. feature 經正規化後，系統以 cosine distance 找最接近的 speaker cluster。若距離高於 `0.32` 且尚未超過 `max_speakers = 4`，建立新的 cluster；否則更新既有 centroid，目前新特徵權重為 `0.18`。
+
+這個方法的優點是完全本機、沒有額外模型依賴，也能支撐 demo 中的 `Speaker 1`、`Speaker 2`。缺點是它只看已切好的 segment，沒有完整處理「同一段內兩個人同時說話」或「同一說話者長時間音色漂移」。正式評估時不應只看標籤是否看起來合理，而應量測 DER、JER、speaker change detection precision/recall，以及 speaker label error 對回覆建議與會議筆記造成的實際影響。
 
 ### 6.4 即時回覆建議
 
@@ -402,6 +434,18 @@ WebSocket client 會將 PCM16 audio buffer 聚合成 100 ms chunk 傳送至後�
 
 會議啟動後，系統每 30 秒檢查是否有新增 final transcript。若有新內容，就呼叫 assistant 的 `meeting_notes` action，將新增逐字稿、既有會議紀錄、既有行動項目，以及已連接的 Google Docs 脈絡一起送入模型。
 
+這裡的重點是「增量整理」，不是每 30 秒把整場會議重新送給 AI。前端會用 `summarizedFinalLineIDs` 記錄哪些 final transcript 已經被摘要過；下一輪只取尚未摘要的 final lines 組成 transcript payload，再加上目前畫面上的 notes/actions 作為 rolling context。這樣可以降低 token 成本、減少重複摘要，也避免長會議逐漸超出模型脈絡限制。
+
+目前 quick action 與 automatic notes 使用的上下文也不同：
+
+| 功能 | 目前送入模型的主要內容 | 設計原因 |
+| --- | --- | --- |
+| `What should I say?` / `Follow-up questions` | 最近最多 16 行 transcript，加上文件標題、文件摘要與 snippets | 需要低延遲與近場語境，重點是回答當下這一輪對話。 |
+| `meeting_notes` 自動更新 | 上次摘要後新增的 final lines、既有 notes、既有 actions、rolling summary、Google Docs 脈絡 | 需要穩定整理，不應受 partial transcript 抖動影響。 |
+| Google Docs live notes | 已整理出的 notes/actions 與 transcript | 讓文件反映目前會議狀態，但不直接把未確認內容當成正式文件修改。 |
+
+研究文件建議的更完整架構，是維護三種記憶：最近 60 到 180 秒的 final transcript 作為口語回覆依據；150 到 300 tokens 的 current-topic rolling summary 作為背景；整場會議的 topics、decisions、open questions、risks、actions 作為結構化狀態。未來如果加入 meeting chat 或跨文件查詢，則應先查結構化狀態與 SQLite/FTS，再視需要做語意檢索，而不是每次都把整場逐字稿塞進 prompt。
+
 會議紀錄主要整理為：
 
 * 討論主題與內容。
@@ -416,6 +460,8 @@ WebSocket client 會將 PCM16 audio buffer 聚合成 100 ms chunk 傳送至後�
 * 狀態。
 
 如果會議中沒有明確指定負責人，系統會標示為 `Unassigned`，避免模型自行猜測。
+
+目前 MVP 的 note/action schema 已足以支撐 UI，但還不夠支撐正式稽核。下一版應把筆記拆成 TL;DR、Topics、Decisions、Action items、Open questions、Risks/blockers、Follow-ups；每個 action item 應至少包含 task、owner、due date、context、state、confidence 與 `evidence_segment_ids`。其中 owner 與 due date 若未在逐字稿明示，應保留 `null` 或 `Unassigned`，不能由模型補猜。這也是 prompt 要求「不要編造承諾」的原因。
 
 ### 6.7 Google Docs Live Notes 與語音驅動文件編輯
 
@@ -638,6 +684,50 @@ emeet 的價值不在於再做一個會後摘要工具，而是在會議當下�
 ---
 
 ## 參考資料
+
+### macOS 音訊、權限與文件操作
+
+* Apple Developer Documentation, `AVAudioEngine`: https://developer.apple.com/documentation/avfaudio/avaudioengine
+* Apple Developer Documentation, ScreenCaptureKit: https://developer.apple.com/documentation/screencapturekit
+* Apple Developer Documentation, `SCStreamConfiguration.capturesAudio`: https://developer.apple.com/documentation/screencapturekit/scstreamconfiguration/capturesaudio
+* Apple WWDC22, Meet ScreenCaptureKit: https://developer.apple.com/videos/play/wwdc2022/10156/
+* Apple WWDC25, Bring advanced speech-to-text to your app with SpeechAnalyzer: https://developer.apple.com/videos/play/wwdc2025/277/
+* Apple Developer Documentation, Keychain services: https://developer.apple.com/documentation/security/keychain-services
+* Google Docs API, `documents.batchUpdate`: https://developers.google.com/docs/api/reference/rest/v1/documents/batchUpdate
+
+### 語音轉文字、分塊與說話者標籤
+
+* Google Cloud Speech-to-Text, `StreamingRecognitionResult`: https://docs.cloud.google.com/speech-to-text/docs/reference/rest/v2/StreamingRecognitionResult
+* Amazon Transcribe, Transcribing streaming audio: https://docs.aws.amazon.com/transcribe/latest/dg/streaming.html
+* OpenAI Realtime transcription: https://platform.openai.com/docs/guides/realtime-transcription
+* Radford et al., Robust Speech Recognition via Large-Scale Weak Supervision: https://arxiv.org/abs/2212.04356
+* Argmax, WhisperKit: https://github.com/argmaxinc/WhisperKit
+* Argmax, WhisperKit paper: https://arxiv.org/abs/2507.10860
+* SYSTRAN, faster-whisper: https://github.com/SYSTRAN/faster-whisper
+* MLX examples, Whisper: https://github.com/ml-explore/mlx-examples/tree/main/whisper
+* Macháček et al., Turning Whisper into Real-Time Transcription System: https://aclanthology.org/2023.ijcnlp-demo.3/
+* Silero VAD: https://github.com/snakers4/silero-vad
+* WebRTC VAD source: https://webrtc.googlesource.com/src/+/refs/heads/main/common_audio/vad/
+* Semantic VAD: Low-Latency Voice Activity Detection for Speech Interaction: https://arxiv.org/abs/2305.12450
+* Window Size Versus Accuracy Experiments in Voice Activity Detectors: https://arxiv.org/abs/2601.17270
+* pyannote.audio: https://github.com/pyannote/pyannote-audio
+* Argmax, SpeakerKit: https://www.argmaxinc.com/blog/speakerkit
+* Zoom RTMS, Handling media data: https://developers.zoom.us/docs/rtms/meetings/media/
+
+### 會議筆記、長脈絡與結構化輸出
+
+* Zhong et al., QMSum: A New Benchmark for Query-based Multi-domain Meeting Summarization: https://aclanthology.org/2021.naacl-main.472/
+* Hu et al., MeetingBank: A Benchmark Dataset for Meeting Summarization: https://arxiv.org/abs/2305.17529
+* Zhang et al., Summ^N: A Multi-Stage Summarization Framework for Long Input Dialogues and Documents: https://aclanthology.org/2022.acl-long.112/
+* Golia and Kalita, Action-Item-Driven Summarization of Long Meeting Transcripts: https://arxiv.org/abs/2312.17581
+* Liu et al., Lost in the Middle: How Language Models Use Long Contexts: https://arxiv.org/abs/2307.03172
+* Packer et al., MemGPT: Towards LLMs as Operating Systems: https://arxiv.org/abs/2310.08560
+* Sarthi et al., RAPTOR: Recursive Abstractive Processing for Tree-Organized Retrieval: https://arxiv.org/abs/2401.18059
+* OpenAI, Structured Outputs: https://platform.openai.com/docs/guides/structured-outputs
+* OpenAI, Prompt Caching: https://platform.openai.com/docs/guides/prompt-caching
+* SQLite FTS5 Extension: https://www.sqlite.org/fts5.html
+
+### 競品與產品文件
 
 * Otter.ai features: https://help.otter.ai/hc/en-us/articles/360047872833-Otter-ai-features
 * Fireflies.ai overview: https://fireflies.zendesk.com/hc/en-us/articles/13940162530577-What-is-Fireflies-ai
