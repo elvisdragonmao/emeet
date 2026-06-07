@@ -11,6 +11,7 @@ class AssistantPromptsTest(unittest.TestCase):
         self.assertIn("structured meeting record", prompt_template_for_action("meeting_notes").instruction)
         self.assertIn("討論主題與內容", prompt_template_for_action("meeting_notes").instruction)
         self.assertIn("meeting-context question", prompt_template_for_action("chat").instruction)
+        self.assertIn("explicit spoken command addressed to AI", prompt_template_for_action("document_edit_plan").instruction)
 
     def test_build_messages_includes_transcript_and_output_contract(self) -> None:
         request = AssistantRequest(
@@ -78,6 +79,38 @@ class AssistantPromptsTest(unittest.TestCase):
         self.assertIn("mtg-1", content)
         self.assertIn("整理 speaker labels", content)
         self.assertIn("Speaker 2", content)
+
+    def test_document_edit_plan_requires_explicit_ai_command(self) -> None:
+        request = AssistantRequest(
+            action="document_edit_plan",
+            provider="ollama",
+            model="fast",
+            thinking="medium",
+            temperature=0.2,
+            max_tokens=700,
+            meeting_id="mtg-1",
+            document_title="Demo plan",
+            document_summary="TODO: confirm demo owner",
+            transcript=[
+                AssistantTranscriptLine(
+                    source="microphone",
+                    source_label="Self",
+                    speaker_hint="self",
+                    speaker_id="self",
+                    speaker_label="Self",
+                    start_ms=0,
+                    end_ms=1800,
+                    text="AI 請幫我把 TODO 改成 Eva will confirm the demo owner.",
+                    is_final=True,
+                )
+            ],
+        )
+
+        content = build_messages(request)[1]["content"]
+
+        self.assertIn("intent, find, replace, heading, text, anchor, occurrence", content)
+        self.assertIn("AI 請幫我", content)
+        self.assertIn("requires_user_confirmation to false", content)
 
 
 if __name__ == "__main__":

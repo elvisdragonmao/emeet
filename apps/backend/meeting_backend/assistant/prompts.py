@@ -13,8 +13,9 @@ OUTPUT_CONTRACT = (
 )
 
 DOCUMENT_EDIT_PLAN_OUTPUT_CONTRACT = (
-    "Return compact JSON only. The JSON object must contain keys intent, find, replace, reason, "
-    "and requires_user_confirmation. requires_user_confirmation must be true for direct edits."
+    "Return compact JSON only. The JSON object must contain keys intent, find, replace, heading, "
+    "text, anchor, occurrence, reason, and requires_user_confirmation. Valid intent values are "
+    "none, replace_text, append_meeting_notes, rewrite_paragraph_containing_anchor, and insert_under_heading."
 )
 
 
@@ -84,10 +85,14 @@ PROMPT_TEMPLATES: Dict[str, PromptTemplate] = {
             "meeting transcript. Do not apply edits. Do not output OAuth secrets or tokens."
         ),
         instruction=(
-            "Return JSON for one proposed edit. The top-level object should include intent, find, replace, "
-            "reason, and requires_user_confirmation. Valid intents are replace_text, append_meeting_notes, "
-            "rewrite_paragraph_containing_anchor, and insert_under_heading. Set requires_user_confirmation "
-            "to true for direct document edits."
+            "Return JSON for at most one proposed edit. Only propose an edit when the final transcript contains "
+            "an explicit spoken command addressed to AI, such as 'AI 請幫我...', 'AI 幫我...', or "
+            "'AI 請幫我要修改...'. If there is no explicit AI-directed edit command, set intent to none. "
+            "If the command is explicit and contains enough information to execute safely, set "
+            "requires_user_confirmation to false. If the command is ambiguous, set intent to none and explain "
+            "what is missing in reason. For replace_text, fill find, replace, and occurrence as first or all. "
+            "For insert_under_heading, fill heading and text. For rewrite_paragraph_containing_anchor, fill "
+            "anchor and text. For append_meeting_notes, no find/replace text is required."
         ),
     ),
     "chat": PromptTemplate(

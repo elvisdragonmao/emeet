@@ -123,5 +123,6 @@ async def respond(body: AssistantRespondBody):
     except Exception as error:
         raise HTTPException(status_code=502, detail=str(error)) from error
 
-    await asyncio.to_thread(MeetingStorage(settings.database_path).record_assistant_result, request, result)
+    if request.action != "document_edit_plan":
+        await asyncio.to_thread(MeetingStorage(settings.database_path).record_assistant_result, request, result)
     return result.to_dict()

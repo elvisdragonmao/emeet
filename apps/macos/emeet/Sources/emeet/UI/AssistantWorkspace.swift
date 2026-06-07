@@ -27,13 +27,6 @@ struct AssistantWorkspace: View {
     let googleDocsBriefing: String
     let googleDocsIsConnected: Bool
     let googleDocsIsBusy: Bool
-    let googleDocsFindText: Binding<String>
-    let googleDocsReplaceText: Binding<String>
-    let googleDocsReplaceOccurrence: Binding<GoogleDocsReplaceOccurrence>
-    let googleDocsInsertHeading: Binding<String>
-    let googleDocsInsertText: Binding<String>
-    let googleDocsRewriteAnchor: Binding<String>
-    let googleDocsRewriteText: Binding<String>
     let googleBrowserMessage: String
     let googleBrowserSeleniumAvailable: Bool
     let googleBrowserSessionActive: Bool
@@ -46,9 +39,6 @@ struct AssistantWorkspace: View {
     let googleRefreshAction: () -> Void
     let googleAppendNotesAction: () -> Void
     let googleUpdateLiveNotesAction: () -> Void
-    let googleApplyReplaceAction: () -> Void
-    let googleInsertUnderHeadingAction: () -> Void
-    let googleRewriteParagraphAction: () -> Void
     let googleBrowserRefreshAction: () -> Void
     let googleBrowserOpenAction: () -> Void
     let googleBrowserScrollAction: () -> Void
@@ -121,13 +111,6 @@ struct AssistantWorkspace: View {
                     briefing: googleDocsBriefing,
                     isConnected: googleDocsIsConnected,
                     isBusy: googleDocsIsBusy,
-                    findText: googleDocsFindText,
-                    replaceText: googleDocsReplaceText,
-                    occurrence: googleDocsReplaceOccurrence,
-                    insertHeading: googleDocsInsertHeading,
-                    insertText: googleDocsInsertText,
-                    rewriteAnchor: googleDocsRewriteAnchor,
-                    rewriteText: googleDocsRewriteText,
                     browserMessage: googleBrowserMessage,
                     browserSeleniumAvailable: googleBrowserSeleniumAvailable,
                     browserSessionActive: googleBrowserSessionActive,
@@ -137,9 +120,6 @@ struct AssistantWorkspace: View {
                     refreshAction: googleRefreshAction,
                     appendNotesAction: googleAppendNotesAction,
                     updateLiveNotesAction: googleUpdateLiveNotesAction,
-                    applyReplaceAction: googleApplyReplaceAction,
-                    insertUnderHeadingAction: googleInsertUnderHeadingAction,
-                    rewriteParagraphAction: googleRewriteParagraphAction,
                     browserRefreshAction: googleBrowserRefreshAction,
                     browserOpenAction: googleBrowserOpenAction,
                     browserScrollAction: googleBrowserScrollAction,
@@ -324,13 +304,6 @@ private struct GoogleDocsWorkspace: View {
     let briefing: String
     let isConnected: Bool
     let isBusy: Bool
-    let findText: Binding<String>
-    let replaceText: Binding<String>
-    let occurrence: Binding<GoogleDocsReplaceOccurrence>
-    let insertHeading: Binding<String>
-    let insertText: Binding<String>
-    let rewriteAnchor: Binding<String>
-    let rewriteText: Binding<String>
     let browserMessage: String
     let browserSeleniumAvailable: Bool
     let browserSessionActive: Bool
@@ -340,9 +313,6 @@ private struct GoogleDocsWorkspace: View {
     let refreshAction: () -> Void
     let appendNotesAction: () -> Void
     let updateLiveNotesAction: () -> Void
-    let applyReplaceAction: () -> Void
-    let insertUnderHeadingAction: () -> Void
-    let rewriteParagraphAction: () -> Void
     let browserRefreshAction: () -> Void
     let browserOpenAction: () -> Void
     let browserScrollAction: () -> Void
@@ -446,20 +416,6 @@ private struct GoogleDocsWorkspace: View {
                 .padding(9)
                 .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
             }
-
-            DirectEditPanel(
-                findText: findText,
-                replaceText: replaceText,
-                occurrence: occurrence,
-                insertHeading: insertHeading,
-                insertText: insertText,
-                rewriteAnchor: rewriteAnchor,
-                rewriteText: rewriteText,
-                isDisabled: !isConnected || isBusy,
-                applyAction: applyReplaceAction,
-                insertUnderHeadingAction: insertUnderHeadingAction,
-                rewriteParagraphAction: rewriteParagraphAction
-            )
 
             BrowserHelperPanel(
                 message: browserMessage,
@@ -569,90 +525,6 @@ private struct GoogleDocSmallButton: View {
         .buttonStyle(.bordered)
         .disabled(disabled)
         .frame(maxWidth: .infinity)
-    }
-}
-
-private struct DirectEditPanel: View {
-    let findText: Binding<String>
-    let replaceText: Binding<String>
-    let occurrence: Binding<GoogleDocsReplaceOccurrence>
-    let insertHeading: Binding<String>
-    let insertText: Binding<String>
-    let rewriteAnchor: Binding<String>
-    let rewriteText: Binding<String>
-    let isDisabled: Bool
-    let applyAction: () -> Void
-    let insertUnderHeadingAction: () -> Void
-    let rewriteParagraphAction: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Direct edit")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-
-            TextField("Find text", text: findText)
-                .textFieldStyle(.roundedBorder)
-                .disabled(isDisabled)
-
-            TextField("Replace with", text: replaceText)
-                .textFieldStyle(.roundedBorder)
-                .disabled(isDisabled)
-
-            HStack(spacing: 8) {
-                Picker("Occurrence", selection: occurrence) {
-                    ForEach(GoogleDocsReplaceOccurrence.allCases) { item in
-                        Text(item.label)
-                            .tag(item)
-                    }
-                }
-                .labelsHidden()
-                .frame(maxWidth: .infinity)
-                .disabled(isDisabled)
-
-                Button(action: applyAction) {
-                    Label("Apply", systemImage: "checkmark.circle")
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(isDisabled)
-            }
-
-            Divider()
-
-            TextField("Heading", text: insertHeading)
-                .textFieldStyle(.roundedBorder)
-                .disabled(isDisabled)
-
-            TextField("Text to insert under heading", text: insertText, axis: .vertical)
-                .textFieldStyle(.roundedBorder)
-                .lineLimit(2...4)
-                .disabled(isDisabled)
-
-            Button(action: insertUnderHeadingAction) {
-                Label("Insert Under Heading", systemImage: "text.insert")
-            }
-            .buttonStyle(.bordered)
-            .disabled(isDisabled)
-
-            Divider()
-
-            TextField("Paragraph anchor text", text: rewriteAnchor)
-                .textFieldStyle(.roundedBorder)
-                .disabled(isDisabled)
-
-            TextField("Replacement paragraph", text: rewriteText, axis: .vertical)
-                .textFieldStyle(.roundedBorder)
-                .lineLimit(2...4)
-                .disabled(isDisabled)
-
-            Button(action: rewriteParagraphAction) {
-                Label("Rewrite Paragraph", systemImage: "paragraphsign")
-            }
-            .buttonStyle(.bordered)
-            .disabled(isDisabled)
-        }
-        .padding(9)
-        .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
     }
 }
 

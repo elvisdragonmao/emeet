@@ -14,6 +14,27 @@ struct ContentView: View {
         .task {
             viewModel.requestScreenRecordingPermissionOnLaunch()
         }
+        .sheet(
+            isPresented: Binding(
+                get: { viewModel.meetingHistoryIsPresented },
+                set: { presented in
+                    if !presented {
+                        viewModel.closeMeetingHistory()
+                    }
+                }
+            )
+        ) {
+            MeetingHistoryView(
+                meetings: viewModel.meetingHistory,
+                selectedMeetingID: viewModel.selectedMeetingHistoryID,
+                record: viewModel.selectedMeetingRecord,
+                isLoading: viewModel.meetingHistoryIsLoading,
+                message: viewModel.meetingHistoryMessage,
+                refreshAction: viewModel.refreshMeetingHistory,
+                selectAction: viewModel.selectMeetingHistory,
+                closeAction: viewModel.closeMeetingHistory
+            )
+        }
     }
 
     private var header: some View {
@@ -75,7 +96,14 @@ struct ContentView: View {
             Button {
                 viewModel.clearCurrentRecords()
             } label: {
-                Label("Delete Records", systemImage: "trash")
+                Label("Clear View", systemImage: "xmark.circle")
+            }
+            .buttonStyle(.bordered)
+
+            Button {
+                viewModel.openMeetingHistory()
+            } label: {
+                Label("History", systemImage: "clock.arrow.circlepath")
             }
             .buttonStyle(.bordered)
 
@@ -183,34 +211,6 @@ struct ContentView: View {
             googleDocsBriefing: viewModel.googleDocsBriefing,
             googleDocsIsConnected: viewModel.googleDocsIsConnected,
             googleDocsIsBusy: viewModel.googleDocsIsBusy,
-            googleDocsFindText: Binding(
-                get: { viewModel.googleDocsFindText },
-                set: { viewModel.updateGoogleDocsFindText($0) }
-            ),
-            googleDocsReplaceText: Binding(
-                get: { viewModel.googleDocsReplaceText },
-                set: { viewModel.updateGoogleDocsReplaceText($0) }
-            ),
-            googleDocsReplaceOccurrence: Binding(
-                get: { viewModel.googleDocsReplaceOccurrence },
-                set: { viewModel.updateGoogleDocsReplaceOccurrence($0) }
-            ),
-            googleDocsInsertHeading: Binding(
-                get: { viewModel.googleDocsInsertHeading },
-                set: { viewModel.updateGoogleDocsInsertHeading($0) }
-            ),
-            googleDocsInsertText: Binding(
-                get: { viewModel.googleDocsInsertText },
-                set: { viewModel.updateGoogleDocsInsertText($0) }
-            ),
-            googleDocsRewriteAnchor: Binding(
-                get: { viewModel.googleDocsRewriteAnchor },
-                set: { viewModel.updateGoogleDocsRewriteAnchor($0) }
-            ),
-            googleDocsRewriteText: Binding(
-                get: { viewModel.googleDocsRewriteText },
-                set: { viewModel.updateGoogleDocsRewriteText($0) }
-            ),
             googleBrowserMessage: viewModel.googleBrowserMessage,
             googleBrowserSeleniumAvailable: viewModel.googleBrowserSeleniumAvailable,
             googleBrowserSessionActive: viewModel.googleBrowserSessionActive,
@@ -226,9 +226,6 @@ struct ContentView: View {
             googleRefreshAction: viewModel.refreshGoogleDocContext,
             googleAppendNotesAction: viewModel.appendMeetingNotesToGoogleDoc,
             googleUpdateLiveNotesAction: viewModel.updateGoogleDocLiveNotes,
-            googleApplyReplaceAction: viewModel.applyGoogleDocsReplacement,
-            googleInsertUnderHeadingAction: viewModel.insertGoogleDocsTextUnderHeading,
-            googleRewriteParagraphAction: viewModel.rewriteGoogleDocsParagraph,
             googleBrowserRefreshAction: viewModel.refreshGoogleBrowserStatus,
             googleBrowserOpenAction: viewModel.openGoogleDocInBrowser,
             googleBrowserScrollAction: viewModel.scrollGoogleDocBrowserToBottom,

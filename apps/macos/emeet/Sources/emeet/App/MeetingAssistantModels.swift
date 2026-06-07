@@ -124,19 +124,3 @@ enum GoogleDocsSyncMode: String, CaseIterable, Identifiable {
         }
     }
 }
-
-enum GoogleDocsReplaceOccurrence: String, CaseIterable, Identifiable {
-    case first
-    case all
-
-    var id: String { rawValue }
-
-    var label: String {
-        switch self {
-        case .first:
-            return "Replace first"
-        case .all:
-            return "Replace all"
-        }
-    }
-}

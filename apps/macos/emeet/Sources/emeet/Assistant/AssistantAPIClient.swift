@@ -77,6 +77,19 @@ struct AssistantRespondResponse: Decodable, Equatable {
     let drafts: [AssistantDraftResponse]
     let notes: [MeetingNoteResponse]
     let actions: [MeetingActionResponse]
+    let documentEditPlan: DocumentEditPlanResponse?
+}
+
+struct DocumentEditPlanResponse: Decodable, Equatable {
+    let intent: String
+    let find: String
+    let replace: String
+    let heading: String
+    let text: String
+    let anchor: String
+    let occurrence: String
+    let reason: String
+    let requiresUserConfirmation: Bool
 }
 
 struct AssistantDraftResponse: Decodable, Equatable {
@@ -183,6 +196,102 @@ struct GoogleBrowserResponse: Decodable, Equatable {
     let seleniumAvailable: Bool
     let chromedriverAvailable: Bool
     let browserSessionActive: Bool
+}
+
+struct MeetingHistoryListResponse: Decodable, Equatable {
+    let meetings: [MeetingHistorySummary]
+}
+
+struct MeetingHistorySummary: Decodable, Identifiable, Equatable {
+    let meetingId: String
+    let title: String
+    let startedAtMs: Int
+    let endedAtMs: Int?
+    let durationMs: Int
+    let sttProvider: String
+    let sttModel: String
+    let assistantProvider: String
+    let assistantModel: String
+    let transcriptCount: Int
+    let assistantResponseCount: Int
+    let notesCount: Int
+    let actionsCount: Int
+    let createdAtMs: Int
+    let updatedAtMs: Int
+
+    var id: String { meetingId }
+}
+
+struct MeetingHistoryRecordResponse: Decodable, Equatable {
+    let meeting: MeetingHistorySummary
+    let transcript: [MeetingHistoryTranscriptLine]
+    let assistantResponses: [MeetingHistoryAssistantResponse]
+    let notes: [MeetingNoteResponse]
+    let actions: [MeetingActionResponse]
+}
+
+struct MeetingHistoryTranscriptLine: Decodable, Identifiable, Equatable {
+    let segmentId: String
+    let source: String
+    let speakerHint: String
+    let speakerId: String
+    let speakerLabel: String
+    let startMs: Int
+    let endMs: Int
+    let text: String
+    let revision: Int
+    let isFinal: Bool
+    let confidence: Double
+    let provider: String
+    let createdAtMs: Int
+
+    var id: String { segmentId }
+
+    var sourceLabel: String {
+        let trimmedSpeakerLabel = speakerLabel.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedSpeakerLabel.isEmpty {
+            return trimmedSpeakerLabel
+        }
+
+        switch speakerHint {
+        case "self":
+            return "Self"
+        case "other":
+            return "Other"
+        default:
+            return source.capitalized
+        }
+    }
+
+    var timeRangeLabel: String {
+        "\(Self.format(milliseconds: startMs)) - \(Self.format(milliseconds: endMs))"
+    }
+
+    private static func format(milliseconds: Int) -> String {
+        let totalSeconds = max(0, milliseconds / 1_000)
+        let minutes = totalSeconds / 60
+        let seconds = totalSeconds % 60
+        return String(format: "%02d:%02d", minutes, seconds)
+    }
+}
+
+struct MeetingHistoryAssistantResponse: Decodable, Identifiable, Equatable {
+    let id: Int
+    let action: String
+    let provider: String
+    let model: String
+    let thinking: String
+    let latencyMs: Int
+    let createdAtMs: Int
+    let suggestions: [MeetingHistorySuggestion]
+}
+
+struct MeetingHistorySuggestion: Decodable, Identifiable, Equatable {
+    let id: Int
+    let title: String
+    let detail: String
+    let badge: String
+    let iconName: String
 }
 
 final class AssistantAPIClient {
@@ -309,6 +418,20 @@ final class AssistantAPIClient {
         return try decoder.decode(GoogleBrowserResponse.self, from: data)
     }
 
+    func fetchMeetingHistory(limit: Int = 50) async throws -> MeetingHistoryListResponse {
+        let (data, response) = try await session.data(from: url(path: "/v1/meetings", queryItems: [
+            URLQueryItem(name: "limit", value: String(limit))
+        ]))
+        try validate(response: response, data: data)
+        return try decoder.decode(MeetingHistoryListResponse.self, from: data)
+    }
+
+    func fetchMeetingRecord(meetingID: String) async throws -> MeetingHistoryRecordResponse {
+        let (data, response) = try await session.data(from: url(path: "/v1/meetings/\(meetingID)"))
+        try validate(response: response, data: data)
+        return try decoder.decode(MeetingHistoryRecordResponse.self, from: data)
+    }
+
     private func post<T: Encodable>(path: String, body: T) async throws -> (Data, URLResponse) {
         var urlRequest = URLRequest(url: url(path: path))
         urlRequest.httpMethod = "POST"
@@ -317,9 +440,10 @@ final class AssistantAPIClient {
         return try await session.data(for: urlRequest)
     }
 
-    private func url(path: String) -> URL {
+    private func url(path: String, queryItems: [URLQueryItem] = []) -> URL {
         var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)
         components?.path = path
+        components?.queryItems = queryItems.isEmpty ? nil : queryItems
         return components?.url ?? baseURL.appendingPathComponent(path)
     }
 

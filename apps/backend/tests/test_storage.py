@@ -5,7 +5,7 @@ import unittest
 
 from meeting_backend.assistant.models import AssistantRequest, AssistantResult, AssistantTranscriptLine
 from meeting_backend.protocol import SessionStart, transcript_event
-from meeting_backend.storage import MeetingStorage, session_id_from_segment_id
+from meeting_backend.storage import MeetingStorage, meeting_id_from_session_id, session_id_from_segment_id
 
 
 class StorageTest(unittest.TestCase):
@@ -97,6 +97,108 @@ class StorageTest(unittest.TestCase):
     def test_extracts_session_id_from_segment_id(self) -> None:
         self.assertEqual(session_id_from_segment_id("seg_macos-system-abcd_0001"), "macos-system-abcd")
         self.assertEqual(session_id_from_segment_id("bad"), "")
+
+    def test_extracts_meeting_id_from_source_session_id(self) -> None:
+        self.assertEqual(meeting_id_from_session_id("mtg-123-microphone"), "mtg-123")
+        self.assertEqual(meeting_id_from_session_id("mtg-123-system"), "mtg-123")
+        self.assertEqual(meeting_id_from_session_id("local-session"), "local-session")
+
+    def test_lists_history_records_for_saved_meetings(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = os.path.join(directory, "meeting.sqlite3")
+            storage = MeetingStorage(database_path)
+            session = SessionStart(
+                session_id="mtg-demo-microphone",
+                source="microphone",
+                sample_rate=16000,
+                channels=1,
+                sample_width=2,
+            )
+
+            storage.record_session_start(session, provider="mlx-whisper", model="large-v3-turbo")
+            storage.record_transcript_event(
+                transcript_event(
+                    event_type="transcript.final",
+                    session=session,
+                    segment_index=1,
+                    start_ms=0,
+                    end_ms=1200,
+                    text="We need to confirm the demo checklist.",
+                    revision=1,
+                    is_final=True,
+                    provider="mlx-whisper",
+                )
+            )
+            storage.record_assistant_result(
+                AssistantRequest(
+                    action="meeting_notes",
+                    meeting_id="mtg-demo",
+                    provider="codex-cli",
+                    model="gpt-5.5",
+                    thinking="medium",
+                    temperature=0.2,
+                    max_tokens=700,
+                    transcript=[],
+                ),
+                AssistantResult(
+                    provider="codex-cli",
+                    model="gpt-5.5",
+                    thinking="medium",
+                    latency_ms=20,
+                    drafts=[],
+                    notes=[{"title": "討論主題與內容", "detail": "Demo checklist needs confirmation."}],
+                    actions=[{"title": "Confirm demo checklist", "owner": "Self", "state": "Draft"}],
+                    raw_text="debug text is not exposed through history",
+                ),
+            )
+            storage.record_assistant_result(
+                AssistantRequest(
+                    action="what_should_i_say",
+                    meeting_id="mtg-demo",
+                    provider="codex-cli",
+                    model="gpt-5.5",
+                    thinking="medium",
+                    temperature=0.2,
+                    max_tokens=700,
+                    transcript=[],
+                ),
+                AssistantResult(
+                    provider="codex-cli",
+                    model="gpt-5.5",
+                    thinking="medium",
+                    latency_ms=15,
+                    drafts=[
+                        {
+                            "title": "Clarify scope",
+                            "detail": "Could we confirm which demo steps are required?",
+                            "badge": "AI",
+                            "icon_name": "quote.bubble",
+                        }
+                    ],
+                    notes=[],
+                    actions=[],
+                    raw_text="debug text is not exposed through history",
+                ),
+            )
+            storage.record_session_end("mtg-demo-microphone")
+
+            meetings = storage.list_meetings()
+            self.assertEqual(len(meetings), 1)
+            self.assertEqual(meetings[0]["meeting_id"], "mtg-demo")
+            self.assertEqual(meetings[0]["transcript_count"], 1)
+            self.assertEqual(meetings[0]["assistant_response_count"], 1)
+            self.assertEqual(meetings[0]["notes_count"], 1)
+            self.assertEqual(meetings[0]["actions_count"], 1)
+
+            record = storage.meeting_record("mtg-demo")
+            self.assertIsNotNone(record)
+            assert record is not None
+            self.assertEqual(record["transcript"][0]["text"], "We need to confirm the demo checklist.")
+            self.assertEqual(record["assistant_responses"][0]["action"], "what_should_i_say")
+            self.assertEqual(record["assistant_responses"][0]["suggestions"][0]["title"], "Clarify scope")
+            self.assertNotIn("raw_text", record["assistant_responses"][0])
+            self.assertEqual(record["notes"][0]["title"], "討論主題與內容")
+            self.assertEqual(record["actions"][0]["title"], "Confirm demo checklist")
 
     def test_adds_new_columns_to_existing_database(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

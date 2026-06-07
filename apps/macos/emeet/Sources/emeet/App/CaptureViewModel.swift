@@ -46,18 +46,17 @@ final class CaptureViewModel: ObservableObject {
     @Published private(set) var googleDocsBriefing = ""
     @Published private(set) var googleDocsSnippets: [String] = []
     @Published private(set) var googleDocsMessage = "Google Docs not connected."
-    @Published private(set) var googleDocsFindText = ""
-    @Published private(set) var googleDocsReplaceText = ""
-    @Published private(set) var googleDocsReplaceOccurrence: GoogleDocsReplaceOccurrence = .first
-    @Published private(set) var googleDocsInsertHeading = ""
-    @Published private(set) var googleDocsInsertText = ""
-    @Published private(set) var googleDocsRewriteAnchor = ""
-    @Published private(set) var googleDocsRewriteText = ""
     @Published private(set) var googleBrowserMessage = "Browser helper optional."
     @Published private(set) var googleBrowserSeleniumAvailable = false
     @Published private(set) var googleBrowserChromeDriverAvailable = false
     @Published private(set) var googleBrowserSessionActive = false
     @Published private(set) var googleBrowserFindText = ""
+    @Published private(set) var meetingHistoryIsPresented = false
+    @Published private(set) var meetingHistoryStatus: CaptureStatus = .idle
+    @Published private(set) var meetingHistoryMessage = "Open saved meetings from the backend."
+    @Published private(set) var meetingHistory: [MeetingHistorySummary] = []
+    @Published private(set) var selectedMeetingHistoryID = ""
+    @Published private(set) var selectedMeetingRecord: MeetingHistoryRecordResponse?
     @Published private(set) var eventLog: [String] = [
         "Ready. Start Meeting begins capture, STT, and auto summaries."
     ]
@@ -72,13 +71,21 @@ final class CaptureViewModel: ObservableObject {
     private let maxTranscriptLineCount = 24
     private let maxFinalTranscriptArchiveCount = 3_000
     private let autoSummaryIntervalSeconds = 30
+    private let documentEditIntervalSeconds = 10
     private var autoSummaryTask: Task<Void, Never>?
+    private var documentEditTask: Task<Void, Never>?
     private var autoSummaryRequestGeneration = 0
+    private var documentEditRequestGeneration = 0
     private var assistantRequestGeneration = 0
+    private var meetingHistoryRequestGeneration = 0
     private var didRequestScreenRecordingPermission = false
     private var currentMeetingID = ""
+    private var shouldCreateNewMeetingOnNextStart = false
     private var finalTranscriptArchive: [TranscriptLine] = []
     private var summarizedFinalLineIDs = Set<String>()
+    private var documentEditCheckedFinalLineIDs = Set<String>()
+    private var appliedDocumentEditKeys = Set<String>()
+    private var documentEditIsPlanning = false
 
     init(transcriptionBackend: TranscriptionBackendConfig = .fromEnvironment()) {
         self.transcriptionBackend = transcriptionBackend
@@ -278,6 +285,10 @@ final class CaptureViewModel: ObservableObject {
         return min(max(Double(elapsedSeconds) / Double(autoSummaryIntervalSeconds), 0), 1)
     }
 
+    var meetingHistoryIsLoading: Bool {
+        meetingHistoryStatus == .starting
+    }
+
     func startAll() {
         connectTranscription()
     }
@@ -385,16 +396,23 @@ final class CaptureViewModel: ObservableObject {
         }
 
         transcriptionStatus = .starting
+        if shouldCreateNewMeetingOnNextStart {
+            currentMeetingID = ""
+            shouldCreateNewMeetingOnNextStart = false
+        }
         _ = ensureCurrentMeetingID()
         transcriptLines.removeAll()
         finalTranscriptArchive.removeAll()
         summarizedFinalLineIDs.removeAll()
+        documentEditCheckedFinalLineIDs.removeAll()
+        appliedDocumentEditKeys.removeAll()
         resetLatencyReadings()
         resetMeetingDrafts()
         appendLog("Connecting transcription backend at \(transcriptionBackend.displayAddress)...")
         microphoneTranscriptionClient.connect(meetingID: currentMeetingID)
         systemTranscriptionClient.connect(meetingID: currentMeetingID)
         startAutoSummaryCountdown()
+        startDocumentEditWatcher()
 
         if microphoneStatus != .running && microphoneStatus != .starting {
             startMicrophone()
@@ -411,15 +429,21 @@ final class CaptureViewModel: ObservableObject {
         transcriptionStatus = .idle
         resetLatencyReadings()
         stopAutoSummaryCountdown()
+        stopDocumentEditWatcher()
+        shouldCreateNewMeetingOnNextStart = !currentMeetingID.isEmpty
         appendLog("Transcription backend disconnected.")
     }
 
     func clearCurrentRecords() {
         autoSummaryRequestGeneration += 1
+        documentEditRequestGeneration += 1
         autoSummaryIsGenerating = false
+        documentEditIsPlanning = false
         transcriptLines.removeAll()
         finalTranscriptArchive.removeAll()
         summarizedFinalLineIDs.removeAll()
+        documentEditCheckedFinalLineIDs.removeAll()
+        appliedDocumentEditKeys.removeAll()
         resetLatencyReadings()
         resetMeetingDrafts()
         resetAssistantDrafts()
@@ -450,6 +474,98 @@ final class CaptureViewModel: ObservableObject {
             appendLog("Meeting record exported: \(url.lastPathComponent)")
         } catch {
             appendLog("Export failed: \(error.localizedDescription)")
+        }
+    }
+
+    func openMeetingHistory() {
+        meetingHistoryIsPresented = true
+        refreshMeetingHistory()
+    }
+
+    func closeMeetingHistory() {
+        meetingHistoryIsPresented = false
+    }
+
+    func refreshMeetingHistory() {
+        meetingHistoryRequestGeneration += 1
+        let requestGeneration = meetingHistoryRequestGeneration
+        meetingHistoryStatus = .starting
+        meetingHistoryMessage = "Loading saved meetings..."
+
+        Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+
+            do {
+                let response = try await self.assistantClient.fetchMeetingHistory()
+                guard self.meetingHistoryRequestGeneration == requestGeneration else {
+                    return
+                }
+
+                self.meetingHistory = response.meetings
+                if response.meetings.isEmpty {
+                    self.selectedMeetingHistoryID = ""
+                    self.selectedMeetingRecord = nil
+                    self.meetingHistoryStatus = .idle
+                    self.meetingHistoryMessage = "No saved meetings yet."
+                    return
+                }
+
+                self.meetingHistoryMessage = "\(response.meetings.count) saved meetings"
+                let selected = response.meetings.first { $0.meetingId == self.selectedMeetingHistoryID }
+                    ?? response.meetings.first
+                if let selected {
+                    self.selectMeetingHistory(selected)
+                } else {
+                    self.meetingHistoryStatus = .running
+                }
+            } catch {
+                guard self.meetingHistoryRequestGeneration == requestGeneration else {
+                    return
+                }
+
+                self.meetingHistoryStatus = .failed(error.localizedDescription)
+                self.meetingHistoryMessage = error.localizedDescription
+            }
+        }
+    }
+
+    func selectMeetingHistory(_ meeting: MeetingHistorySummary) {
+        selectedMeetingHistoryID = meeting.meetingId
+        selectedMeetingRecord = nil
+        loadMeetingRecord(meetingID: meeting.meetingId)
+    }
+
+    private func loadMeetingRecord(meetingID: String) {
+        meetingHistoryRequestGeneration += 1
+        let requestGeneration = meetingHistoryRequestGeneration
+        meetingHistoryStatus = .starting
+        meetingHistoryMessage = "Loading meeting record..."
+
+        Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+
+            do {
+                let record = try await self.assistantClient.fetchMeetingRecord(meetingID: meetingID)
+                guard self.meetingHistoryRequestGeneration == requestGeneration,
+                      self.selectedMeetingHistoryID == meetingID else {
+                    return
+                }
+
+                self.selectedMeetingRecord = record
+                self.meetingHistoryStatus = .running
+                self.meetingHistoryMessage = "Meeting loaded"
+            } catch {
+                guard self.meetingHistoryRequestGeneration == requestGeneration else {
+                    return
+                }
+
+                self.meetingHistoryStatus = .failed(error.localizedDescription)
+                self.meetingHistoryMessage = error.localizedDescription
+            }
         }
     }
 
@@ -505,34 +621,6 @@ final class CaptureViewModel: ObservableObject {
     func updateGoogleDocsMode(_ mode: GoogleDocsSyncMode) {
         googleDocsMode = mode
         appendLog("Google Docs mode set to \(mode.label).")
-    }
-
-    func updateGoogleDocsFindText(_ text: String) {
-        googleDocsFindText = text
-    }
-
-    func updateGoogleDocsReplaceText(_ text: String) {
-        googleDocsReplaceText = text
-    }
-
-    func updateGoogleDocsReplaceOccurrence(_ occurrence: GoogleDocsReplaceOccurrence) {
-        googleDocsReplaceOccurrence = occurrence
-    }
-
-    func updateGoogleDocsInsertHeading(_ heading: String) {
-        googleDocsInsertHeading = heading
-    }
-
-    func updateGoogleDocsInsertText(_ text: String) {
-        googleDocsInsertText = text
-    }
-
-    func updateGoogleDocsRewriteAnchor(_ anchor: String) {
-        googleDocsRewriteAnchor = anchor
-    }
-
-    func updateGoogleDocsRewriteText(_ text: String) {
-        googleDocsRewriteText = text
     }
 
     func updateGoogleBrowserFindText(_ text: String) {
@@ -667,119 +755,6 @@ final class CaptureViewModel: ObservableObject {
 
     func updateGoogleDocLiveNotes() {
         updateGoogleDocLiveNotes(triggeredByAutoSummary: false)
-    }
-
-    func applyGoogleDocsReplacement() {
-        guard googleDocsIsConnected else {
-            googleDocsMessage = "Connect a Google Doc first."
-            return
-        }
-
-        let find = googleDocsFindText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !find.isEmpty else {
-            googleDocsMessage = "Enter find text before applying an edit."
-            return
-        }
-
-        googleDocsStatus = .starting
-        googleDocsMessage = "Applying direct Google Docs edit..."
-        appendLog("Applying Google Docs find/replace edit.")
-        let request = GoogleDocReplaceTextRequest(
-            meetingID: ensureCurrentMeetingID(),
-            find: find,
-            replace: googleDocsReplaceText,
-            occurrence: googleDocsReplaceOccurrence.rawValue
-        )
-
-        Task {
-            do {
-                let response = try await assistantClient.replaceGoogleDocText(request)
-                applyGoogleDocSnapshot(response, fallbackMessage: "Google Doc text replaced.")
-                appendLog("Google Doc direct edit applied.")
-            } catch {
-                googleDocsStatus = .failed(error.localizedDescription)
-                googleDocsMessage = error.localizedDescription
-                appendLog("Google Doc direct edit failed: \(error.localizedDescription)")
-            }
-        }
-    }
-
-    func insertGoogleDocsTextUnderHeading() {
-        guard googleDocsIsConnected else {
-            googleDocsMessage = "Connect a Google Doc first."
-            return
-        }
-
-        let heading = googleDocsInsertHeading.trimmingCharacters(in: .whitespacesAndNewlines)
-        let text = googleDocsInsertText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !heading.isEmpty else {
-            googleDocsMessage = "Enter a heading before inserting text."
-            return
-        }
-        guard !text.isEmpty else {
-            googleDocsMessage = "Enter text to insert under the heading."
-            return
-        }
-
-        googleDocsStatus = .starting
-        googleDocsMessage = "Inserting text under heading..."
-        appendLog("Inserting Google Docs text under heading.")
-        let request = GoogleDocInsertUnderHeadingRequest(
-            meetingID: ensureCurrentMeetingID(),
-            heading: heading,
-            text: text
-        )
-
-        Task {
-            do {
-                let response = try await assistantClient.insertGoogleDocTextUnderHeading(request)
-                applyGoogleDocSnapshot(response, fallbackMessage: "Text inserted under heading.")
-                appendLog("Google Doc heading insert applied.")
-            } catch {
-                googleDocsStatus = .failed(error.localizedDescription)
-                googleDocsMessage = error.localizedDescription
-                appendLog("Google Doc heading insert failed: \(error.localizedDescription)")
-            }
-        }
-    }
-
-    func rewriteGoogleDocsParagraph() {
-        guard googleDocsIsConnected else {
-            googleDocsMessage = "Connect a Google Doc first."
-            return
-        }
-
-        let anchor = googleDocsRewriteAnchor.trimmingCharacters(in: .whitespacesAndNewlines)
-        let text = googleDocsRewriteText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !anchor.isEmpty else {
-            googleDocsMessage = "Enter anchor text for the paragraph rewrite."
-            return
-        }
-        guard !text.isEmpty else {
-            googleDocsMessage = "Enter the replacement paragraph."
-            return
-        }
-
-        googleDocsStatus = .starting
-        googleDocsMessage = "Rewriting paragraph..."
-        appendLog("Rewriting Google Docs paragraph containing anchor.")
-        let request = GoogleDocRewriteParagraphRequest(
-            meetingID: ensureCurrentMeetingID(),
-            anchor: anchor,
-            text: text
-        )
-
-        Task {
-            do {
-                let response = try await assistantClient.rewriteGoogleDocParagraph(request)
-                applyGoogleDocSnapshot(response, fallbackMessage: "Paragraph rewritten.")
-                appendLog("Google Doc paragraph rewrite applied.")
-            } catch {
-                googleDocsStatus = .failed(error.localizedDescription)
-                googleDocsMessage = error.localizedDescription
-                appendLog("Google Doc paragraph rewrite failed: \(error.localizedDescription)")
-            }
-        }
     }
 
     func openGoogleDocInBrowser() {
@@ -1084,6 +1059,134 @@ final class CaptureViewModel: ObservableObject {
         autoSummaryStatusLabel = "Start Meeting to begin"
     }
 
+    private func startDocumentEditWatcher() {
+        documentEditTask?.cancel()
+        documentEditRequestGeneration += 1
+        documentEditIsPlanning = false
+
+        documentEditTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: UInt64(self?.documentEditIntervalSeconds ?? 10) * 1_000_000_000)
+                guard !Task.isCancelled else {
+                    break
+                }
+                guard let self else {
+                    break
+                }
+                self.tickDocumentEditWatcher()
+            }
+        }
+    }
+
+    private func stopDocumentEditWatcher() {
+        documentEditTask?.cancel()
+        documentEditTask = nil
+        documentEditRequestGeneration += 1
+        documentEditIsPlanning = false
+    }
+
+    private func tickDocumentEditWatcher() {
+        guard transcriptionStatus == .starting || transcriptionStatus == .running else {
+            return
+        }
+        guard googleDocsIsConnected else {
+            return
+        }
+        guard !googleDocsIsBusy, !documentEditIsPlanning else {
+            return
+        }
+
+        let newFinalLines = finalTranscriptArchive.filter { !documentEditCheckedFinalLineIDs.contains($0.id) }
+        guard !newFinalLines.isEmpty else {
+            return
+        }
+
+        documentEditIsPlanning = true
+        googleDocsMessage = "Checking voice edit commands..."
+        documentEditRequestGeneration += 1
+        let requestGeneration = documentEditRequestGeneration
+        let lineIDsToMark = Set(newFinalLines.map(\.id))
+
+        let request = AssistantRespondRequest(
+            action: "document_edit_plan",
+            meetingID: ensureCurrentMeetingID(),
+            provider: assistantProviderID,
+            model: assistantModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? "gpt-5.5"
+                : assistantModel,
+            thinking: assistantThinking,
+            transcript: assistantTranscriptPayload(finalOnly: true),
+            rollingSummary: "",
+            previousNotes: [],
+            previousActions: [],
+            documentTitle: googleDocsConnectedTitle,
+            documentSummary: googleDocsPreview,
+            documentSnippets: googleDocsSnippets,
+            documentBriefing: googleDocsBriefing
+        )
+
+        Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+            defer {
+                if self.documentEditRequestGeneration == requestGeneration {
+                    self.documentEditIsPlanning = false
+                }
+            }
+
+            do {
+                let response = try await self.assistantClient.respond(request)
+                guard self.documentEditRequestGeneration == requestGeneration else {
+                    return
+                }
+
+                guard let plan = response.documentEditPlan, plan.intent != "none" else {
+                    self.documentEditCheckedFinalLineIDs.formUnion(lineIDsToMark)
+                    self.googleDocsMessage = "Listening for AI edit commands."
+                    return
+                }
+
+                guard !plan.requiresUserConfirmation else {
+                    self.documentEditCheckedFinalLineIDs.formUnion(lineIDsToMark)
+                    self.googleDocsMessage = plan.reason.isEmpty
+                        ? "AI edit command needs more detail."
+                        : "AI edit command needs more detail: \(plan.reason)"
+                    return
+                }
+
+                let editKey = self.documentEditKey(plan)
+                guard !self.appliedDocumentEditKeys.contains(editKey) else {
+                    self.documentEditCheckedFinalLineIDs.formUnion(lineIDsToMark)
+                    self.googleDocsMessage = "AI edit command was already applied."
+                    return
+                }
+
+                self.googleDocsStatus = .starting
+                self.googleDocsMessage = "Applying AI voice edit..."
+                let snapshot = try await self.applyDocumentEditPlan(plan)
+                guard self.documentEditRequestGeneration == requestGeneration else {
+                    return
+                }
+
+                self.appliedDocumentEditKeys.insert(editKey)
+                self.documentEditCheckedFinalLineIDs.formUnion(lineIDsToMark)
+                self.applyGoogleDocSnapshot(snapshot, fallbackMessage: "AI voice edit applied.")
+                self.appendLog("AI voice edit applied: \(self.documentEditLabel(plan.intent)).")
+            } catch {
+                guard self.documentEditRequestGeneration == requestGeneration else {
+                    return
+                }
+
+                self.documentEditCheckedFinalLineIDs.formUnion(lineIDsToMark)
+                self.googleDocsStatus = .failed(error.localizedDescription)
+                self.googleDocsMessage = error.localizedDescription
+                self.appendLog("AI voice edit failed: \(error.localizedDescription)")
+            }
+
+        }
+    }
+
     private func tickAutoSummaryCountdown() {
         guard transcriptionStatus == .starting || transcriptionStatus == .running else {
             autoSummaryRemainingSeconds = autoSummaryIntervalSeconds
@@ -1291,6 +1394,64 @@ final class CaptureViewModel: ObservableObject {
         }
     }
 
+    private func applyDocumentEditPlan(_ plan: DocumentEditPlanResponse) async throws -> GoogleDocSnapshotResponse {
+        switch plan.intent {
+        case "replace_text":
+            let find = plan.find.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !find.isEmpty else {
+                throw VoiceEditError("AI edit plan did not include find text.")
+            }
+            return try await assistantClient.replaceGoogleDocText(
+                GoogleDocReplaceTextRequest(
+                    meetingID: ensureCurrentMeetingID(),
+                    find: find,
+                    replace: plan.replace,
+                    occurrence: plan.occurrence == "all" ? "all" : "first"
+                )
+            )
+
+        case "insert_under_heading":
+            let heading = plan.heading.trimmingCharacters(in: .whitespacesAndNewlines)
+            let text = plan.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !heading.isEmpty else {
+                throw VoiceEditError("AI edit plan did not include a heading.")
+            }
+            guard !text.isEmpty else {
+                throw VoiceEditError("AI edit plan did not include text to insert.")
+            }
+            return try await assistantClient.insertGoogleDocTextUnderHeading(
+                GoogleDocInsertUnderHeadingRequest(
+                    meetingID: ensureCurrentMeetingID(),
+                    heading: heading,
+                    text: text
+                )
+            )
+
+        case "rewrite_paragraph_containing_anchor":
+            let anchor = plan.anchor.trimmingCharacters(in: .whitespacesAndNewlines)
+            let text = plan.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !anchor.isEmpty else {
+                throw VoiceEditError("AI edit plan did not include anchor text.")
+            }
+            guard !text.isEmpty else {
+                throw VoiceEditError("AI edit plan did not include replacement text.")
+            }
+            return try await assistantClient.rewriteGoogleDocParagraph(
+                GoogleDocRewriteParagraphRequest(
+                    meetingID: ensureCurrentMeetingID(),
+                    anchor: anchor,
+                    text: text
+                )
+            )
+
+        case "append_meeting_notes":
+            return try await assistantClient.appendMeetingNotesToGoogleDoc(googleDocMeetingNotesRequest())
+
+        default:
+            throw VoiceEditError("AI edit plan did not include an executable intent.")
+        }
+    }
+
     private func googleDocMeetingNotesRequest() -> GoogleDocMeetingNotesRequest {
         GoogleDocMeetingNotesRequest(
             meetingID: ensureCurrentMeetingID(),
@@ -1298,6 +1459,35 @@ final class CaptureViewModel: ObservableObject {
             actions: previousActionContextPayload(),
             transcript: assistantTranscriptPayload(finalOnly: true)
         )
+    }
+
+    private func documentEditKey(_ plan: DocumentEditPlanResponse) -> String {
+        [
+            plan.intent,
+            plan.find,
+            plan.replace,
+            plan.heading,
+            plan.text,
+            plan.anchor,
+            plan.occurrence,
+        ]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+            .joined(separator: "\u{1f}")
+    }
+
+    private func documentEditLabel(_ intent: String) -> String {
+        switch intent {
+        case "replace_text":
+            return "replace text"
+        case "insert_under_heading":
+            return "insert under heading"
+        case "rewrite_paragraph_containing_anchor":
+            return "rewrite paragraph"
+        case "append_meeting_notes":
+            return "append meeting notes"
+        default:
+            return "document edit"
+        }
     }
 
     private func ensureCurrentMeetingID() -> String {
@@ -1504,5 +1694,17 @@ final class CaptureViewModel: ObservableObject {
         }
 
         NSWorkspace.shared.open(url)
+    }
+}
+
+private struct VoiceEditError: LocalizedError {
+    let message: String
+
+    init(_ message: String) {
+        self.message = message
+    }
+
+    var errorDescription: String? {
+        message
     }
 }

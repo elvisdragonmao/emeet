@@ -1,13 +1,26 @@
 import os
 import sqlite3
 import time
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
 from meeting_backend.assistant.models import AssistantRequest, AssistantResult
 from meeting_backend.protocol import SessionStart
 
 
 SCHEMA_SQL = """
+CREATE TABLE IF NOT EXISTS meetings (
+    meeting_id TEXT PRIMARY KEY,
+    title TEXT NOT NULL DEFAULT '',
+    started_at_ms INTEGER NOT NULL,
+    ended_at_ms INTEGER,
+    stt_provider TEXT NOT NULL DEFAULT '',
+    stt_model TEXT NOT NULL DEFAULT '',
+    assistant_provider TEXT NOT NULL DEFAULT '',
+    assistant_model TEXT NOT NULL DEFAULT '',
+    created_at_ms INTEGER NOT NULL,
+    updated_at_ms INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS sessions (
     session_id TEXT PRIMARY KEY,
     source TEXT NOT NULL,
@@ -148,6 +161,16 @@ class MeetingStorage:
                     now,
                 ),
             )
+            upsert_meeting(
+                connection,
+                meeting_id=meeting_id_from_session_id(session.session_id),
+                started_at_ms=now,
+                ended_at_ms=None,
+                stt_provider=provider,
+                stt_model=model,
+                now=now,
+                clear_ended=True,
+            )
 
     def record_session_end(self, session_id: str) -> None:
         self.initialize()
@@ -161,6 +184,24 @@ class MeetingStorage:
                 """,
                 (now, now, session_id),
             )
+            row = connection.execute(
+                """
+                SELECT session_id, started_at_ms, ended_at_ms, stt_provider, stt_model, updated_at_ms
+                FROM sessions
+                WHERE session_id = ?
+                """,
+                (session_id,),
+            ).fetchone()
+            if row is not None:
+                upsert_meeting(
+                    connection,
+                    meeting_id=meeting_id_from_session_id(str(row[0])),
+                    started_at_ms=int(row[1]),
+                    ended_at_ms=None if row[2] is None else int(row[2]),
+                    stt_provider=str(row[3]),
+                    stt_model=str(row[4]),
+                    now=int(row[5]),
+                )
 
     def record_transcript_event(self, event: Dict[str, Any]) -> None:
         if event.get("type") not in {"transcript.partial", "transcript.final"}:
@@ -214,6 +255,13 @@ class MeetingStorage:
                     now,
                 ),
             )
+            if event.get("is_final"):
+                update_meeting_title_from_transcript(
+                    connection,
+                    meeting_id=meeting_id_from_session_id(session_id),
+                    text=str(event.get("text") or ""),
+                    now=now,
+                )
 
     def record_assistant_result(self, request: AssistantRequest, result: AssistantResult) -> int:
         self.initialize()
@@ -281,7 +329,64 @@ class MeetingStorage:
                     for item in result.actions
                 ],
             )
+            if request.meeting_id:
+                upsert_meeting(
+                    connection,
+                    meeting_id=request.meeting_id,
+                    started_at_ms=now,
+                    ended_at_ms=None,
+                    assistant_provider=result.provider,
+                    assistant_model=result.model,
+                    now=now,
+                )
             return run_id
+
+    def list_meetings(self, *, limit: int = 50) -> List[Dict[str, Any]]:
+        self.initialize()
+        normalized_limit = max(1, min(limit, 200))
+        with self._connect() as connection:
+            self._backfill_meetings(connection)
+            rows = connection.execute(
+                """
+                SELECT
+                    meeting_id, title, started_at_ms, ended_at_ms,
+                    stt_provider, stt_model, assistant_provider, assistant_model,
+                    created_at_ms, updated_at_ms
+                FROM meetings
+                ORDER BY updated_at_ms DESC
+                LIMIT ?
+                """,
+                (normalized_limit,),
+            ).fetchall()
+            return [self._meeting_summary(connection, row) for row in rows]
+
+    def meeting_record(self, meeting_id: str) -> Optional[Dict[str, Any]]:
+        if not meeting_id:
+            return None
+
+        self.initialize()
+        with self._connect() as connection:
+            self._backfill_meetings(connection)
+            row = connection.execute(
+                """
+                SELECT
+                    meeting_id, title, started_at_ms, ended_at_ms,
+                    stt_provider, stt_model, assistant_provider, assistant_model,
+                    created_at_ms, updated_at_ms
+                FROM meetings
+                WHERE meeting_id = ?
+                """,
+                (meeting_id,),
+            ).fetchone()
+            if row is None:
+                return None
+
+            return {
+                "meeting": self._meeting_summary(connection, row),
+                "transcript": self._meeting_transcript(connection, meeting_id),
+                "assistant_responses": self._meeting_assistant_responses(connection, meeting_id),
+                **self._latest_meeting_record(connection, meeting_id),
+            }
 
     def latest_meeting_record(self, meeting_id: str) -> Dict[str, Any]:
         if not meeting_id:
@@ -289,46 +394,198 @@ class MeetingStorage:
 
         self.initialize()
         with self._connect() as connection:
-            row = connection.execute(
-                """
-                SELECT id
-                FROM assistant_runs
-                WHERE meeting_id = ?
-                  AND action = 'meeting_notes'
-                ORDER BY id DESC
-                LIMIT 1
-                """,
-                (meeting_id,),
-            ).fetchone()
-            if row is None:
-                return {"notes": [], "actions": []}
+            return self._latest_meeting_record(connection, meeting_id)
 
+    def _backfill_meetings(self, connection: sqlite3.Connection) -> None:
+        for row in connection.execute(
+            """
+            SELECT session_id, started_at_ms, ended_at_ms, stt_provider, stt_model, updated_at_ms
+            FROM sessions
+            """
+        ).fetchall():
+            upsert_meeting(
+                connection,
+                meeting_id=meeting_id_from_session_id(str(row[0])),
+                started_at_ms=int(row[1]),
+                ended_at_ms=None if row[2] is None else int(row[2]),
+                stt_provider=str(row[3]),
+                stt_model=str(row[4]),
+                now=int(row[5]),
+            )
+
+        for row in connection.execute(
+            """
+            SELECT meeting_id, provider, model, created_at_ms
+            FROM assistant_runs
+            WHERE meeting_id != ''
+            """
+        ).fetchall():
+            upsert_meeting(
+                connection,
+                meeting_id=str(row[0]),
+                started_at_ms=int(row[3]),
+                ended_at_ms=None,
+                assistant_provider=str(row[1]),
+                assistant_model=str(row[2]),
+                now=int(row[3]),
+            )
+
+    def _meeting_summary(self, connection: sqlite3.Connection, row: sqlite3.Row) -> Dict[str, Any]:
+        meeting_id = str(row[0])
+        started_at_ms = int(row[2])
+        ended_at_ms = None if row[3] is None else int(row[3])
+        updated_at_ms = int(row[9])
+        effective_end_ms = ended_at_ms if ended_at_ms is not None else updated_at_ms
+        notes_actions = self._latest_meeting_record(connection, meeting_id)
+        title = str(row[1] or "") or first_transcript_title(connection, meeting_id) or "Untitled meeting"
+
+        return {
+            "meeting_id": meeting_id,
+            "title": title,
+            "started_at_ms": started_at_ms,
+            "ended_at_ms": ended_at_ms,
+            "duration_ms": max(0, effective_end_ms - started_at_ms),
+            "stt_provider": str(row[4] or ""),
+            "stt_model": str(row[5] or ""),
+            "assistant_provider": str(row[6] or ""),
+            "assistant_model": str(row[7] or ""),
+            "transcript_count": transcript_count(connection, meeting_id),
+            "assistant_response_count": assistant_response_count(connection, meeting_id),
+            "notes_count": len(notes_actions["notes"]),
+            "actions_count": len(notes_actions["actions"]),
+            "created_at_ms": int(row[8]),
+            "updated_at_ms": updated_at_ms,
+        }
+
+    def _meeting_transcript(self, connection: sqlite3.Connection, meeting_id: str) -> List[Dict[str, Any]]:
+        session_ids = session_ids_for_meeting(connection, meeting_id)
+        if not session_ids:
+            return []
+
+        placeholders = ",".join("?" for _ in session_ids)
+        return [
+            {
+                "segment_id": str(row[0]),
+                "source": str(row[1]),
+                "speaker_hint": str(row[2]),
+                "speaker_id": str(row[3]),
+                "speaker_label": str(row[4]),
+                "start_ms": int(row[5]),
+                "end_ms": int(row[6]),
+                "text": str(row[7]),
+                "revision": int(row[8]),
+                "is_final": bool(row[9]),
+                "confidence": float(row[10]),
+                "provider": str(row[11]),
+                "created_at_ms": int(row[12]),
+            }
+            for row in connection.execute(
+                """
+                SELECT
+                    segment_id, source, speaker_hint, speaker_id, speaker_label,
+                    start_ms, end_ms, text, revision, is_final, confidence, provider, created_at_ms
+                FROM transcript_segments
+                WHERE is_final = 1
+                  AND session_id IN ({})
+                ORDER BY created_at_ms, start_ms, segment_id
+                """.format(placeholders),
+                session_ids,
+            ).fetchall()
+        ]
+
+    def _meeting_assistant_responses(
+        self,
+        connection: sqlite3.Connection,
+        meeting_id: str,
+    ) -> List[Dict[str, Any]]:
+        responses: List[Dict[str, Any]] = []
+        for row in connection.execute(
+            """
+            SELECT id, action, provider, model, thinking, latency_ms, created_at_ms
+            FROM assistant_runs
+            WHERE meeting_id = ?
+              AND action IN ('what_should_i_say', 'follow_up_questions', 'chat')
+            ORDER BY created_at_ms DESC, id DESC
+            """,
+            (meeting_id,),
+        ).fetchall():
             run_id = int(row[0])
-            notes = [
-                {"title": str(note[0]), "detail": str(note[1])}
-                for note in connection.execute(
-                    """
-                    SELECT title, detail
-                    FROM notes
-                    WHERE run_id = ?
-                    ORDER BY id
-                    """,
-                    (run_id,),
-                ).fetchall()
-            ]
-            actions = [
-                {"title": str(action[0]), "owner": str(action[1]), "state": str(action[2])}
-                for action in connection.execute(
-                    """
-                    SELECT title, owner, state
-                    FROM actions
-                    WHERE run_id = ?
-                    ORDER BY id
-                    """,
-                    (run_id,),
-                ).fetchall()
-            ]
-            return {"notes": notes, "actions": actions}
+            responses.append(
+                {
+                    "id": run_id,
+                    "action": str(row[1]),
+                    "provider": str(row[2]),
+                    "model": str(row[3]),
+                    "thinking": str(row[4]),
+                    "latency_ms": int(row[5]),
+                    "created_at_ms": int(row[6]),
+                    "suggestions": [
+                        {
+                            "id": int(suggestion[0]),
+                            "title": str(suggestion[1]),
+                            "detail": str(suggestion[2]),
+                            "badge": str(suggestion[3]),
+                            "icon_name": str(suggestion[4]),
+                        }
+                        for suggestion in connection.execute(
+                            """
+                            SELECT id, title, detail, badge, icon_name
+                            FROM assistant_suggestions
+                            WHERE run_id = ?
+                            ORDER BY id
+                            """,
+                            (run_id,),
+                        ).fetchall()
+                    ],
+                }
+            )
+        return responses
+
+    def _latest_meeting_record(
+        self,
+        connection: sqlite3.Connection,
+        meeting_id: str,
+    ) -> Dict[str, List[Dict[str, str]]]:
+        row = connection.execute(
+            """
+            SELECT id
+            FROM assistant_runs
+            WHERE meeting_id = ?
+              AND action = 'meeting_notes'
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (meeting_id,),
+        ).fetchone()
+        if row is None:
+            return {"notes": [], "actions": []}
+
+        run_id = int(row[0])
+        notes = [
+            {"title": str(note[0]), "detail": str(note[1])}
+            for note in connection.execute(
+                """
+                SELECT title, detail
+                FROM notes
+                WHERE run_id = ?
+                ORDER BY id
+                """,
+                (run_id,),
+            ).fetchall()
+        ]
+        actions = [
+            {"title": str(action[0]), "owner": str(action[1]), "state": str(action[2])}
+            for action in connection.execute(
+                """
+                SELECT title, owner, state
+                FROM actions
+                WHERE run_id = ?
+                ORDER BY id
+                """,
+                (run_id,),
+            ).fetchall()
+        ]
+        return {"notes": notes, "actions": actions}
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database_path)
@@ -345,6 +602,120 @@ class MeetingStorage:
 
 def current_time_ms() -> int:
     return int(time.time() * 1000)
+
+
+def upsert_meeting(
+    connection: sqlite3.Connection,
+    *,
+    meeting_id: str,
+    started_at_ms: int,
+    ended_at_ms: Optional[int],
+    now: int,
+    title: str = "",
+    stt_provider: str = "",
+    stt_model: str = "",
+    assistant_provider: str = "",
+    assistant_model: str = "",
+    clear_ended: bool = False,
+) -> None:
+    if not meeting_id:
+        return
+
+    existing = connection.execute(
+        """
+        SELECT
+            title, started_at_ms, ended_at_ms, stt_provider, stt_model,
+            assistant_provider, assistant_model, created_at_ms, updated_at_ms
+        FROM meetings
+        WHERE meeting_id = ?
+        """,
+        (meeting_id,),
+    ).fetchone()
+    if existing is None:
+        connection.execute(
+            """
+            INSERT INTO meetings (
+                meeting_id, title, started_at_ms, ended_at_ms,
+                stt_provider, stt_model, assistant_provider, assistant_model,
+                created_at_ms, updated_at_ms
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                meeting_id,
+                title,
+                started_at_ms,
+                ended_at_ms,
+                stt_provider,
+                stt_model,
+                assistant_provider,
+                assistant_model,
+                now,
+                now,
+            ),
+        )
+        return
+
+    existing_ended_at_ms = None if existing[2] is None else int(existing[2])
+    next_ended_at_ms: Optional[int]
+    if clear_ended:
+        next_ended_at_ms = None
+    elif ended_at_ms is None:
+        next_ended_at_ms = existing_ended_at_ms
+    elif existing_ended_at_ms is None:
+        next_ended_at_ms = ended_at_ms
+    else:
+        next_ended_at_ms = max(existing_ended_at_ms, ended_at_ms)
+
+    connection.execute(
+        """
+        UPDATE meetings
+        SET
+            title = ?,
+            started_at_ms = ?,
+            ended_at_ms = ?,
+            stt_provider = ?,
+            stt_model = ?,
+            assistant_provider = ?,
+            assistant_model = ?,
+            updated_at_ms = ?
+        WHERE meeting_id = ?
+        """,
+        (
+            str(existing[0] or "") or title,
+            min(int(existing[1]), started_at_ms),
+            next_ended_at_ms,
+            stt_provider or str(existing[3] or ""),
+            stt_model or str(existing[4] or ""),
+            assistant_provider or str(existing[5] or ""),
+            assistant_model or str(existing[6] or ""),
+            max(int(existing[8]), now),
+            meeting_id,
+        ),
+    )
+
+
+def update_meeting_title_from_transcript(
+    connection: sqlite3.Connection,
+    *,
+    meeting_id: str,
+    text: str,
+    now: int,
+) -> None:
+    title = title_from_transcript(text)
+    if not meeting_id or not title:
+        return
+
+    connection.execute(
+        """
+        UPDATE meetings
+        SET
+            title = CASE WHEN title = '' THEN ? ELSE title END,
+            updated_at_ms = ?
+        WHERE meeting_id = ?
+        """,
+        (title, now, meeting_id),
+    )
 
 
 def ensure_column(connection: sqlite3.Connection, *, table: str, column: str, definition: str) -> None:
@@ -366,3 +737,86 @@ def session_id_from_segment_id(segment_id: str) -> str:
     if separator <= 0:
         return ""
     return body[:separator]
+
+
+def meeting_id_from_session_id(session_id: str) -> str:
+    normalized = session_id.strip()
+    if not normalized:
+        return ""
+
+    for suffix in ("-microphone", "-system"):
+        if normalized.endswith(suffix):
+            meeting_id = normalized[: -len(suffix)]
+            return meeting_id or normalized
+    return normalized
+
+
+def session_ids_for_meeting(connection: sqlite3.Connection, meeting_id: str) -> List[str]:
+    return [
+        str(row[0])
+        for row in connection.execute("SELECT session_id FROM sessions").fetchall()
+        if meeting_id_from_session_id(str(row[0])) == meeting_id
+    ]
+
+
+def transcript_count(connection: sqlite3.Connection, meeting_id: str) -> int:
+    session_ids = session_ids_for_meeting(connection, meeting_id)
+    if not session_ids:
+        return 0
+    placeholders = ",".join("?" for _ in session_ids)
+    return int(
+        connection.execute(
+            """
+            SELECT COUNT(*)
+            FROM transcript_segments
+            WHERE is_final = 1
+              AND session_id IN ({})
+            """.format(placeholders),
+            session_ids,
+        ).fetchone()[0]
+    )
+
+
+def assistant_response_count(connection: sqlite3.Connection, meeting_id: str) -> int:
+    return int(
+        connection.execute(
+            """
+            SELECT COUNT(*)
+            FROM assistant_runs
+            WHERE meeting_id = ?
+              AND action IN ('what_should_i_say', 'follow_up_questions', 'chat')
+            """,
+            (meeting_id,),
+        ).fetchone()[0]
+    )
+
+
+def first_transcript_title(connection: sqlite3.Connection, meeting_id: str) -> str:
+    session_ids = session_ids_for_meeting(connection, meeting_id)
+    if not session_ids:
+        return ""
+    placeholders = ",".join("?" for _ in session_ids)
+    row = connection.execute(
+        """
+        SELECT text
+        FROM transcript_segments
+        WHERE is_final = 1
+          AND session_id IN ({})
+          AND text != ''
+        ORDER BY created_at_ms, start_ms, segment_id
+        LIMIT 1
+        """.format(placeholders),
+        session_ids,
+    ).fetchone()
+    if row is None:
+        return ""
+    return title_from_transcript(str(row[0]))
+
+
+def title_from_transcript(text: str) -> str:
+    normalized = " ".join(text.split())
+    if not normalized:
+        return ""
+    if len(normalized) <= 64:
+        return normalized
+    return normalized[:61].rstrip() + "..."

@@ -6,6 +6,7 @@ from meeting_backend.assistant.models import AssistantRequest, AssistantTranscri
 from meeting_backend.assistant import service
 from meeting_backend.assistant.service import (
     build_codex_exec_command,
+    canonical_document_edit_plan,
     generate_assistant_response,
     list_provider_descriptors,
     parse_assistant_json,
@@ -155,6 +156,27 @@ class AssistantServiceTest(unittest.TestCase):
 
     def test_parse_assistant_json_ignores_non_object_json(self) -> None:
         self.assertEqual(parse_assistant_json('[{"title": "A"}]'), {})
+
+    def test_canonical_document_edit_plan_supports_noop_and_edit_fields(self) -> None:
+        noop = canonical_document_edit_plan({"intent": "replace_everything"})
+        self.assertEqual(noop["intent"], "none")
+        self.assertTrue(noop["requires_user_confirmation"])
+
+        plan = canonical_document_edit_plan(
+            {
+                "intent": "insert_under_heading",
+                "heading": "Decisions",
+                "text": "Use local STT.",
+                "occurrence": "all",
+                "requires_user_confirmation": False,
+            }
+        )
+
+        self.assertEqual(plan["intent"], "insert_under_heading")
+        self.assertEqual(plan["heading"], "Decisions")
+        self.assertEqual(plan["text"], "Use local STT.")
+        self.assertEqual(plan["occurrence"], "all")
+        self.assertFalse(plan["requires_user_confirmation"])
 
     def test_codex_exec_command_skips_unsupported_approval_flag(self) -> None:
         help_text = """
