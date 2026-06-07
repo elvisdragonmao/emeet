@@ -12,7 +12,7 @@
         <div class="headline">
           <p class="kicker">Realtime · Local-first · Collaborative Meeting Copilot</p>
           <h1>emeet</h1>
-          <h2>即時會議副駕，把會議對話轉成可說出口的回覆與可同步的文件更新</h2>
+          <h2>即時會議 Copilot，同步文件更新、會議記錄、與回覆建議</h2>
           <p>
             macOS 原生工具在會議中擷取麥克風與系統音訊，生成逐字稿，並以文件脈絡輔助使用者回應、追問、整理 notes/actions，以及導覽共同編輯中的 Google Docs。
           </p>
@@ -68,89 +68,89 @@
           <div class="sync-beam" aria-hidden="true"></div>
         </div>
 
-        <aside class="annotation-rail" aria-label="feature annotations">
+           <aside class="annotation-rail" aria-label="feature annotations">
           <article>
             <span class="tag">1</span>
-            <h3>雙路音訊來源</h3>
-            <p>麥克風用 AVAudioEngine，系統音訊用 ScreenCaptureKit；來源分流讓 Self / Other 標籤更穩定。</p>
+            <h3>本機雙路音訊</h3>
+            <p>麥克風與系統音訊分流擷取，先把「我說的」與「對方說的」分開，再進入轉錄管線。</p>
           </article>
           <article>
             <span class="tag">2</span>
-            <h3>即時逐字稿</h3>
-            <p>100 ms PCM16 frame 傳到 FastAPI backend，speech-window segmentation 產生可用的 final transcript。</p>
+            <h3>會中逐字稿</h3>
+            <p>100 ms PCM16 audio frames 送到 FastAPI backend，以 speech window 產生 final transcript，支撐即時提示與筆記。</p>
           </article>
           <article>
             <span class="tag">3</span>
-            <h3>對話提示</h3>
-            <p>What should I say? 產生可直接說出口的回覆；Follow-up questions 產生釐清需求、限制、風險與下一步的追問。</p>
+            <h3>下一句 / 下一問</h3>
+            <p>按下 What should I say? 取得可直接說出口的回覆；按下 Follow-up questions 取得釐清需求、風險與責任的問題。</p>
           </article>
           <article>
             <span class="tag">4</span>
-            <h3>即時會議紀錄</h3>
-            <p>Meeting Notes 與 Next Actions 使用新增 final transcript 滾動更新，並可匯出 Markdown 紀錄。</p>
+            <h3>滾動式 notes/actions</h3>
+            <p>系統根據新增 final transcript 更新 Meeting Notes 與 Next Actions，會議進行中就留下可追蹤紀錄。</p>
           </article>
           <article>
             <span class="tag">5</span>
-            <h3>本地與可替換模型</h3>
-            <p>STT 可切換 faster-whisper / mlx-whisper；助理模型可切換 Ollama、OpenAI-compatible、Codex CLI 與 Copilot CLI。</p>
+            <h3>可替換模型管線</h3>
+            <p>STT 可切換 faster-whisper / mlx-whisper；助理模型可切換 Ollama、OpenAI-compatible endpoint 或 CLI provider。</p>
           </article>
           <article>
             <span class="tag">6</span>
-            <h3>共編與瀏覽導覽</h3>
-            <p>連接 Google Docs 後讀取文件脈絡、更新 live notes，並可透過 Chrome 開啟、捲動或搜尋到指定段落。</p>
+            <h3>Google Docs 共編</h3>
+            <p>連接文件後讀取脈絡、更新 live notes，並只在使用者明確指令下執行可定位、單一步驟的文件操作。</p>
           </article>
         </aside>
       </section>
 
-      <section class="research-grid" aria-label="research poster sections">
+       <section class="research-grid" aria-label="research poster sections">
         <article class="paper-panel motivation">
           <p class="section-label">Motivation</p>
-          <h2>會議中的關鍵壓力發生在「當下」</h2>
+          <h2>會議中的主要壓力發生在「當下」</h2>
           <p>
-            線上會議不只需要會後摘要。當對方提出需求、質疑時程、要求文件修改或追問風險時，使用者需要即時理解、回應、追問，並讓共同文件跟上討論。
+            多數 AI notetaker 解決的是會後整理；但關鍵壓力通常發生在會議中。對方要求時程、追問風險、請你改文件時，使用者需要立刻理解、回應、追問，還要讓共同文件同步更新。
           </p>
           <p>
-            現有 AI notetaker 多半擅長錄音、轉錄與會後整理；emeet 聚焦把正在發生的對話轉換成可採用的會中行動。
+            emeet 的定位不是「另一個摘要工具」，而是把正在發生的對話轉成三種會中行動。
           </p>
           <ul>
-            <li>把遠端與自己的發言轉成可讀逐字稿。</li>
-            <li>把逐字稿轉成下一句話與下一個問題。</li>
-            <li>把會議重點同步到正在共編的文件。</li>
+            <li><strong>即時：</strong>從最新逐字稿產生下一句回覆與下一個追問。</li>
+            <li><strong>本地：</strong>音訊在 macOS 端擷取，模型與供應商可依隱私、速度與成本切換。</li>
+            <li><strong>協作：</strong>會議脈絡連到 Google Docs，live notes 與 action items 跟著討論更新。</li>
           </ul>
           <div class="takeaway">
             <h3>Core Claim</h3>
-            <p>即時會議輔助的價值來自三件事同步：目前對話、共享文件、下一個可採取的回應。</p>
+            <p>AI 會議輔助的價值，不在會後替你回憶，而是在當下幫你把對話推進下一步。</p>
           </div>
         </article>
 
         <article class="paper-panel design">
           <p class="section-label">Design Considerations</p>
-          <h2>降低干擾，同時保留使用者控制</h2>
+          <h2>低干擾、可控制、能落地</h2>
           <dl class="design-list">
             <div>
-              <dt>D1 · Separate audio sources</dt>
-              <dd>麥克風與系統音訊分流，比先混音再分離更適合即時 demo 與來源標註。</dd>
+              <dt>D1 · Realtime belongs to the current turn</dt>
+              <dd>回覆與追問要貼近最新幾句對話，不能等 30 秒摘要週期才出現。</dd>
             </div>
             <div>
-              <dt>D2 · Match cadence to task</dt>
-              <dd>音訊可高頻傳輸；LLM 只在按鈕、筆記週期或文件指令時低頻推理。</dd>
+              <dt>D2 · Local-first by architecture</dt>
+              <dd>麥克風與系統音訊先在本機分流；STT/LLM provider 抽象化，保留本機與私有端點選項。</dd>
             </div>
             <div>
-              <dt>D3 · Ground in shared documents</dt>
-              <dd>會議經常圍繞文件討論，因此建議與筆記要能參考 Google Docs 脈絡。</dd>
+              <dt>D3 · Collaboration needs shared context</dt>
+              <dd>會議常圍繞文件進行，因此提示、筆記與 action items 必須能參考 Google Docs 脈絡。</dd>
             </div>
             <div>
-              <dt>D4 · Keep edits bounded</dt>
-              <dd>文件修改限定在明確語音指令、可定位段落與單一步驟 batchUpdate。</dd>
+              <dt>D4 · Prompts should be conservative</dt>
+              <dd>AI 只提供可說出口的草稿與追問，不猜日期、owner、預算或未確認承諾。</dd>
             </div>
             <div>
-              <dt>D5 · Support browser navigation</dt>
-              <dd>除了改文件，也要能把 Chrome 導到指定位置，讓使用者與協作者看同一段內容。</dd>
+              <dt>D5 · Edits must be bounded</dt>
+              <dd>文件修改只在明確語音指令下執行，限定可定位段落與單一步驟操作，避免失控改文。</dd>
             </div>
           </dl>
           <div class="takeaway">
             <h3>Design Outcome</h3>
-            <p>使用者不需要離開會議視窗，就能取得回覆提示、追問方向、文件位置與滾動式紀錄。</p>
+            <p>使用者不用離開會議節奏，就能取得回覆提示、追問方向、文件脈絡與可保存的會議紀錄。</p>
           </div>
         </article>
 
@@ -171,14 +171,14 @@
             <div class="arch-node store">SQLite<br><small>records + export</small></div>
           </div>
           <p>
-            macOS app 負責擷取、狀態與工作台；backend 負責分段、STT、LLM provider dispatch、Google Docs API 與資料儲存。UI 只接收結構化輸出，避免直接解析模型自由文字。
+            macOS app 負責擷取音訊、顯示逐字稿與管理會議工作台；backend 負責 speech-window segmentation、STT、LLM provider dispatch、Google Docs API 與 SQLite 儲存。前端接收 drafts / notes / actions 等結構化輸出，避免把模型自由文字直接塞進 UI。
           </p>
           <div class="timing-grid" aria-label="processing cadence">
-            <div><span>Audio</span><strong>100 ms</strong><p>小封包穩定傳輸</p></div>
-            <div><span>STT</span><strong>speech window</strong><p>停頓後定稿逐字稿</p></div>
-            <div><span>Prompt</span><strong>on demand</strong><p>按鈕觸發回覆/追問</p></div>
-            <div><span>Notes</span><strong>30 sec</strong><p>根據 final transcript 更新</p></div>
-            <div><span>Docs</span><strong>commanded</strong><p>明確指令才改文件或導覽</p></div>
+            <div><span>Audio</span><strong>100 ms</strong><p>本機擷取後小封包送出</p></div>
+            <div><span>STT</span><strong>speech window</strong><p>停頓後產生 final transcript</p></div>
+            <div><span>Prompt</span><strong>on demand</strong><p>需要回應時按鈕觸發</p></div>
+            <div><span>Notes</span><strong>30 sec</strong><p>用新增 final transcript 更新</p></div>
+            <div><span>Docs</span><strong>explicit command</strong><p>明確指令才導覽或改文件</p></div>
           </div>
         </article>
       </section>
