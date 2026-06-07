@@ -549,14 +549,14 @@ extension CaptureViewModel {
     func applyInitialDocumentBriefingResponse(_ response: AssistantRespondResponse) {
         let notes = response.notes.map {
             MeetingNoteDraft(
-                title: "Doc · \($0.title)",
+                title: documentContextNoteTitle($0.title),
                 detail: documentContextDetail($0.detail)
             )
         }
         let actions = response.actions.map {
             MeetingActionDraft(
                 title: $0.title,
-                owner: $0.owner,
+                owner: documentContextActionOwner($0.owner),
                 state: documentContextActionState($0.state)
             )
         }
@@ -775,33 +775,101 @@ extension CaptureViewModel {
     }
 
     func documentContextDetail(_ detail: String) -> String {
-        let trimmed = detail.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty {
-            return "Source: connected Google Doc before the meeting."
+        let bulletLines = detail
+            .components(separatedBy: .newlines)
+            .map { normalizedDocumentContextBullet($0) }
+            .filter { !$0.isEmpty }
+
+        guard !bulletLines.isEmpty else {
+            return "• 文件中尚無足夠內容。"
         }
-        return "Source: connected Google Doc before the meeting.\n\(trimmed)"
+
+        return bulletLines.joined(separator: "\n")
     }
 
     func documentContextActionState(_ state: String) -> String {
         let trimmed = state.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, trimmed.lowercased() != "draft" else {
-            return "Document Draft"
+        let lowered = trimmed.lowercased()
+        if trimmed.isEmpty || lowered == "draft" || lowered.contains("document draft") {
+            return "草稿"
         }
-        return "Document Draft · \(trimmed)"
+        if lowered.contains("open") {
+            return "待確認"
+        }
+        if lowered.contains("waiting") {
+            return "等待中"
+        }
+        if lowered.contains("confirmed") {
+            return "已確認"
+        }
+        if lowered.contains("blocked") {
+            return "受阻"
+        }
+        return trimmed
     }
 
     func documentBriefingText(notes: [MeetingNoteResponse], actions: [MeetingActionResponse]) -> String {
         var lines: [String] = []
         for note in notes {
-            lines.append("\(note.title): \(note.detail)")
+            lines.append("\(documentContextNoteTitle(note.title)):")
+            lines.append(documentContextDetail(note.detail))
         }
         if !actions.isEmpty {
-            lines.append("Actions:")
+            lines.append("下一步行動:")
             for action in actions {
-                lines.append("- \(action.title) / owner=\(action.owner) / state=\(action.state)")
+                lines.append(
+                    "- \(action.title) / owner=\(documentContextActionOwner(action.owner)) / state=\(documentContextActionState(action.state))"
+                )
             }
         }
         return lines.joined(separator: "\n")
+    }
+
+    func documentContextNoteTitle(_ title: String) -> String {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch trimmed.lowercased() {
+        case "document summary":
+            return "會前文件重點"
+        case "current todos and open questions", "current todos / open questions":
+            return "待辦與開放問題"
+        case "likely meeting agenda":
+            return "可能討論議程"
+        case "sections needing clarification":
+            return "需要釐清的事項"
+        default:
+            return trimmed.isEmpty ? "會前文件重點" : trimmed
+        }
+    }
+
+    func documentContextActionOwner(_ owner: String) -> String {
+        let trimmed = owner.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed.lowercased() != "unassigned" else {
+            return "未指派"
+        }
+        return trimmed
+    }
+
+    func normalizedDocumentContextBullet(_ line: String) -> String {
+        var trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return ""
+        }
+
+        let lowered = trimmed.lowercased()
+        if lowered.hasPrefix("source:")
+            || lowered.contains("connected google doc before the meeting") {
+            return ""
+        }
+
+        while let first = trimmed.first, ["-", "*", "•", "‣"].contains(first) {
+            trimmed.removeFirst()
+            trimmed = trimmed.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        guard !trimmed.isEmpty else {
+            return ""
+        }
+        return "• \(trimmed)"
     }
 
 }

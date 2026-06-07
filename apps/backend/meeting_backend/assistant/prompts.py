@@ -82,10 +82,12 @@ PROMPT_TEMPLATES: Dict[str, PromptTemplate] = {
             "Use only the provided document context. Do not infer commitments that are not written."
         ),
         instruction=(
-            "Create a compact document briefing for the meeting. Use the notes array with these titles "
-            "when applicable: Document summary, Current TODOs and open questions, Likely meeting agenda, "
-            "Sections needing clarification. Use actions only for explicit TODOs found in the document. "
-            "Keep details concise and quote short snippets only when needed."
+            "Create a compact pre-meeting record in Traditional Chinese from the connected Google Doc. "
+            "Use the notes array as meeting-note sections with these Chinese titles when applicable: "
+            "會前文件重點, 待辦與開放問題, 可能討論議程, 需要釐清的事項. "
+            "Each note detail should be 2-5 concise bullet points separated by newlines. "
+            "Use actions only for explicit TODOs found in the document. Keep details concise and quote short "
+            "snippets only when needed. Do not add English source labels unless the document itself requires them."
         ),
     ),
     "document_edit_plan": PromptTemplate(

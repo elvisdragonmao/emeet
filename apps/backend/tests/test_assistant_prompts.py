@@ -10,6 +10,8 @@ class AssistantPromptsTest(unittest.TestCase):
         self.assertIn("follow-up questions", prompt_template_for_action("follow_up_questions").instruction)
         self.assertIn("structured meeting record", prompt_template_for_action("meeting_notes").instruction)
         self.assertIn("討論主題與內容", prompt_template_for_action("meeting_notes").instruction)
+        self.assertIn("會前文件重點", prompt_template_for_action("document_briefing").instruction)
+        self.assertIn("Traditional Chinese", prompt_template_for_action("document_briefing").instruction)
         self.assertIn("meeting-context question", prompt_template_for_action("chat").instruction)
         self.assertIn("explicit spoken command addressed to AI", prompt_template_for_action("document_edit_plan").instruction)
         self.assertIn("saved-meeting title", prompt_template_for_action("meeting_title").instruction)
