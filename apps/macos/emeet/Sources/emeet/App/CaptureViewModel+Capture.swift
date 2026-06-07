@@ -130,6 +130,7 @@ extension CaptureViewModel {
         shouldCreateNewMeetingOnNextStart = false
         shouldPreserveLoadedMeetingOnNextStart = false
         transcriptLines.removeAll()
+        transcriptMarkers.removeAll()
         finalTranscriptArchive.removeAll()
         summarizedFinalLineIDs.removeAll()
         documentEditCheckedFinalLineIDs.removeAll()

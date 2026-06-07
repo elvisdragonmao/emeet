@@ -212,6 +212,7 @@ struct ContentView: View {
             countLabel: viewModel.transcriptCountsLabel,
             backendLatencyLabel: viewModel.backendLatencyLabel,
             transcriptionLatencyLabel: viewModel.transcriptionLatencyLabel,
+            markers: viewModel.transcriptMarkers,
             lines: viewModel.transcriptLines
         )
     }

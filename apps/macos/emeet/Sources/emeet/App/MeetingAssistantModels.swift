@@ -40,6 +40,35 @@ struct TranscriptLine: Identifiable, Equatable {
     }
 }
 
+struct TranscriptMarker: Identifiable, Equatable {
+    let id = UUID()
+    let title: String
+    let detail: String
+    let iconName: String
+    let style: TranscriptMarkerStyle
+    let createdAtMs: Int
+
+    var timeLabel: String {
+        let date = Date(timeIntervalSince1970: TimeInterval(createdAtMs) / 1_000)
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss"
+        return formatter.string(from: date)
+    }
+}
+
+enum TranscriptMarkerStyle: String, Equatable {
+    case info
+    case progress
+    case success
+    case warning
+    case failure
+}
+
+enum DocumentEditCommandHint {
+    case explicit
+    case missingWakeWord
+}
+
 struct AssistantDraft: Identifiable, Equatable {
     let id = UUID()
     let title: String

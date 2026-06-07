@@ -80,6 +80,7 @@ extension CaptureViewModel {
         let loadedLines = record.transcript.map(Self.transcriptLine(from:))
         finalTranscriptArchive = loadedLines
         transcriptLines = Array(loadedLines.suffix(maxTranscriptLineCount))
+        transcriptMarkers.removeAll()
         summarizedFinalLineIDs = Set(loadedLines.map(\.id))
         documentEditCheckedFinalLineIDs = Set(loadedLines.map(\.id))
         appliedDocumentEditKeys.removeAll()

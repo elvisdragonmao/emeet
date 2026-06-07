@@ -13,6 +13,7 @@ final class CaptureViewModel: ObservableObject {
     @Published var systemAudioHistory: [Float] = Array(repeating: 0, count: 96)
     @Published var transcriptionStatus: CaptureStatus = .idle
     @Published var transcriptLines: [TranscriptLine] = []
+    @Published var transcriptMarkers: [TranscriptMarker] = []
     @Published var transcriptionEndpointLabel: String
     @Published var transcriptionSettingsIsPresented = false
     @Published var transcriptionOptionsStatus: CaptureStatus = .idle
@@ -76,6 +77,7 @@ final class CaptureViewModel: ObservableObject {
     let assistantClient: AssistantAPIClient
     let maxHistoryCount = 96
     let maxTranscriptLineCount = 24
+    let maxTranscriptMarkerCount = 12
     let maxFinalTranscriptArchiveCount = 3_000
     let autoSummaryIntervalSeconds = 30
     let documentEditIntervalSeconds = 10

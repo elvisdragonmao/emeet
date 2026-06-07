@@ -96,8 +96,9 @@ PROMPT_TEMPLATES: Dict[str, PromptTemplate] = {
         ),
         instruction=(
             "Return JSON for at most one proposed edit. Only propose an edit when the final transcript contains "
-            "an explicit spoken command addressed to AI, such as 'AI 請幫我...', 'AI 幫我...', or "
-            "'AI 請幫我要修改...'. If there is no explicit AI-directed edit command, set intent to none. "
+            "an explicit spoken command addressed to AI or the assistant, such as 'AI 請幫我...', 'AI 幫我...', "
+            "'請你幫我...', or '請幫我...'. If there is no explicit assistant-directed edit command, set intent "
+            "to none. Do not treat ordinary meeting discussion, TODO review, or quoted document content as an edit. "
             "If the command is explicit and contains enough information to execute safely, set "
             "requires_user_confirmation to false. If the command is ambiguous, set intent to none and explain "
             "what is missing in reason. For replace_text, fill find, replace, and occurrence as first or all. "

@@ -111,6 +111,7 @@ class AssistantPromptsTest(unittest.TestCase):
 
         self.assertIn("intent, find, replace, heading, text, anchor, occurrence", content)
         self.assertIn("AI 請幫我", content)
+        self.assertIn("請你幫我", content)
         self.assertIn("requires_user_confirmation to false", content)
 
 

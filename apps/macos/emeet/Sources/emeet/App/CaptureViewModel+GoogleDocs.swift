@@ -361,12 +361,22 @@ extension CaptureViewModel {
         guard !newFinalLines.isEmpty else {
             return
         }
+        let commandHint = documentEditCommandHint(in: newFinalLines)
 
         documentEditIsPlanning = true
-        googleDocsMessage = "Checking voice edit commands..."
+        googleDocsMessage = "正在檢查語音文件修改指令..."
         documentEditRequestGeneration += 1
         let requestGeneration = documentEditRequestGeneration
         let lineIDsToMark = Set(newFinalLines.map(\.id))
+
+        if commandHint != nil {
+            recordTranscriptMarker(
+                title: "正在判斷文件修改指令",
+                detail: documentEditTranscriptPreview(newFinalLines),
+                iconName: "wand.and.stars",
+                style: .progress
+            )
+        }
 
         let request = AssistantRespondRequest(
             action: "document_edit_plan",
@@ -404,27 +414,63 @@ extension CaptureViewModel {
 
                 guard let plan = response.documentEditPlan, plan.intent != "none" else {
                     self.documentEditCheckedFinalLineIDs.formUnion(lineIDsToMark)
-                    self.googleDocsMessage = "Listening for AI edit commands."
+                    if let commandHint {
+                        let detail: String
+                        switch commandHint {
+                        case .explicit:
+                            let reason = response.documentEditPlan?.reason ?? ""
+                            detail = !reason.isEmpty
+                                ? reason
+                                : "AI 判斷這段內容還不足以安全修改文件，請再說一次位置與要新增或替換的文字。"
+                        case .missingWakeWord:
+                            detail = "聽到疑似文件修改內容。請用「AI 幫我...」或「請你幫我...」開頭，並說清楚位置與內容。"
+                        }
+                        self.recordTranscriptMarker(
+                            title: "沒有套用文件修改",
+                            detail: detail,
+                            iconName: "exclamationmark.bubble",
+                            style: .warning
+                        )
+                    }
+                    self.googleDocsMessage = "正在聆聽 AI 文件修改指令。"
                     return
                 }
 
                 guard !plan.requiresUserConfirmation else {
                     self.documentEditCheckedFinalLineIDs.formUnion(lineIDsToMark)
                     self.googleDocsMessage = plan.reason.isEmpty
-                        ? "AI edit command needs more detail."
-                        : "AI edit command needs more detail: \(plan.reason)"
+                        ? "AI 文件修改指令需要更多資訊。"
+                        : "AI 文件修改指令需要更多資訊：\(plan.reason)"
+                    self.recordTranscriptMarker(
+                        title: "文件修改指令需要更多資訊",
+                        detail: plan.reason.isEmpty ? "請補充要修改的位置與內容。" : plan.reason,
+                        iconName: "questionmark.bubble",
+                        style: .warning
+                    )
                     return
                 }
 
                 let editKey = self.documentEditKey(plan)
                 guard !self.appliedDocumentEditKeys.contains(editKey) else {
                     self.documentEditCheckedFinalLineIDs.formUnion(lineIDsToMark)
-                    self.googleDocsMessage = "AI edit command was already applied."
+                    self.googleDocsMessage = "這個 AI 文件修改指令已套用過。"
+                    self.recordTranscriptMarker(
+                        title: "已略過重複文件修改",
+                        detail: self.documentEditLabel(plan.intent),
+                        iconName: "checkmark.seal",
+                        style: .info
+                    )
                     return
                 }
 
                 self.googleDocsStatus = .starting
-                self.googleDocsMessage = "Applying AI voice edit..."
+                self.googleDocsMessage = "正在套用 AI 語音文件修改..."
+                self.recordTranscriptMarker(
+                    title: "正在套用文件修改",
+                    detail: self.documentEditLabel(plan.intent),
+                    iconName: "doc.text.magnifyingglass",
+                    style: .progress
+                )
                 let snapshot = try await self.applyDocumentEditPlan(plan)
                 guard self.documentEditRequestGeneration == requestGeneration else {
                     return
@@ -432,7 +478,13 @@ extension CaptureViewModel {
 
                 self.appliedDocumentEditKeys.insert(editKey)
                 self.documentEditCheckedFinalLineIDs.formUnion(lineIDsToMark)
-                self.applyGoogleDocSnapshot(snapshot, fallbackMessage: "AI voice edit applied.")
+                self.applyGoogleDocSnapshot(snapshot, fallbackMessage: "AI 語音文件修改已套用。")
+                self.recordTranscriptMarker(
+                    title: "已套用文件修改",
+                    detail: self.documentEditLabel(plan.intent),
+                    iconName: "checkmark.circle",
+                    style: .success
+                )
                 self.appendLog("AI voice edit applied: \(self.documentEditLabel(plan.intent)).")
             } catch {
                 guard self.documentEditRequestGeneration == requestGeneration else {
@@ -442,6 +494,12 @@ extension CaptureViewModel {
                 self.documentEditCheckedFinalLineIDs.formUnion(lineIDsToMark)
                 self.googleDocsStatus = .failed(error.localizedDescription)
                 self.googleDocsMessage = error.localizedDescription
+                self.recordTranscriptMarker(
+                    title: "文件修改失敗",
+                    detail: error.localizedDescription,
+                    iconName: "xmark.octagon",
+                    style: .failure
+                )
                 self.appendLog("AI voice edit failed: \(error.localizedDescription)")
             }
 
@@ -666,16 +724,54 @@ extension CaptureViewModel {
     func documentEditLabel(_ intent: String) -> String {
         switch intent {
         case "replace_text":
-            return "replace text"
+            return "替換文字"
         case "insert_under_heading":
-            return "insert under heading"
+            return "在標題下新增內容"
         case "rewrite_paragraph_containing_anchor":
-            return "rewrite paragraph"
+            return "重寫段落"
         case "append_meeting_notes":
-            return "append meeting notes"
+            return "附加會議紀錄"
         default:
-            return "document edit"
+            return "文件修改"
         }
+    }
+
+    func documentEditCommandHint(in lines: [TranscriptLine]) -> DocumentEditCommandHint? {
+        let text = lines
+            .map(\.text)
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else {
+            return nil
+        }
+
+        let editTerms = ["文件", "新增", "加上", "改成", "修改", "替換", "下面", "最後面", "最後", "刪掉"]
+        let matchedCount = editTerms.filter { text.contains($0) }.count
+        let loweredText = text.lowercased()
+        if matchedCount >= 1
+            && (loweredText.contains("ai")
+                || text.contains("請你幫我")
+                || text.contains("請幫我")
+                || text.contains("幫我")) {
+            return .explicit
+        }
+
+        if matchedCount >= 2 {
+            return .missingWakeWord
+        }
+
+        return nil
+    }
+
+    func documentEditTranscriptPreview(_ lines: [TranscriptLine]) -> String {
+        let text = lines
+            .map(\.text)
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else {
+            return "AI 正在檢查最新完成的逐字稿。"
+        }
+        return "聽到：「\(String(text.prefix(120)))」"
     }
 
     func documentContextDetail(_ detail: String) -> String {

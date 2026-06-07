@@ -47,6 +47,7 @@ extension CaptureViewModel {
             appliedDocumentEditKeys.removeAll()
         } else {
             transcriptLines.removeAll()
+            transcriptMarkers.removeAll()
             finalTranscriptArchive.removeAll()
             summarizedFinalLineIDs.removeAll()
             documentEditCheckedFinalLineIDs.removeAll()
@@ -206,6 +207,23 @@ extension CaptureViewModel {
         systemBackendLatencyMs = nil
         microphoneTranscriptionLatencyMs = nil
         systemTranscriptionLatencyMs = nil
+    }
+
+    func recordTranscriptMarker(
+        title: String,
+        detail: String,
+        iconName: String,
+        style: TranscriptMarkerStyle
+    ) {
+        let marker = TranscriptMarker(
+            title: title,
+            detail: detail,
+            iconName: iconName,
+            style: style,
+            createdAtMs: Int(Date().timeIntervalSince1970 * 1_000)
+        )
+        transcriptMarkers.append(marker)
+        transcriptMarkers = Array(transcriptMarkers.suffix(maxTranscriptMarkerCount))
     }
 
     func averageLatency(_ values: [Int?]) -> Int? {
