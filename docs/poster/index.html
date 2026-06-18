@@ -10,34 +10,34 @@
     <main class="poster" aria-label="emeet A1 report poster">
       <header class="poster-header">
         <div class="headline">
-          <p class="kicker">Realtime · Local-first · Collaborative Meeting Copilot</p>
+          <p class="kicker">Google Docs Referencing · Local-first · Meeting Copilot</p>
           <h1>emeet</h1>
-          <h2>即時會議 Copilot，同步文件更新、會議記錄、與回覆建議</h2>
+          <h2>Google Docs 即時參照的會議 Copilot</h2>
           <p>
-            macOS 原生工具在會議中擷取麥克風與系統音訊，生成逐字稿，並以文件脈絡輔助使用者回應、追問、整理 notes/actions，以及導覽共同編輯中的 Google Docs。
+            macOS 原生工具在會議中擷取麥克風與系統音訊，生成逐字稿，讓正在討論的 Google Docs 成為 AI 可參照的共同脈絡；再以此支援追問、保守回覆、notes/actions 與可控文件更新。
           </p>
         </div>
 
         <div class="focus-grid" aria-label="product focus">
           <article>
-            <span>Realtime</span>
-            <strong>會中即時輔助</strong>
-            <p>不是只等會後摘要，而是在對話還在進行時提供下一句回覆與追問。</p>
+            <span>Reference</span>
+            <strong>Google Docs 即時參照</strong>
+            <p>讀取共同文件內容，讓追問、回覆與筆記不只依賴零散逐字稿。</p>
+          </article>
+          <article>
+            <span>Support</span>
+            <strong>Follow-up support</strong>
+            <p>用 What should I say? 與 Follow-up questions 推進下一步討論。</p>
+          </article>
+          <article>
+            <span>Collaborate</span>
+            <strong>Live notes 回寫</strong>
+            <p>把會議重點與 action items 同步寫回 Google Docs 的 live notes 區塊。</p>
           </article>
           <article>
             <span>Local</span>
             <strong>本地音訊與模型彈性</strong>
             <p>macOS 音訊擷取搭配本機 STT、Ollama 或 OpenAI-compatible endpoint。</p>
-          </article>
-          <article>
-            <span>Collaborate</span>
-            <strong>文件共編脈絡</strong>
-            <p>讀取 Google Docs 內容，並把會議 live notes 同步寫回文件。</p>
-          </article>
-          <article>
-            <span>Prompt</span>
-            <strong>對話提示</strong>
-            <p>使用 What should I say? 與 Follow-up questions 推進討論。</p>
           </article>
         </div>
       </header>
@@ -45,7 +45,7 @@
       <section class="product-demo" aria-labelledby="demo-title">
         <div class="demo-title">
           <p class="section-label">Product Interface</p>
-          <h2 id="demo-title">正在會議中：逐字稿、AI 提示與 Google Docs 共編同時發生</h2>
+          <h2 id="demo-title">正在會議中：Google Docs 參照、逐字稿與 follow-up support 同時發生</h2>
         </div>
 
         <div class="visual-stage">
@@ -77,17 +77,17 @@
           <article>
             <span class="tag">2</span>
             <h3>會中逐字稿</h3>
-            <p>100 ms PCM16 audio frames 送到 FastAPI backend，以 speech window 產生 final transcript，支撐即時提示與筆記。</p>
+            <p>100 ms PCM16 audio frames 送到 FastAPI backend，以 speech window 產生 final transcript，提供文件參照與助理管線使用。</p>
           </article>
           <article>
             <span class="tag">3</span>
-            <h3>下一句 / 下一問</h3>
-            <p>按下 What should I say? 取得可直接說出口的回覆；按下 Follow-up questions 取得釐清需求、風險與責任的問題。</p>
+            <h3>Follow-up support</h3>
+            <p>在 Google Docs 脈絡之上，按下 Follow-up questions 產生下一問，按下 What should I say? 取得保守回覆。</p>
           </article>
           <article>
             <span class="tag">4</span>
             <h3>滾動式 notes/actions</h3>
-            <p>系統根據新增 final transcript 更新 Meeting Notes 與 Next Actions，會議進行中就留下可追蹤紀錄。</p>
+            <p>系統根據新增 final transcript 與文件脈絡更新 Meeting Notes 與 Next Actions，會議進行中就留下可追蹤紀錄。</p>
           </article>
           <article>
             <span class="tag">5</span>
@@ -96,8 +96,8 @@
           </article>
           <article>
             <span class="tag">6</span>
-            <h3>Google Docs 共編</h3>
-            <p>連接文件後讀取脈絡、更新 live notes，並只在使用者明確指令下執行可定位、單一步驟的文件操作。</p>
+            <h3>Google Docs 參照</h3>
+            <p>連接文件後讀取 title、sections 與 snippets，更新 live notes，並只在明確指令下執行單一步驟文件操作。</p>
           </article>
         </aside>
       </section>
@@ -105,21 +105,21 @@
       <section class="research-grid" aria-label="research poster sections">
         <article class="paper-panel motivation">
           <p class="section-label">Motivation</p>
-          <h2>會議中的主要壓力發生在「當下」</h2>
+          <h2>會議常卡在共同文件脈絡</h2>
           <p>
-            多數 AI notetaker 解決的是會後整理；但關鍵壓力通常發生在會議中。對方要求時程、追問風險、請你改文件時，使用者需要立刻理解、回應、追問，還要讓共同文件同步更新。
+            多數 AI notetaker 解決的是會後整理；但很多會議其實圍繞 Google Docs、需求文件或企劃書進行。關鍵壓力不是會後才忘記，而是會中就需要立刻參照文件、理解對話、追問限制，並讓共同文件同步更新。
           </p>
           <p>
-            emeet 的定位不是「另一個摘要工具」，而是把正在發生的對話轉成三種會中行動。
+            emeet 的定位不是「另一個摘要工具」，而是先把正在討論的 Google Docs 變成 AI grounding，再提供 follow-up support。
           </p>
           <ul>
-            <li><strong>即時：</strong>從最新逐字稿產生下一句回覆與下一個追問。</li>
+            <li><strong>參照：</strong>讀取 Google Docs 脈絡，讓 AI 知道大家正在討論哪份文件。</li>
+            <li><strong>跟進：</strong>從逐字稿與文件脈絡產生追問、回覆與下一步。</li>
             <li><strong>本地：</strong>音訊在 macOS 端擷取，模型與供應商可依隱私、速度與成本切換。</li>
-            <li><strong>協作：</strong>會議脈絡連到 Google Docs，live notes 與 action items 跟著討論更新。</li>
           </ul>
           <div class="takeaway">
             <h3>Core Claim</h3>
-            <p>AI 會議輔助的價值，不在會後替你回憶，而是在當下幫你把對話推進下一步。</p>
+            <p>AI 會議輔助的價值，不只在會後替你回憶，而是在當下參照共同文件並協助推進下一步。</p>
           </div>
         </article>
 
@@ -128,20 +128,20 @@
           <h2>低干擾、可控制、能落地</h2>
           <dl class="design-list">
             <div>
-              <dt>D1 · Realtime belongs to the current turn</dt>
-              <dd>回覆與追問要貼近最新幾句對話，不能等 30 秒摘要週期才出現。</dd>
+              <dt>D1 · Shared docs become grounding</dt>
+              <dd>Google Docs 不是匯出目的地，而是會議中追問、回覆與筆記的共同脈絡來源。</dd>
             </div>
             <div>
               <dt>D2 · Local-first by architecture</dt>
               <dd>麥克風與系統音訊先在本機分流；STT/LLM provider 抽象化，保留本機與私有端點選項。</dd>
             </div>
             <div>
-              <dt>D3 · Collaboration needs shared context</dt>
-              <dd>會議常圍繞文件進行，因此提示、筆記與 action items 必須能參考 Google Docs 脈絡。</dd>
+              <dt>D3 · Follow-up belongs to the current turn</dt>
+              <dd>追問與回覆要貼近最新幾句對話與文件脈絡，不能等 30 秒摘要週期才出現。</dd>
             </div>
             <div>
               <dt>D4 · Prompts should be conservative</dt>
-              <dd>AI 只提供可說出口的草稿與追問，不猜日期、owner、預算或未確認承諾。</dd>
+              <dd>AI 只使用提供的 transcript 與 Google Docs context，不猜日期、owner、預算或未確認承諾。</dd>
             </div>
             <div>
               <dt>D5 · Edits must be bounded</dt>
@@ -150,13 +150,13 @@
           </dl>
           <div class="takeaway">
             <h3>Design Outcome</h3>
-            <p>使用者不用離開會議節奏，就能取得回覆提示、追問方向、文件脈絡與可保存的會議紀錄。</p>
+            <p>使用者不用離開會議節奏，就能參照共同文件、取得追問方向，並留下可保存的會議紀錄。</p>
           </div>
         </article>
 
         <article class="paper-panel approach">
           <p class="section-label">Approach / System Architecture</p>
-          <h2>高頻音訊管線 + 低頻語意協作管線</h2>
+          <h2>高頻音訊管線 + Google Docs 脈絡管線</h2>
           <div class="architecture" aria-label="system architecture diagram">
             <div class="arch-node input">Mic<br><small>AVAudioEngine</small></div>
             <div class="arch-node input">System<br><small>ScreenCaptureKit</small></div>
@@ -171,14 +171,14 @@
             <div class="arch-node store">SQLite<br><small>records + export</small></div>
           </div>
           <p>
-            macOS app 負責擷取音訊、顯示逐字稿與管理會議工作台；backend 負責 speech-window segmentation、STT、LLM provider dispatch、Google Docs API 與 SQLite 儲存。前端接收 drafts / notes / actions 等結構化輸出，避免把模型自由文字直接塞進 UI。
+            macOS app 負責擷取音訊、顯示逐字稿與管理 Google Docs 連線；backend 負責 speech-window segmentation、STT、Google Docs snapshot、LLM provider dispatch 與 SQLite 儲存。Assistant request 同時帶入 final transcript 與文件 snippets，前端只接收 drafts / notes / actions 等結構化輸出。
           </p>
           <div class="timing-grid" aria-label="processing cadence">
             <div><span>Audio</span><strong>100 ms</strong><p>本機擷取後小封包送出</p></div>
             <div><span>STT</span><strong>speech window</strong><p>停頓後產生 final transcript</p></div>
-            <div><span>Prompt</span><strong>on demand</strong><p>需要回應時按鈕觸發</p></div>
-            <div><span>Notes</span><strong>30 sec</strong><p>用新增 final transcript 更新</p></div>
-            <div><span>Docs</span><strong>explicit command</strong><p>明確指令才導覽或改文件</p></div>
+            <div><span>Docs</span><strong>snapshot</strong><p>讀取共同文件作為 grounding</p></div>
+            <div><span>Support</span><strong>on demand</strong><p>追問與回覆由按鈕觸發</p></div>
+            <div><span>Notes</span><strong>30 sec</strong><p>用 transcript + docs context 更新</p></div>
           </div>
         </article>
       </section>
