@@ -27,4 +27,4 @@ if [[ -n "${MEETING_BACKEND_UV_EXTRA:-}" ]]; then
     done
 fi
 
-exec uv run "${UV_ARGS[@]}" uvicorn meeting_backend.main:app --reload --host "$HOST" --port "$PORT"
+exec uv run "${UV_ARGS[@]}" python -m uvicorn meeting_backend.main:app --reload --host "$HOST" --port "$PORT"
