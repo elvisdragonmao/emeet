@@ -1,18 +1,16 @@
 # 國立陽明交通大學百川學士學位學程 專題探索期末報告
 
-## emeet：Google Docs 即時參照與會議輔助系統
+## emeet：Google Docs 即時參照會議輔助系統
 
 ## 摘要
 
-emeet 是一個以 macOS 原生應用程式實作的即時會議輔助工具。本專題目前最重要的目標，是讓會議中正在討論的 Google Docs 成為 AI 可以即時 referencing 的共同脈絡：系統能讀取文件內容，將文件摘要與片段放入會議助理上下文，並把會議中產生的重點與下一步行動同步更新回文件中的 live notes 區塊。
+emeet 是一個以 macOS 原生應用程式實作的即時會議輔助工具。本專題的目標是讓會議中的使用者可以更加專注於討論與文件內容，而不需要同時處理會議軟體、Google Docs 與 AI 工具的多重介面。emeet 的核心概念是「會議副駕」，它在使用者的電腦上擷取會議音訊，將其轉換為逐字稿，並結合正在討論的 Google Docs 文件脈絡，提供即時的編輯輔助、追問、回覆建議、會議紀錄與下一步行動撰寫。
 
-在 Google Docs 文件脈絡之上，emeet 也提供會議中的 follow-up support。使用者在啟動會議後，系統會同時擷取麥克風與系統音訊，將音訊轉換為 16 kHz mono PCM16 格式，透過 WebSocket 傳送至後端進行語音分段與語音轉文字。逐字稿會依來源標示為 `Self`、`Other`，並可對系統音訊做初步的本機說話者分群。使用者可在會議中按下 `What should I say?` 取得保守、自然、可直接說出口的回覆建議；也可以按下 `Follow-up questions` 取得有助於釐清需求、風險、時程與責任分工的追問。系統另會每 30 秒根據新增逐字稿與文件脈絡更新會議紀錄與下一步行動，並支援匯出 Markdown 形式的會議紀錄。
+在 Google Docs 文件脈絡之上，emeet 提供會議中的 follow-up support。使用者在啟動會議後，系統會同時擷取麥克風與系統音訊，將音訊轉換為 16 kHz mono PCM16 格式，透過 WebSocket 傳送至後端進行語音分段與語音轉文字。逐字稿會依來源標示為 `Self`、`Other`，並可對系統音訊做初步的本機說話者分群。使用者可在會議中按下 `What should I say?` 取得保守、自然、可直接說出口的回覆建議；也可以按下 `Follow-up questions` 取得有助於釐清需求、風險、時程與責任分工的追問。系統另會每 30 秒根據新增逐字稿與文件脈絡更新會議紀錄與下一步行動，並支援匯出 Markdown 形式的會議紀錄。
 
-Google Docs 整合目前採取可控的 MVP 範圍。emeet 已支援連接指定 Google Docs 文件，讀取文件內容，將會議中產生的重點與行動項目同步更新至文件中的 `emeet Live Notes` 區塊，也能根據明確的語音指令規劃並執行單一步驟的文件編輯，例如替換文字、在指定標題下插入內容、改寫包含特定關鍵字的段落等。
+外部文件整合方面，emeet 已支援連接指定 Google Docs 文件，讀取文件內容，將會議中產生的重點與行動項目同步更新至文件中的 `emeet Live Notes` 區塊，也能根據明確的語音指令規劃並執行單一步驟的文件編輯，例如替換文字、在指定標題下插入內容、改寫包含特定關鍵字的段落等。
 
-整體而言，emeet 嘗試將會議輔助工具從「會後整理」推進到「會中協作」。目前系統已完成可展示的端到端原型，包含 Google Docs 即時 referencing、macOS 音訊擷取、後端語音轉文字、模型供應商抽象、會議 follow-up support、會議紀錄儲存與匯出。後續若要進一步走向穩定產品，仍需補強真正串流式逐字稿、語音活動偵測、說話者辨識、文件操作確認流程、隱私與同意介面，以及更完整的延遲與準確率測試。
-
----
+emeet 嘗試將會議輔助工具從「會後整理」推進到「會中協作」。目前系統已完成可展示的端到端原型，包含 Google Docs 即時 referencing、macOS 音訊擷取、後端語音轉文字、模型供應商抽象、會議 follow-up support、會議紀錄儲存與匯出。後續若要進一步走向穩定產品，仍需補強真正串流式逐字稿、語音活動偵測、說話者辨識、文件操作確認流程、隱私與同意介面，以及更完整的延遲與準確率測試。
 
 ## 一、專題動機與問題定義
 
@@ -24,7 +22,7 @@ Google Docs 整合目前採取可控的 MVP 範圍。emeet 已支援連接指定
 
 **能否建立一個私密、低干擾、可切換模型的即時會議副駕，讓使用者在會議中即時 reference Google Docs 文件脈絡，並在此基礎上取得可追問的問題、可說出口的回覆、會議紀錄、下一步行動，以及可套用到文件的保守編輯建議？**
 
-基於這個問題，emeet 的產品定位並不是完整的會議平台，也不是單純的 AI 會後筆記工具。它不管理行事曆、不取代 Zoom、Google Meet 或 Microsoft Teams，也不自動替使用者發言或發送訊息。它專注於一個明確的端到端流程：擷取音訊、產生逐字稿、將逐字稿與 Google Docs 文件脈絡結合、提供 follow-up support、更新會議紀錄，並在使用者明確指示下協助修改文件。
+基於這個問題，emeet 的產品定位並不是完整的會議平台，也不是單純的 AI 會後筆記工具。它不取代 Zoom、Google Meet 或 Microsoft Teams，也不自動替使用者發言或發送訊息。它專注於一個明確的端到端流程：擷取音訊、產生逐字稿、將逐字稿與外部文件脈絡結合、提供 follow-up support、更新會議紀錄，並在使用者明確指示下協助修改文件。
 
 本專題想解決的即時痛點可分為四類：
 
@@ -34,8 +32,6 @@ Google Docs 整合目前採取可控的 MVP 範圍。emeet 已支援連接指定
 4. **同步整理困難**：使用者需要一邊參與討論，一邊整理文件、會議紀錄與行動項目，容易中斷對話節奏。
 
 emeet 的設計就是圍繞這些問題展開：先讓共同文件成為會議中可即時引用的脈絡，再在這個脈絡之上提供追問、回覆、notes/actions 與文件更新支援。
-
----
 
 ## 二、相關工具比較與專題定位
 
@@ -56,7 +52,7 @@ AI 會議工具市場已經相當成熟。Otter.ai、Fireflies.ai、Fathom、Gra
 | Google Meet Gemini notes   | Meet 內建 Take notes for me，筆記可進 Google Docs    | Gemini notes 重點在 Meet 生態系；emeet 嘗試將同樣概念延伸為任意通話旁的即時副駕。                         |
 | Hedy / Cluely 類工具          | 會中即時 coaching、real-time suggestions           | emeet 除會中建議外，也加入文件讀取、文件編輯與本機模型供應商切換。                                          |
 
-由上述比較可見，emeet 的差異化重點不在於「能不能摘要」，而在於以下四點：
+由上述比較可見，emeet 的差異化重點不在於能不能做會議摘要，而在於以下四點：
 
 ### 1. Google Docs 即時 referencing
 
@@ -73,8 +69,6 @@ AI 會議工具市場已經相當成熟。Otter.ai、Fireflies.ai、Fathom、Gra
 ### 4. 模型與供應商可切換
 
 不同會議對速度、成本、準確率、語言能力與隱私需求不同。emeet 將語音轉文字與助理模型分層抽象，目前支援 `faster-whisper`、`mlx-whisper`、Ollama、OpenAI-compatible endpoint、Codex CLI、GitHub Copilot CLI 等路徑，方便依情境選擇不同模型。
-
----
 
 ## 三、專題目標與範圍
 
@@ -108,8 +102,6 @@ AI 會議工具市場已經相當成熟。Otter.ai、Fireflies.ai、Fathom、Gra
 * 不把目前的說話者分群宣稱為完整 speaker diarization。
 
 這些限制是刻意保留的設計邊界。因為會議輔助工具一旦牽涉自動承諾、自動發言或自動修改外部資料，就會有較高風險。因此 emeet 目前將 AI 定位為副駕，而不是代理人。
-
----
 
 ## 四、設計考量
 
@@ -192,8 +184,6 @@ Google Docs 整合雖然可以直接透過 API 修改文件，但文件修改具
 * `append_meeting_notes`
 
 這樣可以將風險控制在較明確、單一步驟、容易理解的文件操作內。未來若要處理更高風險的文件，例如合約、委託書或正式報告，仍需要加入人工確認、修改預覽與版本回復機制。
-
----
 
 ## 五、系統架構
 
@@ -351,8 +341,6 @@ emeet 使用 SQLite 儲存會議資料。主要資料表包括：
 
 目前儲存策略偏向 append-first。逐字稿事件與助理執行結果都會被記錄，使用者可以在 meeting history 中查看、重新命名、產生標題，或匯出 Markdown 紀錄。這樣的設計已足以支撐展示與基本使用，但還不是完整的長期 meeting memory 系統。若未來要支援跨會議查詢、語意搜尋與長期知識庫，仍需加入全文搜尋、embedding 或 RAG 架構。
 
----
-
 ## 六、實作內容
 
 ### 6.1 音訊擷取與轉換
@@ -483,8 +471,6 @@ Google Docs Live Notes 是本專題第一個產品展示目標。當 Google Docs
 
 目前這部分已能展示會議語音、文件脈絡與 API 寫入的整合，但還需要更完整的人工確認介面。對正式文件而言，使用者應該能在套用前看到修改前後差異，並明確按下確認。
 
----
-
 ## 七、專題歷程
 
 本專題的進行可分為四個階段。
@@ -513,8 +499,6 @@ Google Docs Live Notes 是本專題第一個產品展示目標。當 Google Docs
 
 同時，我也整理了 meeting history、Markdown export、模型供應商切換、測試與建置流程。最後，本專題形成一個可完整展示的端到端原型：會議中的 Google Docs 文件可以被即時 reference，macOS 音訊會轉成逐字稿，逐字稿與文件脈絡再進入會議助理、資料儲存與匯出流程。
 
----
-
 ## 八、目前成果與驗證
 
 目前已完成的成果包括：
@@ -532,53 +516,6 @@ Google Docs Live Notes 是本專題第一個產品展示目標。當 Google Docs
 11. 會議歷史、重新命名、延續與 Markdown 匯出。
 12. 助理模型供應商抽象。
 13. Google Docs 授權、連接、讀取、live notes 更新與有限度文件編輯。
-
-本次盤點時已執行後端測試：
-
-```bash
-cd apps/backend
-uv run pytest
-```
-
-測試結果為：
-
-```text
-71 passed in 0.32s
-```
-
-也執行 macOS 應用程式建置：
-
-```bash
-cd apps/macos/emeet
-swift build
-```
-
-結果為 build 成功。
-
-目前測試涵蓋範圍包括：
-
-* assistant prompts、schema 與 service。
-* audio helper。
-* config。
-* Google Docs service。
-* MLX Whisper provider。
-* protocol。
-* segmenter。
-* local speaker assignment。
-* storage。
-* transcription options。
-
-尚未完成的驗證包括：
-
-* Zoom、Google Meet、Microsoft Teams 等實際會議場景的系統音訊 benchmark。
-* 中文與中英混雜會議的 WER / CER。
-* speaker label accuracy。
-* button-to-suggestion latency。
-* notes faithfulness。
-* Google Docs voice edit 的端到端 UI 測試。
-* 1 到 2 小時長會議的記憶體、延遲與穩定性測試。
-
----
 
 ## 九、目前限制
 
@@ -636,8 +573,6 @@ swift build
 
 未來若要讓系統建立 Jira issue、寄 email、發 Slack 訊息、修改 Drive 檔案或操作其他外部工具，必須加入 user confirmation、audit log、dry-run preview，甚至 undo / rollback。MVP 階段不應自動執行這類高風險外部副作用。
 
----
-
 ## 十、後續工作
 
 ### 10.1 近期可完成方向
@@ -665,8 +600,6 @@ swift build
 4. 建立可審計的外部 action layer。
 5. 應用於高隱私與高紀錄需求場景，例如警察筆錄、法律諮詢、醫療諮詢、心理諮商與機密專案會議。
 
----
-
 ## 十一、專題反思
 
 這次專題最大的收穫，是我更清楚理解「做一個 AI 應用」和「把 AI 放進真實工作流」之間的差異。只要呼叫模型產生摘要，其實很快就能做出看起來有用的 demo；但要讓系統能在真實會議中穩定運作，就必須處理音訊擷取、延遲、分段、模型輸出格式、資料保存、文件 API、權限、隱私與錯誤恢復等細節。
@@ -677,8 +610,6 @@ swift build
 
 目前 emeet 還不是成熟產品，但已經證明一個端到端方向是可行的：會議音訊可以即時轉成逐字稿，Google Docs 可以成為會議中的共同參照脈絡，逐字稿與文件內容可以轉成當下有用的追問、回覆與 notes/actions，文件也可以在使用者明確指示下被安全地修改。接下來真正重要的工作，是把這個原型變得更穩、更快、更可驗證，也更尊重使用者對隱私與控制權的需求。
 
----
-
 ## 十二、結論
 
 emeet 的價值不在於再做一個會後摘要工具，而是在會議當下把 Google Docs 文件與即時逐字稿結合，讓共同文件成為 AI 可以 reference 的會議脈絡；在此之後，系統再提供追問問題、下一句話、會議筆記、行動項目與文件修改等 follow-up support。它目前已完成可展示的端到端 MVP，包含 Google Docs live notes 與語音驅動文件編輯、macOS 音訊擷取、WebSocket 語音轉文字、Whisper 類模型供應商、說話者標籤、助理模型抽象、滾動式會議紀錄、歷史紀錄與 Markdown 匯出。
@@ -686,8 +617,6 @@ emeet 的價值不在於再做一個會後摘要工具，而是在會議當下�
 不過，要讓 emeet 從 prototype 走向更可信的產品，接下來最重要的不是增加更多表面功能，而是提升基礎可靠性。包含真正串流式 partial transcript、更穩定的 VAD、更可靠的說話者標籤、可追溯的 evidence-grounded schema、完整的隱私與同意介面、文件操作確認流程，以及可重複執行的 benchmark。
 
 若這些基礎逐步補上，emeet 將能和一般 AI 會議工具拉開明確差異。它不是會議後的記錄員，而是會議進行中能參照共同文件、協助 follow-up、且保持使用者可控的私密 AI 副駕。
-
----
 
 ## 參考資料
 
