@@ -242,7 +242,7 @@ extension CaptureViewModel {
     }
 
     func averageLatency(_ values: [Int?]) -> Int? {
-        let concreteValues = values.compactMap(\.self)
+        let concreteValues = values.compactMap { $0 }
         guard !concreteValues.isEmpty else {
             return nil
         }
